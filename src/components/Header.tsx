@@ -1,16 +1,24 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Menu, X, Globe } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import logo from "@/assets/bizarri-logo.png";
 import logoWhite from "@/assets/bizarri-logo-white.png";
 
-const navItems = [
+// Shown in the desktop bar. Rules and Privacy live in the footer and the
+// full-screen menu — nine items in a row left nothing with any weight.
+const primaryNav = [
   { to: "/", key: "home" as const },
   { to: "/about", key: "about" as const },
   { to: "/facilities", key: "facilities" as const },
   { to: "/photos", key: "photos" as const },
   { to: "/booking", key: "booking" as const },
+  { to: "/almail-ai", key: "chatTitle" as const },
+  { to: "/contact", key: "contact" as const },
+];
+
+const menuNav = [
+  ...primaryNav.slice(0, 5),
   { to: "/news", key: "news" as const },
   { to: "/almail-ai", key: "chatTitle" as const },
   { to: "/rules", key: "rules" as const },
@@ -19,26 +27,79 @@ const navItems = [
 
 export function Header() {
   const [open, setOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const { tr, lang, setLang } = useI18n();
   const location = useLocation();
-  const isHome = location.pathname === "/";
+
+  // The homepage hero is a full-bleed dark image; the bar sits on top of it
+  // until the visitor scrolls, then picks up its solid background.
+  const overHero = location.pathname === "/" && !scrolled;
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 40);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  // Lock the page behind the full-screen menu, and let Escape close it.
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const linkTone = overHero
+    ? "text-white/75 hover:text-white"
+    : "text-foreground/70 hover:text-foreground";
 
   return (
     <>
-      <header className="fixed top-0 inset-x-0 z-50 backdrop-blur-md bg-background/80 border-b border-border/60">
-        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-3" onClick={() => setOpen(false)}>
-            <img src={logo} alt="Bizarri" className="h-9 dark:hidden" />
-            <img src={logoWhite} alt="Bizarri" className="h-9 hidden dark:block" />
+      <header
+        className={`fixed inset-x-0 top-0 z-50 transition-colors duration-500 ${
+          overHero
+            ? "bg-transparent border-b border-transparent"
+            : "border-b border-border/60 bg-background/80 backdrop-blur-md"
+        }`}
+      >
+        <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-6">
+          <Link
+            to="/"
+            className="flex items-center gap-3 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-current"
+            onClick={() => setOpen(false)}
+            aria-label={tr("brand")}
+          >
+            <img
+              src={overHero ? logoWhite : logo}
+              alt="Bizarri"
+              className="h-9 w-auto dark:hidden"
+              width={609}
+              height={183}
+            />
+            <img
+              src={logoWhite}
+              alt="Bizarri"
+              className="hidden h-9 w-auto dark:block"
+              width={609}
+              height={183}
+            />
           </Link>
 
-          <nav className="hidden lg:flex items-center gap-8">
-            {navItems.map((n) => (
+          <nav className="hidden items-center gap-6 lg:flex xl:gap-8">
+            {primaryNav.map((n) => (
               <Link
                 key={n.to}
                 to={n.to}
-                className="text-sm tracking-wide uppercase text-foreground/70 hover:text-foreground transition-colors"
-                activeProps={{ className: "text-foreground font-medium" }}
+                className={`whitespace-nowrap text-sm uppercase tracking-wide transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-current ${linkTone}`}
+                activeProps={{
+                  className: overHero ? "text-white font-medium" : "text-foreground font-medium",
+                }}
               >
                 {tr(n.key)}
               </Link>
@@ -48,48 +109,63 @@ export function Header() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setLang(lang === "en" ? "ar" : "en")}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-2 text-xs uppercase tracking-widest border border-border hover:bg-foreground hover:text-background transition-colors"
+              // Arabic is a first-class language here, not a setting buried in
+              // a menu — the toggle stays reachable at every breakpoint.
+              className={`flex items-center gap-1.5 border px-3 py-2 text-xs uppercase tracking-widest transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current ${
+                overHero
+                  ? "border-white/30 text-white hover:bg-white hover:text-black"
+                  : "border-border hover:bg-foreground hover:text-background"
+              }`}
+              lang={lang === "en" ? "ar" : "en"}
             >
-              <Globe className="w-3.5 h-3.5" />
+              <Globe className="h-3.5 w-3.5" />
               {tr("language")}
             </button>
             <button
               onClick={() => setOpen(true)}
-              className="p-2.5 hover:bg-secondary transition-colors"
-              aria-label="Open menu"
+              // Desktop already has the full nav — no duplicate entry point.
+              className={`p-2.5 transition-colors lg:hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current ${
+                overHero ? "text-white hover:bg-white/10" : "hover:bg-secondary"
+              }`}
+              aria-label={tr("menu")}
+              aria-expanded={open}
             >
-              <Menu className="w-5 h-5" />
+              <Menu className="h-5 w-5" />
             </button>
           </div>
         </div>
       </header>
 
       {open && (
-        <div className="fixed inset-0 z-[60] bg-black text-white animate-fade-in overflow-y-auto">
-          <div className="sticky top-0 bg-black max-w-7xl mx-auto px-6 h-20 flex items-center justify-between z-10">
+        <div
+          className="animate-fade-in fixed inset-0 z-[60] overflow-y-auto bg-black text-white"
+          role="dialog"
+          aria-modal="true"
+          aria-label={tr("menu")}
+        >
+          <div className="sticky top-0 z-10 mx-auto flex h-20 max-w-7xl items-center justify-between bg-black px-6">
             <img src={logoWhite} alt="Bizarri" className="h-9" />
-            <button onClick={() => setOpen(false)} className="p-2.5" aria-label="Close menu">
-              <X className="w-6 h-6" />
+            <button
+              onClick={() => setOpen(false)}
+              className="p-2.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+              aria-label={tr("close")}
+              autoFocus
+            >
+              <X className="h-6 w-6" />
             </button>
           </div>
-          <nav className="px-6 py-10 flex flex-col gap-5 items-center">
-            {navItems.map((n, i) => (
+          <nav className="flex flex-col items-center gap-5 px-6 py-10">
+            {menuNav.map((n, i) => (
               <Link
                 key={n.to}
                 to={n.to}
                 onClick={() => setOpen(false)}
-                className="font-display text-3xl md:text-5xl tracking-tight hover:opacity-60 transition-opacity animate-fade-up"
+                className="animate-fade-up font-display text-3xl tracking-tight transition-opacity hover:opacity-60 focus-visible:opacity-60 focus-visible:outline-none md:text-5xl"
                 style={{ animationDelay: `${i * 50}ms` }}
               >
                 {tr(n.key)}
               </Link>
             ))}
-            <button
-              onClick={() => setLang(lang === "en" ? "ar" : "en")}
-              className="mt-8 px-6 py-3 border border-white/30 text-sm tracking-widest uppercase hover:bg-white hover:text-black transition-colors"
-            >
-              {tr("language")}
-            </button>
           </nav>
         </div>
       )}
