@@ -29,6 +29,7 @@ export const t: Dict = {
     ar: "تجربة شاليه عصري خاص في الكويت، مصمم للراحة والخصوصية والتقنية والاسترخاء.",
   },
   menu: { en: "Menu", ar: "القائمة" },
+  close: { en: "Close", ar: "إغلاق" },
   language: { en: "العربية", ar: "English" },
   startBooking: { en: "Start your booking request", ar: "ابدأ طلب الحجز" },
   invalidSelection: {
@@ -78,6 +79,23 @@ export const t: Dict = {
     ar: "إنشاء الصور يعمل فقط مع طلبات تتعلق بشاليه بيزاري (الداخل، المسبح، الغرف، الهوية...).",
   },
   generating: { en: "Generating image…", ar: "جارٍ إنشاء الصورة…" },
+  introMember: { en: "A Member of Almail Group", ar: "عضو في مجموعة الميل" },
+  introTagline: { en: "A Private Luxury Experience", ar: "تجربة فاخرة خاصة" },
+  skip: { en: "Skip", ar: "تخطي" },
+  stayWithUs: { en: "Stay with us", ar: "أقم معنا" },
+  exploreChalet: { en: "Explore the chalet", ar: "استكشف الشاليه" },
+  viewGallery: { en: "View the gallery", ar: "شاهد المعرض" },
+  ourPackages: { en: "Our Packages", ar: "باقاتنا" },
+  packagesIntro: {
+    en: "Two fixed stays, each with the whole chalet to yourself.",
+    ar: "إقامتان محددتان، ولك الشاليه بالكامل في كلٍ منهما.",
+  },
+  nights3: { en: "3 nights", ar: "٣ ليالٍ" },
+  nights2: { en: "2 nights", ar: "ليلتان" },
+  theChalet: { en: "The Chalet", ar: "الشاليه" },
+  seeAllFacilities: { en: "See all facilities", ar: "عرض كل المرافق" },
+  seeAllPhotos: { en: "See all photos", ar: "عرض كل الصور" },
+  scroll: { en: "Scroll", ar: "مرر" },
 };
 
 interface Ctx {

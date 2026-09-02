@@ -35,7 +35,7 @@
 }
 
 :root {
-  --radius: 0.25rem;
+  --radius: 0rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.08 0 0);
   --card: oklch(0.99 0 0);
@@ -96,6 +96,9 @@
   [dir="rtl"] body {
     font-family: var(--font-arabic);
     letter-spacing: 0;
+    /* Arabic glyphs sit smaller in the em box than Latin; give them more
+       leading so body copy reads at parity with the English side. */
+    line-height: 1.9;
   }
   [dir="rtl"] h1,
   [dir="rtl"] h2,
@@ -192,4 +195,56 @@
   .animate-scale-in {
     animation: scale-in 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
   }
+}
+
+/* Honour the OS "reduce motion" setting: drop the entrance animations and
+   hover translation, keeping opacity changes only. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .animate-fade-up,
+  .animate-fade-in,
+  .animate-scale-in {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+  }
+  .hover-lift {
+    transition: none;
+  }
+  .hover-lift:hover {
+    transform: none;
+  }
+  .reveal {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
+@layer utilities {
+  /* Scroll-triggered entrance. Starts hidden, `.is-visible` is added by the
+     useReveal hook once the element enters the viewport. */
+  .reveal {
+    opacity: 0;
+    transform: translateY(28px);
+    transition:
+      opacity 0.9s cubic-bezier(0.16, 1, 0.3, 1),
+      transform 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .reveal.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Arabic is cursive: letter-spacing severs the joins between letterforms, and
+   uppercase has no meaning in the script. Neutralise both wherever a Tailwind
+   utility sets them. Deliberately unlayered — layered rules (including
+   @layer base) always lose to Tailwind's utilities layer, whatever their
+   specificity. */
+[dir="rtl"] [class*="tracking-"] {
+  letter-spacing: 0;
+}
+[dir="rtl"] [class*="uppercase"] {
+  text-transform: none;
 }

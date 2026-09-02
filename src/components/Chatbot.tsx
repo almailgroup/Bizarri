@@ -11,7 +11,7 @@ interface Msg {
 }
 
 export function Chatbot() {
-  const { lang, tr } = useI18n();
+  const { lang, tr, dir } = useI18n();
   const [open, setOpen] = useState(false);
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
@@ -69,15 +69,18 @@ export function Chatbot() {
     }
   };
 
-  const panelClass =
-    "fixed bottom-24 right-4 z-40 w-[88vw] max-w-[340px] h-[60vh] max-h-[460px] bg-background border border-border shadow-luxe flex flex-col animate-scale-in";
+  // Pin to the side the reader starts from: right in English, left in Arabic.
+  const side = dir === "rtl" ? "left-4" : "right-4";
+  const fabSide = dir === "rtl" ? "left-6" : "right-6";
+  const panelClass = `fixed bottom-24 ${side} z-40 w-[88vw] max-w-[340px] h-[60vh] max-h-[460px] bg-background border border-border shadow-luxe flex flex-col animate-scale-in`;
 
   return (
     <>
       <button
         onClick={() => setOpen((o) => !o)}
-        className="fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-black text-white shadow-luxe flex items-center justify-center hover:scale-105 transition-transform"
-        aria-label="Open chat"
+        className={`fixed bottom-6 ${fabSide} z-40 w-14 h-14 rounded-full bg-black text-white shadow-luxe flex items-center justify-center hover:scale-105 transition-transform focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white`}
+        aria-label={tr("chatTitle")}
+        aria-expanded={open}
       >
         {open ? <X className="w-5 h-5" /> : <MessageCircle className="w-5 h-5" />}
       </button>
@@ -144,7 +147,9 @@ export function Chatbot() {
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && send()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.nativeEvent.isComposing) send();
+              }}
               placeholder={tr("chatPlaceholder")}
               className="flex-1 px-3 py-2 text-sm bg-secondary outline-none"
               disabled={loading}
