@@ -96,6 +96,74 @@ export const t: Dict = {
   seeAllFacilities: { en: "See all facilities", ar: "عرض كل المرافق" },
   seeAllPhotos: { en: "See all photos", ar: "عرض كل الصور" },
   scroll: { en: "Scroll", ar: "مرر" },
+
+  // Offers
+  offers: { en: "Offers", ar: "العروض" },
+  offersIntro: {
+    en: "Fixed-rate packages for the whole chalet. Custom dates are priced per day.",
+    ar: "باقات بسعر ثابت للشاليه بالكامل. التواريخ المخصصة تُسعّر يومياً.",
+  },
+  fullWeekPkg: { en: "Full Week Package", ar: "باقة الأسبوع الكامل" },
+  days7: { en: "7 days", ar: "٧ أيام" },
+  days4: { en: "4 days", ar: "٤ أيام" },
+  days3: { en: "3 days", ar: "٣ أيام" },
+  perDayRates: { en: "Custom dates", ar: "تواريخ مخصصة" },
+  perDayIntro: {
+    en: "Any other stay of 3 days or more is priced per day.",
+    ar: "أي إقامة أخرى من ٣ أيام فأكثر تُسعّر يومياً.",
+  },
+  weekdayNight: { en: "Sun – Wed, per day", ar: "الأحد – الأربعاء، لليوم" },
+  weekendNight: { en: "Thu – Sat, per day", ar: "الخميس – السبت، لليوم" },
+
+  // Booking calendar
+  selectDates: { en: "Select your dates", ar: "اختر تواريخك" },
+  pickStart: { en: "Tap a day to start", ar: "اضغط على يوم للبدء" },
+  pickEnd: { en: "Now tap your check-out day", ar: "الآن اضغط على يوم المغادرة" },
+  minStay: {
+    en: "Minimum stay is 3 days.",
+    ar: "الحد الأدنى للإقامة ٣ أيام.",
+  },
+  rangeBlocked: {
+    en: "Those dates include a day that isn't available.",
+    ar: "التواريخ المحددة تتضمن يوماً غير متاح.",
+  },
+  total: { en: "Total", ar: "الإجمالي" },
+  checkIn: { en: "Check-in", ar: "الوصول" },
+  checkOut: { en: "Check-out", ar: "المغادرة" },
+  nightsLabel: { en: "Days", ar: "الأيام" },
+  unavailableLabel: { en: "Unavailable", ar: "غير متاح" },
+  selectedLabel: { en: "Selected", ar: "المحدد" },
+  clear: { en: "Clear", ar: "مسح" },
+  continueLabel: { en: "Continue", ar: "متابعة" },
+  customPricing: { en: "Custom pricing", ar: "تسعير مخصص" },
+  bookingRef: { en: "Booking reference", ar: "رقم الحجز" },
+
+  // Admin
+  availability: { en: "Availability & Pricing", ar: "التوفر والأسعار" },
+  adminCalHint: {
+    en: "Tap a day to block it or give it a custom price.",
+    ar: "اضغط على يوم لحظره أو تحديد سعر مخصص له.",
+  },
+  markUnavailable: { en: "Mark unavailable", ar: "تعيين كغير متاح" },
+  markAvailable: { en: "Mark available", ar: "تعيين كمتاح" },
+  customPrice: { en: "Custom price", ar: "سعر مخصص" },
+  save: { en: "Save", ar: "حفظ" },
+  reset: { en: "Reset", ar: "إعادة تعيين" },
+  packageRates: { en: "Package Rates", ar: "أسعار الباقات" },
+  requests: { en: "Booking Requests", ar: "طلبات الحجز" },
+  noRequests: { en: "No requests yet.", ar: "لا توجد طلبات." },
+  statusPending: { en: "Pending / Waiting list", ar: "قيد الانتظار" },
+  statusAccepted: { en: "Accepted", ar: "مقبول" },
+  statusRejected: { en: "Rejected", ar: "مرفوض" },
+  exportExcel: { en: "Export to Excel", ar: "تصدير إلى إكسل" },
+  deleteRequest: { en: "Delete request", ar: "حذف الطلب" },
+  deleteConfirmTitle: { en: "Delete this request?", ar: "حذف هذا الطلب؟" },
+  deleteConfirmBody: {
+    en: 'This cannot be undone. Type "Delete" to confirm.',
+    ar: 'لا يمكن التراجع عن هذا. اكتب "Delete" للتأكيد.',
+  },
+  cancel: { en: "Cancel", ar: "إلغاء" },
+  guestsLabel: { en: "Guests", ar: "الضيوف" },
 };
 
 interface Ctx {

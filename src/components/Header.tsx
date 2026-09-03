@@ -5,22 +5,19 @@ import { useI18n } from "@/lib/i18n";
 import logo from "@/assets/bizarri-logo.png";
 import logoWhite from "@/assets/bizarri-logo-white.png";
 
-// Shown in the desktop bar. Rules and Privacy live in the footer and the
-// full-screen menu — nine items in a row left nothing with any weight.
+// Home, About and Almail AI were removed from the site navigation; the logo
+// still links home and the assistant is reachable from the chat widget.
 const primaryNav = [
-  { to: "/", key: "home" as const },
-  { to: "/about", key: "about" as const },
   { to: "/facilities", key: "facilities" as const },
   { to: "/photos", key: "photos" as const },
+  { to: "/offers", key: "offers" as const },
   { to: "/booking", key: "booking" as const },
-  { to: "/almail-ai", key: "chatTitle" as const },
   { to: "/contact", key: "contact" as const },
 ];
 
 const menuNav = [
-  ...primaryNav.slice(0, 5),
+  ...primaryNav.slice(0, 4),
   { to: "/news", key: "news" as const },
-  { to: "/almail-ai", key: "chatTitle" as const },
   { to: "/rules", key: "rules" as const },
   { to: "/contact", key: "contact" as const },
 ];

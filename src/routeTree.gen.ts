@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as RulesRouteImport } from './routes/rules'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as PhotosRouteImport } from './routes/photos'
+import { Route as OffersRouteImport } from './routes/offers'
 import { Route as NewsRouteImport } from './routes/news'
 import { Route as FacilitiesRouteImport } from './routes/facilities'
 import { Route as ContactRouteImport } from './routes/contact'
@@ -34,6 +35,11 @@ const PrivacyRoute = PrivacyRouteImport.update({
 const PhotosRoute = PhotosRouteImport.update({
   id: '/photos',
   path: '/photos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OffersRoute = OffersRouteImport.update({
+  id: '/offers',
+  path: '/offers',
   getParentRoute: () => rootRouteImport,
 } as any)
 const NewsRoute = NewsRouteImport.update({
@@ -86,6 +92,7 @@ export interface FileRoutesByFullPath {
   '/contact': typeof ContactRoute
   '/facilities': typeof FacilitiesRoute
   '/news': typeof NewsRoute
+  '/offers': typeof OffersRoute
   '/photos': typeof PhotosRoute
   '/privacy': typeof PrivacyRoute
   '/rules': typeof RulesRoute
@@ -99,6 +106,7 @@ export interface FileRoutesByTo {
   '/contact': typeof ContactRoute
   '/facilities': typeof FacilitiesRoute
   '/news': typeof NewsRoute
+  '/offers': typeof OffersRoute
   '/photos': typeof PhotosRoute
   '/privacy': typeof PrivacyRoute
   '/rules': typeof RulesRoute
@@ -113,6 +121,7 @@ export interface FileRoutesById {
   '/contact': typeof ContactRoute
   '/facilities': typeof FacilitiesRoute
   '/news': typeof NewsRoute
+  '/offers': typeof OffersRoute
   '/photos': typeof PhotosRoute
   '/privacy': typeof PrivacyRoute
   '/rules': typeof RulesRoute
@@ -128,6 +137,7 @@ export interface FileRouteTypes {
     | '/contact'
     | '/facilities'
     | '/news'
+    | '/offers'
     | '/photos'
     | '/privacy'
     | '/rules'
@@ -141,6 +151,7 @@ export interface FileRouteTypes {
     | '/contact'
     | '/facilities'
     | '/news'
+    | '/offers'
     | '/photos'
     | '/privacy'
     | '/rules'
@@ -154,6 +165,7 @@ export interface FileRouteTypes {
     | '/contact'
     | '/facilities'
     | '/news'
+    | '/offers'
     | '/photos'
     | '/privacy'
     | '/rules'
@@ -168,6 +180,7 @@ export interface RootRouteChildren {
   ContactRoute: typeof ContactRoute
   FacilitiesRoute: typeof FacilitiesRoute
   NewsRoute: typeof NewsRoute
+  OffersRoute: typeof OffersRoute
   PhotosRoute: typeof PhotosRoute
   PrivacyRoute: typeof PrivacyRoute
   RulesRoute: typeof RulesRoute
@@ -194,6 +207,13 @@ declare module '@tanstack/react-router' {
       path: '/photos'
       fullPath: '/photos'
       preLoaderRoute: typeof PhotosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/offers': {
+      id: '/offers'
+      path: '/offers'
+      fullPath: '/offers'
+      preLoaderRoute: typeof OffersRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/news': {
@@ -264,6 +284,7 @@ const rootRouteChildren: RootRouteChildren = {
   ContactRoute: ContactRoute,
   FacilitiesRoute: FacilitiesRoute,
   NewsRoute: NewsRoute,
+  OffersRoute: OffersRoute,
   PhotosRoute: PhotosRoute,
   PrivacyRoute: PrivacyRoute,
   RulesRoute: RulesRoute,
