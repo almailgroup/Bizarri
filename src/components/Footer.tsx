@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Instagram, Phone, MapPin, Mail, Lock } from "lucide-react";
+import { Instagram, Phone, MapPin, Mail } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import logoWhite from "@/assets/bizarri-logo-white.png";
 
@@ -96,12 +96,6 @@ export function Footer() {
         <div className="max-w-7xl mx-auto px-6 py-8 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-white/50 tracking-widest uppercase">
           <p>© {new Date().getFullYear()} Bizarri Chalet</p>
           <div className="flex items-center gap-6">
-            <Link
-              to="/admin"
-              className="flex items-center gap-2 hover:text-white transition-colors"
-            >
-              <Lock className="w-3 h-3" /> {tr("adminAccess")}
-            </Link>
             <a
               href="https://almailgroup.com"
               target="_blank"

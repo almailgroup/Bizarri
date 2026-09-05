@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { PageShell } from "@/components/PageShell";
 import { useI18n } from "@/lib/i18n";
+import { usePageMeta } from "@/hooks/use-page-meta";
 
 export const Route = createFileRoute("/rules")({ component: Rules });
 
@@ -9,7 +10,13 @@ const RULES_EN = `Bizarri Chalet Rentals is committed to protecting the privacy 
 We do not share, sell, or disclose guest information to third parties unless required by law or essential to completing your reservation. By booking with Bizarri, guests agree to the responsible use of their information as described in this policy, ensuring a transparent and secure experience throughout their stay.`;
 
 function Rules() {
-  const { tr } = useI18n();
+  const { tr, lang } = useI18n();
+  usePageMeta(
+    lang === "en" ? "Rules & Regulations" : "القوانين والأحكام",
+    lang === "en"
+      ? "House rules for guests staying at Bizarri Chalet."
+      : "قوانين الإقامة لضيوف شاليه بيزاري.",
+  );
   return (
     <PageShell>
       <section className="max-w-3xl mx-auto px-6 py-24 md:py-32">

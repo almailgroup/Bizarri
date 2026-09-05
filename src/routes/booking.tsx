@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { PageShell } from "@/components/PageShell";
 import { useI18n } from "@/lib/i18n";
+import { usePageMeta } from "@/hooks/use-page-meta";
 import {
   DEFAULT_RATES,
   MIN_STAY_DAYS,
@@ -29,6 +30,12 @@ export const Route = createFileRoute("/booking")({ component: Booking });
 
 function Booking() {
   const { tr, lang } = useI18n();
+  usePageMeta(
+    lang === "en" ? "Booking" : "الحجز",
+    lang === "en"
+      ? "Check availability and request your stay at Bizarri Chalet."
+      : "تحقق من التوفر واطلب إقامتك في شاليه بيزاري.",
+  );
   const [stage, setStage] = useState<"intro" | "calendar" | "form" | "done">("intro");
   const [chalet, setChalet] = useState<"1" | "2">("1");
   const [confirmed, setConfirmed] = useState<BookingRecord | null>(null);
@@ -414,9 +421,32 @@ function BookingForm({
 }) {
   const { tr, lang } = useI18n();
   const [form, setForm] = useState({ name: "", phone: "", email: "", guests: "2", notes: "" });
+  const [errors, setErrors] = useState<Partial<Record<keyof typeof form, string>>>({});
+
+  // `required` alone accepted "a" as a name and "1" as a phone number.
+  const validate = () => {
+    const next: Partial<Record<keyof typeof form, string>> = {};
+    if (form.name.trim().length < 2) {
+      next.name = lang === "en" ? "Please enter your full name." : "يرجى إدخال الاسم الكامل.";
+    }
+    if (form.phone.replace(/\D/g, "").length < 8) {
+      next.phone = lang === "en" ? "Enter a valid phone number." : "يرجى إدخال رقم هاتف صحيح.";
+    }
+    if (!/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(form.email.trim())) {
+      next.email =
+        lang === "en" ? "Enter a valid email address." : "يرجى إدخال بريد إلكتروني صحيح.";
+    }
+    const guests = Number(form.guests);
+    if (!Number.isInteger(guests) || guests < 1 || guests > 20) {
+      next.guests = lang === "en" ? "Between 1 and 20 guests." : "بين ١ و ٢٠ ضيفاً.";
+    }
+    setErrors(next);
+    return Object.keys(next).length === 0;
+  };
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!validate()) return;
     const existing = loadBookings();
     const record: BookingRecord = {
       id: generateBookingId(existing),
@@ -453,7 +483,9 @@ function BookingForm({
   ];
 
   return (
-    <form onSubmit={submit} className="animate-fade-up space-y-6">
+    // noValidate: the browser's own bubbles fire first and are unlocalised,
+    // so validate() owns the messages instead.
+    <form onSubmit={submit} noValidate className="animate-fade-up space-y-6">
       <h1 className="mb-4 font-display text-4xl md:text-5xl">
         {lang === "en" ? "Guest Information" : "معلومات الضيف"}
       </h1>
@@ -484,11 +516,24 @@ function BookingForm({
             <input
               required
               type={f.type || "text"}
-              min={f.type === "number" ? 1 : undefined}
+              min={f.key === "guests" ? 1 : undefined}
+              max={f.key === "guests" ? 20 : undefined}
               value={form[f.key]}
-              onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
-              className="mt-2 w-full border border-border bg-secondary px-4 py-3 outline-none focus:border-foreground"
+              aria-invalid={!!errors[f.key]}
+              aria-describedby={errors[f.key] ? `err-${f.key}` : undefined}
+              onChange={(e) => {
+                setForm({ ...form, [f.key]: e.target.value });
+                if (errors[f.key]) setErrors({ ...errors, [f.key]: undefined });
+              }}
+              className={`mt-2 w-full border bg-secondary px-4 py-3 outline-none focus:border-foreground ${
+                errors[f.key] ? "border-destructive" : "border-border"
+              }`}
             />
+            {errors[f.key] && (
+              <span id={`err-${f.key}`} className="mt-1 block text-sm text-destructive">
+                {errors[f.key]}
+              </span>
+            )}
           </label>
         ))}
       </div>

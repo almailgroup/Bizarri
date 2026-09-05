@@ -1,12 +1,19 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { PageShell } from "@/components/PageShell";
 import { useI18n } from "@/lib/i18n";
-import { Phone, Mail, MapPin, Instagram, MessageCircle } from "lucide-react";
+import { usePageMeta } from "@/hooks/use-page-meta";
+import { Phone, Mail, MapPin, Instagram, MessageCircle, ArrowUpRight } from "lucide-react";
 
 export const Route = createFileRoute("/contact")({ component: Contact });
 
 function Contact() {
   const { tr, lang } = useI18n();
+  usePageMeta(
+    lang === "en" ? "Contact" : "تواصل معنا",
+    lang === "en"
+      ? "Reach Bizarri Chalet by phone, WhatsApp or email, or find us on the map."
+      : "تواصل مع شاليه بيزاري عبر الهاتف أو واتساب أو البريد الإلكتروني.",
+  );
   const items = [
     {
       icon: Phone,
@@ -67,14 +74,31 @@ function Contact() {
           ))}
         </div>
 
-        <div className="mt-16">
-          <iframe
-            src="https://www.google.com/maps?q=Kuwait&output=embed"
-            className="w-full h-[400px] grayscale border border-border"
-            loading="lazy"
-            title="Map"
-          />
-        </div>
+        {/* The old embed was ?q=Kuwait — a pin on the whole country, which told
+            a guest nothing. Until we have the chalet's coordinates this links
+            straight to the verified Maps entry instead of showing a wrong map. */}
+        <a
+          href="https://maps.app.goo.gl/5wjw1skfpqdnDhFa6"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="group mt-16 flex flex-wrap items-center justify-between gap-6 border border-border p-10 transition-colors hover:bg-black hover:text-white"
+        >
+          <span className="flex items-center gap-5">
+            <MapPin className="h-8 w-8 shrink-0" strokeWidth={1.25} />
+            <span>
+              <span className="block text-xs uppercase tracking-widest opacity-60">
+                {tr("location")}
+              </span>
+              <span className="mt-1 block font-display text-3xl">
+                {lang === "en" ? "Bizarri Chalet, Kuwait" : "شاليه بيزاري، الكويت"}
+              </span>
+            </span>
+          </span>
+          <span className="inline-flex items-center gap-2 text-sm uppercase tracking-widest">
+            {lang === "en" ? "Open in Maps" : "فتح في الخرائط"}
+            <ArrowUpRight className="h-4 w-4 transition-transform group-hover:translate-x-1 group-hover:-translate-y-1" />
+          </span>
+        </a>
       </section>
     </PageShell>
   );

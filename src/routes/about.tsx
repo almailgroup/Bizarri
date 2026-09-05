@@ -1,11 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { PageShell } from "@/components/PageShell";
 import { useI18n } from "@/lib/i18n";
+import { usePageMeta } from "@/hooks/use-page-meta";
 
 export const Route = createFileRoute("/about")({ component: About });
 
 function About() {
   const { tr, lang } = useI18n();
+  usePageMeta(
+    lang === "en" ? "About" : "عن الشاليه",
+    lang === "en"
+      ? "About Bizarri Chalet, a private retreat by Almail Group in Kuwait."
+      : "عن شاليه بيزاري، ملاذ خاص من مجموعة الميل في الكويت.",
+  );
   return (
     <PageShell>
       <section className="max-w-4xl mx-auto px-6 py-24 md:py-32">

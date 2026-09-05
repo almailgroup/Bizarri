@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { PageShell } from "@/components/PageShell";
 import { Reveal } from "@/components/Reveal";
 import { useI18n } from "@/lib/i18n";
+import { usePageMeta } from "@/hooks/use-page-meta";
 import logoWhite from "@/assets/bizarri-logo-white.png";
 import heroImg from "@/assets/room-3.jpg";
 import room1 from "@/assets/room-1.jpg";
@@ -22,6 +23,12 @@ const highlights = [
 
 function Home() {
   const { tr, lang } = useI18n();
+  usePageMeta(
+    "",
+    lang === "en"
+      ? "A premium private chalet experience in Kuwait by Almail Group — smart, private and designed for relaxation."
+      : "تجربة شاليه خاص فاخر في الكويت من مجموعة الميل — ذكي وخاص ومصمم للاسترخاء.",
+  );
 
   return (
     <PageShell>

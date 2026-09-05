@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { PageShell } from "@/components/PageShell";
 import { useI18n } from "@/lib/i18n";
+import { usePageMeta } from "@/hooks/use-page-meta";
 import { useEffect, useState } from "react";
 import { Newspaper } from "lucide-react";
 
@@ -17,6 +18,12 @@ export interface NewsItem {
 
 function News() {
   const { tr, lang } = useI18n();
+  usePageMeta(
+    lang === "en" ? "News" : "الأخبار",
+    lang === "en"
+      ? "Latest news and announcements from Bizarri Chalet."
+      : "آخر الأخبار والإعلانات من شاليه بيزاري.",
+  );
   const [items, setItems] = useState<NewsItem[]>([]);
 
   useEffect(() => {

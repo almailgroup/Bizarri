@@ -4,12 +4,19 @@ import { ArrowRight } from "lucide-react";
 import { PageShell } from "@/components/PageShell";
 import { Reveal } from "@/components/Reveal";
 import { useI18n } from "@/lib/i18n";
+import { usePageMeta } from "@/hooks/use-page-meta";
 import { DEFAULT_RATES, formatMoney, loadRates, type Rates } from "@/lib/booking";
 
 export const Route = createFileRoute("/offers")({ component: Offers });
 
 function Offers() {
   const { tr, lang } = useI18n();
+  usePageMeta(
+    lang === "en" ? "Offers" : "العروض",
+    lang === "en"
+      ? "Fixed-rate stay packages for Bizarri Chalet, plus per-day rates for custom dates."
+      : "باقات إقامة بسعر ثابت لشاليه بيزاري، وأسعار يومية للتواريخ المخصصة.",
+  );
   // Rates are admin-editable, so read them rather than hard-coding the figures.
   const [rates, setRates] = useState<Rates>(DEFAULT_RATES);
   useEffect(() => setRates(loadRates()), []);

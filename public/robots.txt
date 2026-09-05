@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /Bizarri/admin
+
+Sitemap: https://almailgroup.github.io/Bizarri/sitemap.xml

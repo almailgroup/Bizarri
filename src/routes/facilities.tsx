@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { PageShell } from "@/components/PageShell";
 import { useI18n } from "@/lib/i18n";
+import { usePageMeta } from "@/hooks/use-page-meta";
 import {
   Wifi,
   Tv,
@@ -22,6 +23,12 @@ export const Route = createFileRoute("/facilities")({ component: Facilities });
 
 function Facilities() {
   const { tr, lang } = useI18n();
+  usePageMeta(
+    lang === "en" ? "Facilities" : "المرافق",
+    lang === "en"
+      ? "Smart home automation, private pool, full kitchen, 5G internet and more."
+      : "منزل ذكي ومسبح خاص ومطبخ متكامل وإنترنت الجيل الخامس والمزيد.",
+  );
 
   const tech = [
     { icon: Wifi, en: "5G Internet", ar: "إنترنت الجيل الخامس" },
