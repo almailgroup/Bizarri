@@ -1,7 +1,14 @@
 project_id = "jxpxbpaaizjeoxbftwwd"
 
+# Public: the site calls these without a session. They are protected by the
+# origin allow-list and per-IP rate limits in _shared/http.ts, not by a JWT.
 [functions.chat]
 verify_jwt = false
 
 [functions.generate-image]
 verify_jwt = false
+
+# Invoked by a Database Webhook on bookings INSERT, which sends the service
+# role key, so this one stays behind JWT verification.
+[functions.notify-booking]
+verify_jwt = true

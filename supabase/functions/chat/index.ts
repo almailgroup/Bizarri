@@ -1,10 +1,5 @@
 // Almail Group AI Assistant — Bizarri Chalet
-// Powered by Lovable AI Gateway
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { corsHeaders, isOriginAllowed, json, parseMessages, rateLimit } from "../_shared/http.ts";
 
 const SYSTEM_PROMPT = `You are "Almail AI", the official AI assistant for Bizarri Chalet and Almail Group.
 
@@ -51,12 +46,29 @@ If a question is not covered by the verified facts above, do NOT invent details.
 Never claim to make, modify, or confirm bookings yourself. Direct booking actions to the /booking page or the contact details above.`;
 
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const origin = req.headers.get("origin");
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders(origin) });
+  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405, origin);
+
+  // The function is public (verify_jwt = false), so the origin check and the
+  // budget below are what keep it from being a free AI proxy for the internet.
+  if (!isOriginAllowed(origin)) return json({ error: "Origin not allowed" }, 403, origin);
+  if (!rateLimit(req, 20, 60_000)) {
+    return json({ error: "Too many requests. Please slow down." }, 429, origin);
+  }
 
   try {
-    const { messages } = await req.json();
+    const body = await req.json().catch(() => null);
+    if (!body || typeof body !== "object") return json({ error: "Invalid body" }, 400, origin);
+
+    const parsed = parseMessages((body as Record<string, unknown>).messages);
+    if ("error" in parsed) return json({ error: parsed.error }, 400, origin);
+
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    if (!LOVABLE_API_KEY) {
+      console.error("LOVABLE_API_KEY is not configured");
+      return json({ error: "Assistant unavailable" }, 503, origin);
+    }
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -66,50 +78,26 @@ Deno.serve(async (req: Request) => {
       },
       body: JSON.stringify({
         model: "google/gemini-2.5-flash",
-        messages: [{ role: "system", content: SYSTEM_PROMPT }, ...messages],
+        messages: [{ role: "system", content: SYSTEM_PROMPT }, ...parsed],
       }),
     });
 
     if (!response.ok) {
       if (response.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "Rate limit exceeded. Please try again shortly." }),
-          {
-            status: 429,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          },
-        );
+        return json({ error: "Rate limit exceeded. Please try again shortly." }, 429, origin);
       }
       if (response.status === 402) {
-        return new Response(
-          JSON.stringify({ error: "AI credits exhausted. Please contact the site owner." }),
-          {
-            status: 402,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          },
-        );
+        return json({ error: "AI credits exhausted. Please contact the site owner." }, 402, origin);
       }
-      const t = await response.text();
-      console.error("AI gateway error:", response.status, t);
-      return new Response(JSON.stringify({ error: "AI gateway error" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      console.error("AI gateway error:", response.status, await response.text());
+      return json({ error: "AI gateway error" }, 502, origin);
     }
 
     const data = await response.json();
-    const reply = data?.choices?.[0]?.message?.content ?? "";
-    return new Response(JSON.stringify({ reply }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return json({ reply: data?.choices?.[0]?.message?.content ?? "" }, 200, origin);
   } catch (e) {
+    // Never echo the raw error: it can carry upstream detail.
     console.error("chat error:", e);
-    return new Response(
-      JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      },
-    );
+    return json({ error: "Unexpected error" }, 500, origin);
   }
 });

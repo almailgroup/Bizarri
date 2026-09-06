@@ -1,24 +1,21 @@
 /**
- * Booking domain: storage, availability, and the pricing engine shared by the
- * guest calendar (/booking) and the admin panel (/admin).
+ * Booking domain: dates, money and the pricing rules.
  *
- * Persistence is localStorage, matching the rest of the app. Note this means
- * availability, custom prices and booking requests live in ONE browser: what an
- * admin blocks or prices here is not visible to guests on other devices. Moving
- * these three keys to Supabase tables is what makes the flow real in production.
+ * This is a deliberate mirror of the SQL in supabase/migrations — quote_stay(),
+ * match_package() and default_day_rate() — so the calendar can show a live
+ * total without a round-trip per click. It is NOT the authority: the server
+ * re-prices every request inside request_booking(), and its answer is what gets
+ * stored. If the two ever disagree, the database wins.
+ *
+ * All persistence lives in src/lib/api.ts.
  */
-
-export const STORAGE_KEYS = {
-  unavailable: "bizarri_unavailable",
-  bookings: "bizarri_bookings",
-  prices: "bizarri_prices",
-  rates: "bizarri_rates",
-} as const;
 
 /** Guests may not request a stay shorter than this. */
 export const MIN_STAY_DAYS = 3;
 
-export type BookingStatus = "pending" | "accepted" | "rejected";
+import type { PackageKey } from "@/integrations/supabase/types";
+
+export type { BookingStatus, PackageKey } from "@/integrations/supabase/types";
 
 export interface Rates {
   /** Sun–Sat, 7 days. */
@@ -40,24 +37,6 @@ export const DEFAULT_RATES: Rates = {
   dailyWeekday: 75,
   dailyWeekend: 120,
 };
-
-export interface BookingRecord {
-  id: string;
-  name: string;
-  phone: string;
-  email: string;
-  guests: string;
-  notes?: string;
-  chalet: string;
-  /** Inclusive ISO dates, yyyy-mm-dd. */
-  start: string;
-  end: string;
-  days: number;
-  total: number;
-  packageLabel: string | null;
-  status: BookingStatus;
-  createdAt: string;
-}
 
 /* ------------------------------------------------------------------ dates */
 
@@ -101,60 +80,7 @@ export function daysBetween(start: Date, end: Date): number {
   return eachDay(start, end).length;
 }
 
-/* ---------------------------------------------------------------- storage */
-
-function read<T>(key: string, fallback: T): T {
-  if (typeof window === "undefined") return fallback;
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function write(key: string, value: unknown): void {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    /* quota or private mode — the change simply doesn't persist */
-  }
-}
-
-export const loadUnavailable = () => read<string[]>(STORAGE_KEYS.unavailable, []);
-export const saveUnavailable = (v: string[]) => write(STORAGE_KEYS.unavailable, v);
-
-/** Custom per-day overrides, keyed by yyyy-mm-dd. */
-export const loadPrices = () => read<Record<string, number>>(STORAGE_KEYS.prices, {});
-export const savePrices = (v: Record<string, number>) => write(STORAGE_KEYS.prices, v);
-
-export const loadRates = (): Rates => ({ ...DEFAULT_RATES, ...read(STORAGE_KEYS.rates, {}) });
-export const saveRates = (v: Rates) => write(STORAGE_KEYS.rates, v);
-
-export const loadBookings = () => read<BookingRecord[]>(STORAGE_KEYS.bookings, []);
-export const saveBookings = (v: BookingRecord[]) => write(STORAGE_KEYS.bookings, v);
-
-/* ------------------------------------------------------------------ ids */
-
-/** Short, human-quotable reference, e.g. BZR-4K9QF2. */
-export function generateBookingId(existing: BookingRecord[] = []): string {
-  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no I/O/0/1
-  const taken = new Set(existing.map((b) => b.id));
-  for (let attempt = 0; attempt < 50; attempt++) {
-    let s = "";
-    const bytes = new Uint8Array(6);
-    crypto.getRandomValues(bytes);
-    for (const b of bytes) s += alphabet[b % alphabet.length];
-    const id = `BZR-${s}`;
-    if (!taken.has(id)) return id;
-  }
-  return `BZR-${Date.now().toString(36).toUpperCase()}`;
-}
-
 /* -------------------------------------------------------------- pricing */
-
-export type PackageKey = "fullWeek" | "weekend" | "weekday";
 
 export interface Quote {
   total: number;

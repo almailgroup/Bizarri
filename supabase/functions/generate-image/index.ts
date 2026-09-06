@@ -1,10 +1,12 @@
 // Almail AI — Bizarri Chalet image generation
 // Restricted to Bizarri Chalet / Almail Group related imagery only.
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import {
+  corsHeaders,
+  isOriginAllowed,
+  json as jsonWithOrigin,
+  rateLimit,
+} from "../_shared/http.ts";
 
 const REFUSAL_EN =
   "I can only generate images related to Bizarri Chalet or Almail Group (chalet interiors, pools, rooms, lifestyle, branding, etc.). Please refine your request.";
@@ -19,16 +21,37 @@ Not allowed (return NO): people portraits unrelated to chalet, other brands, gen
 
 Respond with ONLY one word: YES or NO.`;
 
+const MAX_PROMPT_CHARS = 600;
+
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const origin = req.headers.get("origin");
+  const json = (body: unknown, status = 200) => jsonWithOrigin(body, status, origin);
+
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders(origin) });
+  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
+
+  // Image generation is the most expensive call the site can make, so it gets
+  // a tighter budget than chat: 5 a minute per IP.
+  if (!isOriginAllowed(origin)) return json({ error: "Origin not allowed" }, 403);
+  if (!rateLimit(req, 5, 60_000)) {
+    return json({ error: "Too many image requests. Please wait a moment." }, 429);
+  }
 
   try {
-    const { prompt, lang } = await req.json();
-    if (!prompt || typeof prompt !== "string") {
+    const body = await req.json().catch(() => null);
+    if (!body || typeof body !== "object") return json({ error: "Invalid body" }, 400);
+    const { prompt, lang } = body as { prompt?: unknown; lang?: unknown };
+    if (typeof prompt !== "string" || prompt.trim().length === 0) {
       return json({ error: "Missing prompt" }, 400);
     }
+    if (prompt.length > MAX_PROMPT_CHARS) {
+      return json({ error: `Prompt must be under ${MAX_PROMPT_CHARS} characters` }, 400);
+    }
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    if (!LOVABLE_API_KEY) {
+      console.error("LOVABLE_API_KEY is not configured");
+      return json({ error: "Image generation unavailable" }, 503);
+    }
     const refusal = lang === "ar" ? REFUSAL_AR : REFUSAL_EN;
 
     // 1) Classify
@@ -49,7 +72,7 @@ Deno.serve(async (req: Request) => {
       if (classifyRes.status === 429)
         return json({ error: "Rate limit exceeded. Try again shortly." }, 429);
       if (classifyRes.status === 402) return json({ error: "AI credits exhausted." }, 402);
-      return json({ error: "Classifier error" }, 500);
+      return json({ error: "Classifier error" }, 502);
     }
     const classifyData = await classifyRes.json();
     const verdict = (classifyData?.choices?.[0]?.message?.content ?? "").trim().toUpperCase();
@@ -74,21 +97,15 @@ Deno.serve(async (req: Request) => {
       if (imgRes.status === 429)
         return json({ error: "Rate limit exceeded. Try again shortly." }, 429);
       if (imgRes.status === 402) return json({ error: "AI credits exhausted." }, 402);
-      return json({ error: "Image generation error" }, 500);
+      return json({ error: "Image generation error" }, 502);
     }
     const imgData = await imgRes.json();
     const url: string | undefined = imgData?.choices?.[0]?.message?.images?.[0]?.image_url?.url;
     if (!url) return json({ error: "No image returned" }, 500);
     return json({ imageUrl: url });
   } catch (e) {
+    // Never echo the raw error: it can carry upstream detail.
     console.error("generate-image error", e);
-    return json({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
+    return json({ error: "Unexpected error" }, 500);
   }
 });
-
-function json(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-}

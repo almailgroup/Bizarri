@@ -1,20 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { PageShell } from "@/components/PageShell";
 import { useI18n } from "@/lib/i18n";
+import { usePublishedNews } from "@/lib/api";
 import { usePageMeta } from "@/hooks/use-page-meta";
-import { useEffect, useState } from "react";
+
 import { Newspaper } from "lucide-react";
 
 export const Route = createFileRoute("/news")({ component: News });
-
-export interface NewsItem {
-  id: string;
-  title_en: string;
-  title_ar: string;
-  body_en: string;
-  body_ar: string;
-  date: string; // ISO
-}
 
 function News() {
   const { tr, lang } = useI18n();
@@ -24,18 +16,8 @@ function News() {
       ? "Latest news and announcements from Bizarri Chalet."
       : "آخر الأخبار والإعلانات من شاليه بيزاري.",
   );
-  const [items, setItems] = useState<NewsItem[]>([]);
-
-  useEffect(() => {
-    try {
-      const stored = JSON.parse(localStorage.getItem("bizarri_news") || "[]");
-      setItems(stored);
-    } catch {
-      /* ignore malformed localStorage */
-    }
-  }, []);
-
-  const sorted = [...items].sort((a, b) => (a.date < b.date ? 1 : -1));
+  const { data: items } = usePublishedNews();
+  const sorted = items ?? [];
 
   return (
     <PageShell>
@@ -56,11 +38,14 @@ function News() {
           {sorted.map((it) => (
             <article key={it.id} className="border border-border p-8 hover-lift animate-fade-up">
               <p className="text-xs tracking-widest uppercase text-muted-foreground mb-3">
-                {new Date(it.date).toLocaleDateString(lang === "ar" ? "ar-EG" : "en-US", {
-                  day: "numeric",
-                  month: "long",
-                  year: "numeric",
-                })}
+                {new Date(it.published_at ?? it.created_at).toLocaleDateString(
+                  lang === "ar" ? "ar-EG" : "en-US",
+                  {
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                  },
+                )}
               </p>
               <h2 className="font-display text-3xl md:text-4xl mb-4">
                 {lang === "ar" ? it.title_ar || it.title_en : it.title_en || it.title_ar}

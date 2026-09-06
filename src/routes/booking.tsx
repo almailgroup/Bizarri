@@ -1,30 +1,21 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { PageShell } from "@/components/PageShell";
 import { useI18n } from "@/lib/i18n";
 import { usePageMeta } from "@/hooks/use-page-meta";
 import {
-  DEFAULT_RATES,
   MIN_STAY_DAYS,
   daysBetween,
+  eachDay,
   fmtDate,
   formatMoney,
-  generateBookingId,
-  isBlocked,
-  loadBookings,
-  loadPrices,
-  loadRates,
-  loadUnavailable,
   quote,
-  rangeIsFree,
-  saveBookings,
   startOfMonth,
   startOfToday,
-  type Availability,
-  type BookingRecord,
-  type Rates,
 } from "@/lib/booking";
+import { useAvailability, useChalets, useRates, useRequestBooking } from "@/lib/api";
+import type { BookingRow } from "@/integrations/supabase/types";
 
 export const Route = createFileRoute("/booking")({ component: Booking });
 
@@ -36,9 +27,10 @@ function Booking() {
       ? "Check availability and request your stay at Bizarri Chalet."
       : "تحقق من التوفر واطلب إقامتك في شاليه بيزاري.",
   );
-  const [stage, setStage] = useState<"intro" | "calendar" | "form" | "done">("intro");
-  const [chalet, setChalet] = useState<"1" | "2">("1");
-  const [confirmed, setConfirmed] = useState<BookingRecord | null>(null);
+
+  const [stage, setStage] = useState<"intro" | "calendar" | "done">("intro");
+  const [chaletId, setChaletId] = useState(1);
+  const [confirmed, setConfirmed] = useState<BookingRow | null>(null);
 
   return (
     <PageShell>
@@ -48,12 +40,16 @@ function Booking() {
         </p>
 
         {stage === "intro" && (
-          <Intro chalet={chalet} setChalet={setChalet} onNext={() => setStage("calendar")} />
+          <Intro
+            chaletId={chaletId}
+            setChaletId={setChaletId}
+            onNext={() => setStage("calendar")}
+          />
         )}
 
         {stage === "calendar" && (
           <Calendar
-            chalet={chalet}
+            chaletId={chaletId}
             onDone={(b) => {
               setConfirmed(b);
               setStage("done");
@@ -71,12 +67,16 @@ function Booking() {
               {tr("bookingRef")}
             </p>
             <p className="mt-2 font-mono text-2xl" dir="ltr">
-              {confirmed.id}
+              {confirmed.ref}
+            </p>
+            <p className="mt-6 text-muted-foreground">
+              {fmtDate(new Date(confirmed.start_date))} → {fmtDate(new Date(confirmed.end_date))} ·{" "}
+              {formatMoney(Number(confirmed.total), lang)}
             </p>
             <p className="mt-8 text-muted-foreground">
               {lang === "en"
-                ? "We will contact you shortly to confirm."
-                : "سوف نتواصل معكم قريباً للتأكيد."}
+                ? "Keep this reference. We will contact you shortly to confirm."
+                : "احتفظ بهذا الرقم. سوف نتواصل معكم قريباً للتأكيد."}
             </p>
           </div>
         )}
@@ -86,15 +86,17 @@ function Booking() {
 }
 
 function Intro({
-  chalet,
-  setChalet,
+  chaletId,
+  setChaletId,
   onNext,
 }: {
-  chalet: "1" | "2";
-  setChalet: (c: "1" | "2") => void;
+  chaletId: number;
+  setChaletId: (id: number) => void;
   onNext: () => void;
 }) {
   const { tr, lang } = useI18n();
+  const { data: chalets } = useChalets();
+
   return (
     <div className="animate-fade-up">
       <h1 className="mb-8 font-display text-5xl md:text-6xl">{tr("startBooking")}</h1>
@@ -109,21 +111,19 @@ function Intro({
           {tr("pickChalet")}
         </p>
         <div className="grid gap-4 sm:grid-cols-2">
-          {(["1", "2"] as const).map((n) => (
+          {(chalets ?? []).map((c) => (
             <button
-              key={n}
-              onClick={() => setChalet(n)}
-              aria-pressed={chalet === n}
+              key={c.id}
+              onClick={() => setChaletId(c.id)}
+              aria-pressed={chaletId === c.id}
               className={`border p-6 text-start transition-colors ${
-                chalet === n
+                chaletId === c.id
                   ? "border-foreground bg-foreground text-background"
                   : "border-border hover:border-foreground/50"
               }`}
             >
-              <p className="text-xs uppercase tracking-widest opacity-70">Chalet {n}</p>
-              <p className="mt-2 font-display text-2xl">
-                {n === "1" ? tr("bizarri1") : tr("bizarri2")}
-              </p>
+              <p className="text-xs uppercase tracking-widest opacity-70">Chalet {c.id}</p>
+              <p className="mt-2 font-display text-2xl">{lang === "en" ? c.name_en : c.name_ar}</p>
             </button>
           ))}
         </div>
@@ -139,7 +139,7 @@ function Intro({
   );
 }
 
-function Calendar({ chalet, onDone }: { chalet: "1" | "2"; onDone: (b: BookingRecord) => void }) {
+function Calendar({ chaletId, onDone }: { chaletId: number; onDone: (b: BookingRow) => void }) {
   const { tr, lang } = useI18n();
   const today = useMemo(startOfToday, []);
   const thisMonth = useMemo(() => startOfMonth(today), [today]);
@@ -150,22 +150,34 @@ function Calendar({ chalet, onDone }: { chalet: "1" | "2"; onDone: (b: BookingRe
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
 
-  const [unavailable, setUnavailable] = useState<string[]>([]);
-  const [prices, setPrices] = useState<Record<string, number>>({});
-  const [rates, setRates] = useState<Rates>(DEFAULT_RATES);
+  // A year of availability in one request, so paging months is instant and the
+  // blocked set always comes from the server rather than the browser.
+  const windowEnd = useMemo(() => new Date(today.getFullYear() + 1, today.getMonth(), 0), [today]);
+  const {
+    data: calendar,
+    isLoading,
+    error: loadError,
+  } = useAvailability(chaletId, thisMonth, windowEnd);
+  const { data: rates } = useRates();
 
-  useEffect(() => {
-    setUnavailable(loadUnavailable());
-    setPrices(loadPrices());
-    setRates(loadRates());
-  }, []);
+  const byDay = useMemo(() => {
+    const map = new Map<string, { blocked: boolean; price: number; custom: boolean }>();
+    for (const d of calendar ?? []) {
+      map.set(d.day, { blocked: d.blocked, price: Number(d.price), custom: d.custom });
+    }
+    return map;
+  }, [calendar]);
 
-  const availability: Availability = useMemo(
-    () => ({ unavailable: new Set(unavailable), today }),
-    [unavailable, today],
-  );
+  // Days outside the fetched window count as unavailable rather than
+  // optimistically bookable.
+  const dayBlocked = (d: Date) => byDay.get(fmtDate(d))?.blocked ?? true;
 
-  // Past months are not reachable: the back control stops at the current month.
+  const customPrices = useMemo(() => {
+    const out: Record<string, number> = {};
+    for (const [iso, v] of byDay) if (v.custom) out[iso] = v.price;
+    return out;
+  }, [byDay]);
+
   const atFirstMonth = month.getTime() <= thisMonth.getTime();
 
   const cells = useMemo(() => {
@@ -178,18 +190,19 @@ function Calendar({ chalet, onDone }: { chalet: "1" | "2"; onDone: (b: BookingRe
     return arr;
   }, [month]);
 
-  const current = start && end ? quote(start, end, prices, rates) : null;
+  // Shown live while choosing; request_booking() re-derives it server-side and
+  // its answer is what is stored.
+  const current = start && end && rates ? quote(start, end, customPrices, rates) : null;
   const tooShort = current !== null && current.days < MIN_STAY_DAYS;
 
   const selectDay = (d: Date) => {
     setError("");
-    // First click, or restarting: begin a new range.
     if (!start || end || d < start) {
       setStart(d);
       setEnd(null);
       return;
     }
-    if (!rangeIsFree(start, d, availability)) {
+    if (eachDay(start, d).some(dayBlocked)) {
       setError(tr("rangeBlocked"));
       return;
     }
@@ -213,11 +226,10 @@ function Calendar({ chalet, onDone }: { chalet: "1" | "2"; onDone: (b: BookingRe
   if (showForm && start && end && current) {
     return (
       <BookingForm
-        chalet={chalet}
+        chaletId={chaletId}
         start={start}
         end={end}
         total={current.total}
-        packageLabel={current.packageKey}
         onBack={() => setShowForm(false)}
         onDone={onDone}
       />
@@ -228,11 +240,23 @@ function Calendar({ chalet, onDone }: { chalet: "1" | "2"; onDone: (b: BookingRe
     <div className="animate-fade-up">
       <h1 className="mb-2 font-display text-4xl md:text-5xl">{tr("selectDates")}</h1>
       <p className="mb-6 text-sm text-muted-foreground">
-        {chalet === "1" ? tr("bizarri1") : tr("bizarri2")} ·{" "}
+        {chaletId === 1 ? tr("bizarri1") : tr("bizarri2")} ·{" "}
         {!start || end ? tr("pickStart") : tr("pickEnd")}
       </p>
 
-      <div className="border border-border p-6 md:p-8">
+      {loadError && (
+        <p className="mb-4 border border-destructive p-4 text-sm text-destructive">
+          {(loadError as Error).message}
+        </p>
+      )}
+
+      <div className="relative border border-border p-6 md:p-8">
+        {isLoading && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/70 text-sm uppercase tracking-widest text-muted-foreground">
+            {lang === "en" ? "Loading availability…" : "جارٍ تحميل التوفر…"}
+          </div>
+        )}
+
         <div className="mb-6 flex items-center justify-between">
           <button
             onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}
@@ -263,11 +287,11 @@ function Calendar({ chalet, onDone }: { chalet: "1" | "2"; onDone: (b: BookingRe
         <div className="grid grid-cols-7 gap-1">
           {cells.map((d, i) => {
             if (!d) return <div key={`pad-${i}`} />;
-            const blocked = isBlocked(d, availability);
             const iso = fmtDate(d);
+            const blocked = dayBlocked(d);
             const selected = isEdge(d);
             const within = inRange(d);
-            const priced = prices[iso] !== undefined;
+            const priced = byDay.get(iso)?.custom === true;
             const dayLabel = d.toLocaleDateString(lang === "ar" ? "ar-EG" : "en-US", {
               weekday: "long",
               day: "numeric",
@@ -281,9 +305,6 @@ function Calendar({ chalet, onDone }: { chalet: "1" | "2"; onDone: (b: BookingRe
                 onClick={() => selectDay(d)}
                 aria-label={`${dayLabel}${blocked ? ` — ${tr("unavailableLabel")}` : ""}`}
                 aria-pressed={!!selected}
-                // One branch only: emitting hover:bg-secondary alongside
-                // hover:bg-black let the grey win the cascade, so hovering a
-                // selected day made it look deselected.
                 className={`relative flex aspect-square flex-col items-center justify-center text-sm transition-colors ${
                   blocked
                     ? "cursor-not-allowed text-muted-foreground/40 line-through"
@@ -325,7 +346,6 @@ function Calendar({ chalet, onDone }: { chalet: "1" | "2"; onDone: (b: BookingRe
         </div>
       </div>
 
-      {/* Live summary: updates on every change to the selection. */}
       <div className="mt-6 grid gap-3 sm:grid-cols-3">
         <div className="border border-border p-4">
           <p className="text-xs uppercase tracking-widest text-muted-foreground">{tr("checkIn")}</p>
@@ -342,7 +362,9 @@ function Calendar({ chalet, onDone }: { chalet: "1" | "2"; onDone: (b: BookingRe
           </p>
         </div>
         <div
-          className={`border p-4 ${tooShort ? "border-destructive" : "border-foreground bg-foreground text-background"}`}
+          className={`border p-4 ${
+            tooShort ? "border-destructive" : "border-foreground bg-foreground text-background"
+          }`}
         >
           <p className="text-xs uppercase tracking-widest opacity-70">
             {tr("total")}
@@ -403,27 +425,25 @@ function Calendar({ chalet, onDone }: { chalet: "1" | "2"; onDone: (b: BookingRe
 }
 
 function BookingForm({
-  chalet,
+  chaletId,
   start,
   end,
   total,
-  packageLabel,
   onBack,
   onDone,
 }: {
-  chalet: "1" | "2";
+  chaletId: number;
   start: Date;
   end: Date;
   total: number;
-  packageLabel: string | null;
   onBack: () => void;
-  onDone: (b: BookingRecord) => void;
+  onDone: (b: BookingRow) => void;
 }) {
   const { tr, lang } = useI18n();
+  const request = useRequestBooking();
   const [form, setForm] = useState({ name: "", phone: "", email: "", guests: "2", notes: "" });
   const [errors, setErrors] = useState<Partial<Record<keyof typeof form, string>>>({});
 
-  // `required` alone accepted "a" as a name and "1" as a phone number.
   const validate = () => {
     const next: Partial<Record<keyof typeof form, string>> = {};
     if (form.name.trim().length < 2) {
@@ -444,35 +464,20 @@ function BookingForm({
     return Object.keys(next).length === 0;
   };
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
-    const existing = loadBookings();
-    const record: BookingRecord = {
-      id: generateBookingId(existing),
-      ...form,
-      chalet: `Bizarri Chalet ${chalet}`,
-      start: fmtDate(start),
-      end: fmtDate(end),
-      days: daysBetween(start, end),
-      total,
-      packageLabel,
-      status: "pending",
-      createdAt: new Date().toISOString(),
-    };
-    saveBookings([...existing, record]);
-
-    const subject = encodeURIComponent(`Booking ${record.id} — ${record.chalet}`);
-    const body = encodeURIComponent(
-      `Booking Request ${record.id}\n\n` +
-        `Chalet: ${record.chalet}\n` +
-        `Dates: ${record.start} → ${record.end} (${record.days} days)\n` +
-        `Total: KD ${record.total}\n\n` +
-        `Name: ${record.name}\nPhone: ${record.phone}\nEmail: ${record.email}\n` +
-        `Guests: ${record.guests}\nNotes: ${record.notes}\n`,
-    );
-    window.location.href = `mailto:mansouralmail@gmail.com,sales@bizarri.com?subject=${subject}&body=${body}`;
-    onDone(record);
+    const booking = await request.mutateAsync({
+      chaletId,
+      start,
+      end,
+      name: form.name,
+      phone: form.phone,
+      email: form.email,
+      guests: Number(form.guests),
+      notes: form.notes,
+    });
+    onDone(booking);
   };
 
   const fields: { key: keyof typeof form; label: string; type?: string }[] = [
@@ -493,7 +498,7 @@ function BookingForm({
       <div className="space-y-1 border border-border bg-secondary p-4 text-sm">
         <p>
           <span className="text-muted-foreground">{tr("pickChalet")}: </span>
-          <span className="font-medium">Bizarri Chalet {chalet}</span>
+          <span className="font-medium">Bizarri Chalet {chaletId}</span>
         </p>
         <p>
           <span className="text-muted-foreground">{tr("selectedDates")}: </span>
@@ -550,12 +555,20 @@ function BookingForm({
         />
       </label>
 
+      {/* Server-side rejections (dates taken since you picked them, rate limit) */}
+      {request.isError && (
+        <p className="border border-destructive p-4 text-sm text-destructive">
+          {(request.error as Error).message}
+        </p>
+      )}
+
       <div className="flex flex-wrap gap-3">
         <button
           type="submit"
-          className="bg-black px-10 py-4 text-sm uppercase tracking-widest text-white hover:opacity-90"
+          disabled={request.isPending}
+          className="bg-black px-10 py-4 text-sm uppercase tracking-widest text-white hover:opacity-90 disabled:opacity-50"
         >
-          {tr("submit")}
+          {request.isPending ? (lang === "en" ? "Sending…" : "جارٍ الإرسال…") : tr("submit")}
         </button>
         <button
           type="button"

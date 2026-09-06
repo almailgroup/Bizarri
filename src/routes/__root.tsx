@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Outlet, Link, createRootRouteWithContext, useRouter } from "@tanstack/react-router";
 
 import { I18nProvider, useI18n } from "@/lib/i18n";
+import { AuthProvider } from "@/lib/auth";
 import { PageShell } from "@/components/PageShell";
 import { IntroLoader } from "@/components/IntroLoader";
 
@@ -87,10 +88,12 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   return (
     <QueryClientProvider client={queryClient}>
-      <I18nProvider>
-        <IntroLoader />
-        <Outlet />
-      </I18nProvider>
+      <AuthProvider>
+        <I18nProvider>
+          <IntroLoader />
+          <Outlet />
+        </I18nProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

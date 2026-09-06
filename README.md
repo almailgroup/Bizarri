@@ -16,7 +16,7 @@ It ships as a fully static single-page app and is deployed to **GitHub Pages**.
 | Framework   | React 19 + TanStack Router (file-based routing)    |
 | Build tool  | Vite 7                                             |
 | Styling     | Tailwind CSS v4 + shadcn/ui (Radix) components     |
-| Data / auth | Supabase (browser client, public anon key)         |
+| Data / auth | Supabase Postgres + Auth, with RLS on every table  |
 | AI features | Supabase Edge Functions (`chat`, `generate-image`) |
 | Hosting     | GitHub Pages (static)                              |
 
@@ -34,8 +34,12 @@ bun run lint     # eslint
 
 Supabase credentials live in `.env` (`VITE_SUPABASE_*`). These are the **public**
 publishable/anon keys and are safe to commit — data access is protected by
-Supabase Row Level Security. The Edge Functions in `supabase/functions/` are
-deployed separately via the Supabase CLI and are not part of the static build.
+Supabase Row Level Security.
+
+The backend (schema, RLS, booking logic, Edge Functions) lives in
+[`supabase/`](supabase/README.md), which documents the design and how to deploy
+it. **The booking and admin pages need those migrations applied to work**;
+`supabase/tests/run.sh` exercises them against a throwaway Postgres.
 
 ## Deployment (GitHub Pages)
 
