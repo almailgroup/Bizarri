@@ -164,6 +164,20 @@ export const t: Dict = {
   },
   cancel: { en: "Cancel", ar: "إلغاء" },
   guestsLabel: { en: "Guests", ar: "الضيوف" },
+  horizonNote: {
+    en: "Booking opens 12 months ahead. For later dates, please contact us.",
+    ar: "الحجز متاح حتى ١٢ شهراً مقدماً. للتواريخ الأبعد، يرجى التواصل معنا.",
+  },
+  checkBooking: { en: "Check an existing request", ar: "تتبع طلب حجز" },
+  checkBookingHint: {
+    en: "Enter the reference from your confirmation and the email you used.",
+    ar: "أدخل رقم الحجز من رسالة التأكيد والبريد الإلكتروني الذي استخدمته.",
+  },
+  checkStatus: { en: "Check status", ar: "عرض الحالة" },
+  bookingNotFound: {
+    en: "No request matches that reference and email.",
+    ar: "لا يوجد طلب مطابق لهذا الرقم والبريد الإلكتروني.",
+  },
 };
 
 interface Ctx {

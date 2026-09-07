@@ -1,4 +1,13 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -23,6 +32,8 @@ const AuthContext = createContext<AuthValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const userIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -30,7 +41,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     supabase.auth
       .getSession()
       .then(({ data }) => {
-        if (!cancelled) setSession(data.session);
+        if (cancelled) return;
+        userIdRef.current = data.session?.user.id ?? null;
+        setSession(data.session);
       })
       .catch(() => {
         /* offline or misconfigured — treat as signed out */
@@ -40,6 +53,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
+      // Drop every cached query when the identity changes. Otherwise the
+      // is_admin answer and the previous admin's booking list — guest names,
+      // phones and emails — survive sign-out into the next session. Keyed on
+      // the user id so routine token refreshes do not clear the cache.
+      const nextId = next?.user.id ?? null;
+      if (nextId !== userIdRef.current) {
+        userIdRef.current = nextId;
+        queryClient.clear();
+      }
       setSession(next);
     });
 
@@ -47,7 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       cancelled = true;
       sub.subscription.unsubscribe();
     };
-  }, []);
+  }, [queryClient]);
 
   const value = useMemo<AuthValue>(
     () => ({

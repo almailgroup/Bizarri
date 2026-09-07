@@ -14,7 +14,13 @@ import {
   startOfMonth,
   startOfToday,
 } from "@/lib/booking";
-import { useAvailability, useChalets, useRates, useRequestBooking } from "@/lib/api";
+import {
+  useAvailability,
+  useChalets,
+  useLookupBooking,
+  useRates,
+  useRequestBooking,
+} from "@/lib/api";
 import type { BookingRow } from "@/integrations/supabase/types";
 
 export const Route = createFileRoute("/booking")({ component: Booking });
@@ -70,8 +76,13 @@ function Booking() {
               {confirmed.ref}
             </p>
             <p className="mt-6 text-muted-foreground">
-              {fmtDate(new Date(confirmed.start_date))} → {fmtDate(new Date(confirmed.end_date))} ·{" "}
-              {formatMoney(Number(confirmed.total), lang)}
+              {/* Render the server's date strings as-is. new Date("2026-10-11")
+                  parses as UTC midnight, so reading it back with local getters
+                  showed the previous day for anyone behind UTC. */}
+              <span dir="ltr">
+                {confirmed.start_date} → {confirmed.end_date}
+              </span>{" "}
+              · {formatMoney(Number(confirmed.total), lang)}
             </p>
             <p className="mt-8 text-muted-foreground">
               {lang === "en"
@@ -135,6 +146,88 @@ function Intro({
       >
         {tr("bookNow")}
       </button>
+
+      <LookupPanel />
+    </div>
+  );
+}
+
+/** Guests get a reference on confirmation; this is how they use it later. */
+function LookupPanel() {
+  const { tr, lang } = useI18n();
+  const lookup = useLookupBooking();
+  const [ref, setRef] = useState("");
+  const [email, setEmail] = useState("");
+
+  const found = lookup.data?.[0];
+  const statusLabel = (s: string) =>
+    s === "accepted"
+      ? tr("statusAccepted")
+      : s === "rejected"
+        ? tr("statusRejected")
+        : s === "cancelled"
+          ? lang === "en"
+            ? "Cancelled"
+            : "ملغى"
+          : tr("statusPending");
+
+  return (
+    <div className="mt-16 border-t border-border pt-10">
+      <h2 className="font-display text-2xl">{tr("checkBooking")}</h2>
+      <p className="mt-2 text-sm text-muted-foreground">{tr("checkBookingHint")}</p>
+
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!ref.trim() || !email.trim()) return;
+          lookup.mutate({ ref, email });
+        }}
+        className="mt-5 flex flex-wrap gap-3"
+      >
+        <input
+          value={ref}
+          onChange={(e) => setRef(e.target.value)}
+          placeholder="BZR-XXXXXX"
+          dir="ltr"
+          aria-label={tr("bookingRef")}
+          className="min-w-[10rem] flex-1 border border-border bg-secondary px-4 py-3 font-mono outline-none focus:border-foreground"
+        />
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder={tr("email")}
+          dir="ltr"
+          aria-label={tr("email")}
+          className="min-w-[12rem] flex-1 border border-border bg-secondary px-4 py-3 outline-none focus:border-foreground"
+        />
+        <button
+          type="submit"
+          disabled={lookup.isPending}
+          className="border border-foreground px-6 py-3 text-sm uppercase tracking-widest transition-colors hover:bg-foreground hover:text-background disabled:opacity-50"
+        >
+          {tr("checkStatus")}
+        </button>
+      </form>
+
+      {lookup.isSuccess && !found && (
+        <p className="mt-4 text-sm text-muted-foreground">{tr("bookingNotFound")}</p>
+      )}
+      {lookup.isError && (
+        <p className="mt-4 text-sm text-destructive">{(lookup.error as Error).message}</p>
+      )}
+      {found && (
+        <div className="mt-5 border border-border p-6">
+          <p className="font-mono text-xs text-muted-foreground" dir="ltr">
+            {found.ref}
+          </p>
+          <p className="mt-2 font-display text-2xl">{statusLabel(found.status)}</p>
+          <p className="mt-2 text-sm text-muted-foreground" dir="ltr">
+            Chalet {found.chalet_id} · {found.start_date} → {found.end_date} ({found.days}{" "}
+            {tr("nightsLabel")}) · {formatMoney(Number(found.total), lang)}
+          </p>
+        </div>
+      )}
     </div>
   );
 }
@@ -179,6 +272,14 @@ function Calendar({ chaletId, onDone }: { chaletId: number; onDone: (b: BookingR
   }, [byDay]);
 
   const atFirstMonth = month.getTime() <= thisMonth.getTime();
+  // Availability is only known inside the fetched window. Without this the
+  // guest could page into months where every day renders unavailable, which
+  // reads as "booked solid" rather than "not loaded".
+  const lastMonth = useMemo(
+    () => new Date(windowEnd.getFullYear(), windowEnd.getMonth(), 1),
+    [windowEnd],
+  );
+  const atLastMonth = month.getTime() >= lastMonth.getTime();
 
   const cells = useMemo(() => {
     const first = new Date(month.getFullYear(), month.getMonth(), 1);
@@ -269,8 +370,9 @@ function Calendar({ chaletId, onDone }: { chaletId: number; onDone: (b: BookingR
           <p className="font-display text-2xl capitalize">{monthName}</p>
           <button
             onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}
+            disabled={atLastMonth}
             aria-label={lang === "en" ? "Next month" : "الشهر التالي"}
-            className="p-2 hover:bg-secondary"
+            className="p-2 enabled:hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-25"
           >
             <ChevronRight className="h-5 w-5 rtl:rotate-180" />
           </button>
@@ -328,6 +430,8 @@ function Calendar({ chaletId, onDone }: { chaletId: number; onDone: (b: BookingR
             );
           })}
         </div>
+
+        {atLastMonth && <p className="mt-4 text-xs text-muted-foreground">{tr("horizonNote")}</p>}
 
         <div className="mt-6 flex flex-wrap gap-4 text-xs text-muted-foreground">
           <span className="flex items-center gap-2">
