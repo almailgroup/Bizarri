@@ -1,4 +1,4 @@
-project_id = "jxpxbpaaizjeoxbftwwd"
+project_id = "wpajjuavtebjzomptxcu"
 
 # Public: the site calls these without a session. They are protected by the
 # origin allow-list and per-IP rate limits in _shared/http.ts, not by a JWT.
