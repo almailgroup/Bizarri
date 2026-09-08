@@ -210,8 +210,8 @@ export const t: Dict = {
     ar: "تُرسل إلى جانب إشعار البريد الإلكتروني عند وصول طلب حجز جديد.",
   },
   callmebotSteps: {
-    en: 'Each number needs its own one-time setup: save +34 644 59 71 07 as a contact, send it "I allow callmebot to send me messages" on WhatsApp, and it replies with an API key to enter below.',
-    ar: 'كل رقم يحتاج إعداداً لمرة واحدة: احفظ +34 644 59 71 07 كجهة اتصال، أرسل له عبر واتساب "I allow callmebot to send me messages"، وسيردّ بمفتاح API لإدخاله أدناه.',
+    en: 'Each number needs its own one-time setup with the free CallMeBot service: add its WhatsApp contact, send it "I allow callmebot to send me messages", and it replies with an API key to enter below. Full steps: backend/supabase/README.md.',
+    ar: 'كل رقم يحتاج إعداداً لمرة واحدة مع خدمة CallMeBot المجانية: أضف جهة اتصال واتساب الخاصة بها، أرسل لها "I allow callmebot to send me messages"، وسترد بمفتاح API لإدخاله أدناه. الخطوات كاملة في backend/supabase/README.md.',
   },
   whatsappPhoneLabel: {
     en: "Phone (with country code, digits only)",
