@@ -1,9 +1,8 @@
 # Bizarri
 
 A premium private chalet website for **Bizarri** by Almail Group (Kuwait) — a
-bilingual (English / Arabic) marketing site with an online booking request flow,
-photo gallery, and an "Almail AI" concierge chat powered by Supabase Edge
-Functions.
+bilingual (English / Arabic) marketing site with an online booking request
+flow and a photo gallery.
 
 Built with React 19, [TanStack Router](https://tanstack.com/router),
 [Tailwind CSS v4](https://tailwindcss.com), and [Supabase](https://supabase.com).
@@ -25,8 +24,7 @@ backend/
 ```
 
 Nothing else at the repo root is part of the app: `.github/` holds the deploy
-workflow, `.lovable/` is leftover platform metadata from where this project
-was originally generated.
+workflow.
 
 ## Tech stack
 
@@ -36,7 +34,6 @@ was originally generated.
 | Build tool  | Vite 7                                             |
 | Styling     | Tailwind CSS v4 + shadcn/ui (Radix) components      |
 | Data / auth | Supabase Postgres + Auth, with RLS on every table  |
-| AI features | Supabase Edge Functions (`chat`, `generate-image`) |
 | Hosting     | GitHub Pages (static)                              |
 
 ## Local development
@@ -101,8 +98,7 @@ project — a fresh account, a new org, or the current project was deleted.
 4. **Deploy the Edge Functions and their secrets:**
 
    ```bash
-   supabase functions deploy chat generate-image notify-booking
-   supabase secrets set LOVABLE_API_KEY=...
+   supabase functions deploy notify-booking
    supabase secrets set RESEND_API_KEY=...          # optional: booking emails
    supabase secrets set NOTIFY_EMAILS=sales@bizarri.com
    supabase secrets set ALLOWED_ORIGINS=https://almailgroup.github.io

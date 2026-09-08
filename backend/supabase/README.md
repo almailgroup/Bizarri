@@ -66,9 +66,7 @@ backend/supabase/
     20260906090300_seed.sql           chalets, default rates, settings
     20260907120000_booking_guards.sql readable validation errors
   functions/
-    _shared/http.ts                   CORS allow-list, rate limiting, validation
-    chat/                             Almail AI assistant
-    generate-image/                   image generation
+    _shared/http.ts                   CORS headers, shared by notify-booking
     notify-booking/                   email on new booking request
   tests/
     run.sh                            applies migrations to a scratch DB and runs the suites
@@ -84,7 +82,7 @@ cd backend
 supabase login
 supabase link --project-ref <your-project-ref>
 supabase db push                 # applies supabase/migrations/
-supabase functions deploy chat generate-image notify-booking
+supabase functions deploy notify-booking
 ```
 
 Switching to a different Supabase project (new account, new org, a fresh
@@ -106,19 +104,15 @@ intended behaviour rather than a bug.
 ### Function secrets
 
 ```bash
-supabase secrets set LOVABLE_API_KEY=...        # chat + generate-image
 supabase secrets set RESEND_API_KEY=...         # optional: booking emails
 supabase secrets set NOTIFY_EMAILS=sales@bizarri.com
 supabase secrets set ALLOWED_ORIGINS=https://almailgroup.github.io
 ```
 
-`ALLOWED_ORIGINS` matters. `chat` and `generate-image` run with
-`verify_jwt = false` so the public site can call them, which means the origin
-allow-list and the per-IP limits (20/min chat, 5/min images) are the only thing
-between the site and someone else spending your AI budget.
-
 Without `RESEND_API_KEY`, `notify-booking` logs and returns success — a missing
-key must never make booking look broken.
+key must never make booking look broken. `ALLOWED_ORIGINS` scopes which
+origins its CORS response allows; it defaults to the production site and
+local dev if unset.
 
 ### Booking notifications
 
@@ -145,7 +139,5 @@ and would make every policy test pass regardless of whether the policies work.
 
 - `settings` is public-readable by design (contact details, social links).
   Never put secrets in it.
-- The rate limiter in `_shared/http.ts` is per-isolate and therefore a speed
-  bump, not a guarantee. If abuse becomes real, move it to a table.
 - `rates` is global rather than per-chalet. Per-chalet pricing means adding a
   `chalet_id` column and a lookup in `quote_stay()`.

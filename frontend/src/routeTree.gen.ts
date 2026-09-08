@@ -17,7 +17,6 @@ import { Route as NewsRouteImport } from './routes/news'
 import { Route as FacilitiesRouteImport } from './routes/facilities'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as BookingRouteImport } from './routes/booking'
-import { Route as AlmailAiRouteImport } from './routes/almail-ai'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as IndexRouteImport } from './routes/index'
@@ -62,11 +61,6 @@ const BookingRoute = BookingRouteImport.update({
   path: '/booking',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AlmailAiRoute = AlmailAiRouteImport.update({
-  id: '/almail-ai',
-  path: '/almail-ai',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
   path: '/admin',
@@ -87,7 +81,6 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/admin': typeof AdminRoute
-  '/almail-ai': typeof AlmailAiRoute
   '/booking': typeof BookingRoute
   '/contact': typeof ContactRoute
   '/facilities': typeof FacilitiesRoute
@@ -101,7 +94,6 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/admin': typeof AdminRoute
-  '/almail-ai': typeof AlmailAiRoute
   '/booking': typeof BookingRoute
   '/contact': typeof ContactRoute
   '/facilities': typeof FacilitiesRoute
@@ -116,7 +108,6 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/admin': typeof AdminRoute
-  '/almail-ai': typeof AlmailAiRoute
   '/booking': typeof BookingRoute
   '/contact': typeof ContactRoute
   '/facilities': typeof FacilitiesRoute
@@ -132,7 +123,6 @@ export interface FileRouteTypes {
     | '/'
     | '/about'
     | '/admin'
-    | '/almail-ai'
     | '/booking'
     | '/contact'
     | '/facilities'
@@ -146,7 +136,6 @@ export interface FileRouteTypes {
     | '/'
     | '/about'
     | '/admin'
-    | '/almail-ai'
     | '/booking'
     | '/contact'
     | '/facilities'
@@ -160,7 +149,6 @@ export interface FileRouteTypes {
     | '/'
     | '/about'
     | '/admin'
-    | '/almail-ai'
     | '/booking'
     | '/contact'
     | '/facilities'
@@ -175,7 +163,6 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AboutRoute: typeof AboutRoute
   AdminRoute: typeof AdminRoute
-  AlmailAiRoute: typeof AlmailAiRoute
   BookingRoute: typeof BookingRoute
   ContactRoute: typeof ContactRoute
   FacilitiesRoute: typeof FacilitiesRoute
@@ -244,13 +231,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BookingRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/almail-ai': {
-      id: '/almail-ai'
-      path: '/almail-ai'
-      fullPath: '/almail-ai'
-      preLoaderRoute: typeof AlmailAiRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/admin': {
       id: '/admin'
       path: '/admin'
@@ -279,7 +259,6 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
   AdminRoute: AdminRoute,
-  AlmailAiRoute: AlmailAiRoute,
   BookingRoute: BookingRoute,
   ContactRoute: ContactRoute,
   FacilitiesRoute: FacilitiesRoute,
