@@ -1,7 +1,7 @@
 /**
  * Booking domain: dates, money and the pricing rules.
  *
- * This is a deliberate mirror of the SQL in supabase/migrations — quote_stay(),
+ * This is a deliberate mirror of the SQL in backend/supabase/migrations — quote_stay(),
  * match_package() and default_day_rate() — so the calendar can show a live
  * total without a round-trip per click. It is NOT the authority: the server
  * re-prices every request inside request_booking(), and its answer is what gets

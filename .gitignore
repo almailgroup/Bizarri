@@ -12,7 +12,9 @@ dist
 dist-ssr
 .output
 .vinxi
-.tanstack/**
+# Anchored patterns (containing a slash) only match at the repo root,
+# so this needs the ** prefix to also cover frontend/.tanstack/.
+**/.tanstack/**
 .nitro
 *.local
 tsconfig.tsbuildinfo

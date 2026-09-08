@@ -16,7 +16,7 @@ INSERT permission on `bookings`. They call `request_booking()`, which:
    thought it was,
 4. generates the `BZR-XXXXXX` reference and forces `status = 'pending'`.
 
-The client mirrors the pricing rules in `src/lib/booking.ts` purely so the
+The client mirrors the pricing rules in `frontend/src/lib/booking.ts` purely so the
 calendar can show a live total without a round-trip. If the two ever disagree,
 the database wins.
 
@@ -52,19 +52,26 @@ rate.
 
 ## Files
 
+This directory is `backend/supabase/` in the repo — the Supabase CLI requires
+the folder to be named `supabase`, so it's nested one level under `backend/`
+rather than renamed. Run CLI commands from `backend/`, or pass
+`--workdir backend` from the repo root.
+
 ```
-migrations/
-  20260906090000_core_schema.sql    tables, constraints, triggers
-  20260906090100_booking_logic.sql  pricing + booking functions
-  20260906090200_rls.sql            RLS policies, grants, audit trigger
-  20260906090300_seed.sql           chalets, default rates, settings
-functions/
-  _shared/http.ts                   CORS allow-list, rate limiting, validation
-  chat/                             Almail AI assistant
-  generate-image/                   image generation
-  notify-booking/                   email on new booking request
-tests/
-  run.sh                            applies migrations to a scratch DB and runs the suites
+backend/supabase/
+  migrations/
+    20260906090000_core_schema.sql    tables, constraints, triggers
+    20260906090100_booking_logic.sql  pricing + booking functions
+    20260906090200_rls.sql            RLS policies, grants, audit trigger
+    20260906090300_seed.sql           chalets, default rates, settings
+    20260907120000_booking_guards.sql readable validation errors
+  functions/
+    _shared/http.ts                   CORS allow-list, rate limiting, validation
+    chat/                             Almail AI assistant
+    generate-image/                   image generation
+    notify-booking/                   email on new booking request
+  tests/
+    run.sh                            applies migrations to a scratch DB and runs the suites
 ```
 
 ## Deploying
@@ -73,11 +80,17 @@ Requires the [Supabase CLI](https://supabase.com/docs/guides/cli) and the
 database password (Dashboard → Settings → Database).
 
 ```bash
+cd backend
 supabase login
-supabase link --project-ref jxpxbpaaizjeoxbftwwd
-supabase db push                 # applies migrations/
+supabase link --project-ref <your-project-ref>
+supabase db push                 # applies supabase/migrations/
 supabase functions deploy chat generate-image notify-booking
 ```
+
+Switching to a different Supabase project (new account, new org, a fresh
+project) means re-running `supabase link` with the new project's ref and
+updating `frontend/.env` — see the root [README](../../README.md#switching-to-a-new-supabase-project)
+for the full checklist.
 
 Then, **once**, in the SQL editor — replace the email with the real admin
 account, which must already exist under Authentication → Users:
@@ -120,8 +133,8 @@ Dashboard → Database → Webhooks → *Create*:
 RPC, double-booking prevention and the audit trail.
 
 ```bash
-supabase/tests/run.sh                # local cluster on :55432
-PGPORT=5432 supabase/tests/run.sh    # or your own
+backend/supabase/tests/run.sh                # local cluster on :55432
+PGPORT=5432 backend/supabase/tests/run.sh    # or your own
 ```
 
 The runner applies the migrations to a throwaway database owned by a

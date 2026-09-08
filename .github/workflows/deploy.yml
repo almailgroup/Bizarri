@@ -21,6 +21,11 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        # The Vite app lives in frontend/; backend/ (Supabase) is not part of
+        # the static build.
+        working-directory: frontend
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -47,7 +52,7 @@ jobs:
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: frontend/dist
 
   deploy:
     needs: build

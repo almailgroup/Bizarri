@@ -5,7 +5,7 @@
 /**
  * Database types for the Bizarri schema.
  *
- * Mirrors supabase/migrations/. Regenerate with:
+ * Mirrors backend/supabase/migrations/. Regenerate with:
  *   supabase gen types typescript --project-id <id> > src/integrations/supabase/types.ts
  */
 
