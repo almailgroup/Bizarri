@@ -106,13 +106,39 @@ intended behaviour rather than a bug.
 ```bash
 supabase secrets set RESEND_API_KEY=...         # optional: booking emails
 supabase secrets set NOTIFY_EMAILS=sales@bizarri.com
+supabase secrets set CALLMEBOT_PHONE=96594040955   # optional: booking WhatsApp alerts
+supabase secrets set CALLMEBOT_APIKEY=...
 supabase secrets set ALLOWED_ORIGINS=https://almailgroup.github.io
 ```
 
 Without `RESEND_API_KEY`, `notify-booking` logs and returns success — a missing
-key must never make booking look broken. `ALLOWED_ORIGINS` scopes which
-origins its CORS response allows; it defaults to the production site and
-local dev if unset.
+key must never make booking look broken. Same for the CallMeBot pair: without
+both, WhatsApp is skipped and email still goes out. `ALLOWED_ORIGINS` scopes
+which origins its CORS response allows; it defaults to the production site
+and local dev if unset.
+
+`NOTIFY_EMAILS` and the `CALLMEBOT_*` pair are each a **fallback** — the
+primary source is the `notify_emails` / `notify_whatsapp` rows in
+`public.settings`, editable from the admin panel's Site Settings tab without
+a redeploy. The secrets only matter until an admin sets those, or if the
+settings row is ever empty.
+
+#### Adding a WhatsApp number
+
+[CallMeBot](https://www.callmebot.com/blog/free-api-whatsapp-messages/) is a
+free, unofficial service — no account, but no uptime guarantee either; it
+only sends to the one number that generated a given API key, so each
+recipient does their own one-time opt-in:
+
+1. Save `+34 644 59 71 07` as a contact on the phone that should receive alerts.
+2. From that phone, send it a WhatsApp message: `I allow callmebot to send me messages`.
+3. It replies with an API key.
+4. Enter that phone number and key in the admin panel's Site Settings →
+   WhatsApp notifications, or as the `CALLMEBOT_PHONE` / `CALLMEBOT_APIKEY`
+   secrets above for a single default recipient.
+
+Repeat for every number that should get a WhatsApp alert — a shared key
+cannot message a different number.
 
 ### Booking notifications
 

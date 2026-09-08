@@ -101,8 +101,16 @@ project — a fresh account, a new org, or the current project was deleted.
    supabase functions deploy notify-booking
    supabase secrets set RESEND_API_KEY=...          # optional: booking emails
    supabase secrets set NOTIFY_EMAILS=sales@bizarri.com
+   supabase secrets set CALLMEBOT_PHONE=96594040955 # optional: booking WhatsApp alerts
+   supabase secrets set CALLMEBOT_APIKEY=...
    supabase secrets set ALLOWED_ORIGINS=https://almailgroup.github.io
    ```
+
+   Both `NOTIFY_EMAILS` and the `CALLMEBOT_*` pair are just fallbacks — day
+   to day, recipients for both channels are managed from the admin panel's
+   Site Settings tab, no redeploy needed. See
+   [`backend/supabase/README.md`](backend/supabase/README.md#adding-a-whatsapp-number)
+   for how to get a CallMeBot API key.
 
 5. **Create the admin account.** Dashboard → Authentication → Users → *Add
    user* (email + password). Then, in the SQL editor, grant it admin rights —

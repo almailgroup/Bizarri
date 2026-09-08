@@ -204,6 +204,25 @@ export const t: Dict = {
   },
   savedTick: { en: "Saved", ar: "تم الحفظ" },
   noActivity: { en: "No activity yet.", ar: "لا يوجد نشاط بعد." },
+  notifyWhatsapp: { en: "WhatsApp notifications", ar: "إشعارات واتساب" },
+  notifyWhatsappHint: {
+    en: "Sent alongside the email notification whenever a new booking request arrives.",
+    ar: "تُرسل إلى جانب إشعار البريد الإلكتروني عند وصول طلب حجز جديد.",
+  },
+  callmebotSteps: {
+    en: 'Each number needs its own one-time setup: save +34 644 59 71 07 as a contact, send it "I allow callmebot to send me messages" on WhatsApp, and it replies with an API key to enter below.',
+    ar: 'كل رقم يحتاج إعداداً لمرة واحدة: احفظ +34 644 59 71 07 كجهة اتصال، أرسل له عبر واتساب "I allow callmebot to send me messages"، وسيردّ بمفتاح API لإدخاله أدناه.',
+  },
+  whatsappPhoneLabel: {
+    en: "Phone (with country code, digits only)",
+    ar: "الهاتف (مع رمز الدولة، أرقام فقط)",
+  },
+  whatsappApikeyLabel: { en: "CallMeBot API key", ar: "مفتاح CallMeBot" },
+  addNumber: { en: "Add number", ar: "إضافة رقم" },
+  noWhatsappNumbers: {
+    en: "No WhatsApp numbers added yet.",
+    ar: "لم تتم إضافة أي رقم واتساب بعد.",
+  },
 };
 
 interface Ctx {

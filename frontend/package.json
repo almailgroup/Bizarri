@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "test:integration": "node tests/be-test.mjs && node tests/fixes.mjs && node tests/authtest.mjs"
+    "test:integration": "node tests/be-test.mjs && node tests/fixes.mjs && node tests/authtest.mjs && node tests/admin-features.mjs && node tests/notify-whatsapp-logic.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

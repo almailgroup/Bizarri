@@ -343,6 +343,64 @@ async function adminPage(state) {
   await ctx.close();
 }
 
+// ================================================= WhatsApp recipients (CallMeBot)
+{
+  const state = makeState();
+  const { p, ctx } = await adminPage(state);
+  await p.getByRole("button", { name: "Site Settings" }).click();
+  await p.waitForTimeout(400);
+
+  ck(
+    "Starts with no WhatsApp numbers",
+    await p.getByText("No WhatsApp numbers added yet.").isVisible(),
+  );
+  ck(
+    "Shows the CallMeBot opt-in steps",
+    await p.getByText(/I allow callmebot to send me messages/).isVisible(),
+  );
+
+  await p.getByRole("button", { name: /add number/i }).click();
+  await p.waitForTimeout(200);
+  // Three inputs share the "96594040955" placeholder (contact phone,
+  // contact WhatsApp, and this recipient row), so target by label instead.
+  await p.getByLabel("Phone (with country code, digits only)").fill("96599998888");
+  await p.getByLabel("CallMeBot API key").fill("998877");
+  await p
+    .getByRole("button", { name: /^Save$/i })
+    .last()
+    .click();
+  await p.waitForTimeout(400);
+
+  const waCall = state.calls.find(
+    (c) => c.path === "settings" && c.body?.key === "notify_whatsapp",
+  );
+  ck(
+    "Saving adds a {phone, apikey} pair to notify_whatsapp",
+    JSON.stringify(waCall?.body?.value) ===
+      JSON.stringify([{ phone: "96599998888", apikey: "998877" }]),
+    JSON.stringify(waCall?.body),
+  );
+  ck(
+    "Settings store reflects the new WhatsApp recipient",
+    JSON.stringify(state.settings.notify_whatsapp) ===
+      JSON.stringify([{ phone: "96599998888", apikey: "998877" }]),
+  );
+
+  // remove it again
+  await p.getByLabel(/remove number/i).click();
+  await p
+    .getByRole("button", { name: /^Save$/i })
+    .last()
+    .click();
+  await p.waitForTimeout(400);
+  ck(
+    "Removing the row and saving clears notify_whatsapp",
+    Array.isArray(state.settings.notify_whatsapp) && state.settings.notify_whatsapp.length === 0,
+    JSON.stringify(state.settings.notify_whatsapp),
+  );
+  await ctx.close();
+}
+
 // =========================================================== Activity panel
 {
   const state = makeState();
