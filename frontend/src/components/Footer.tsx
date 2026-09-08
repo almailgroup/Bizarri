@@ -1,10 +1,12 @@
 import { Link } from "@tanstack/react-router";
 import { Instagram, Phone, MapPin, Mail } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
+import { useContactInfo } from "@/lib/api";
 import logoWhite from "@/assets/bizarri-logo-white.png";
 
 export function Footer() {
   const { tr } = useI18n();
+  const contact = useContactInfo();
   return (
     <footer className="bg-black text-white">
       <div className="max-w-7xl mx-auto px-6 py-20 grid md:grid-cols-4 gap-12">
@@ -18,23 +20,24 @@ export function Footer() {
           <ul className="space-y-3 text-sm">
             <li>
               <a
-                href="tel:+96594040955"
+                href={`tel:${contact.phone}`}
+                dir="ltr"
                 className="flex items-center gap-3 hover:text-white text-white/70"
               >
-                <Phone className="w-4 h-4" /> +965 94040955
+                <Phone className="w-4 h-4" /> {contact.phone}
               </a>
             </li>
             <li>
               <a
-                href="mailto:sales@bizarri.com"
+                href={`mailto:${contact.email}`}
                 className="flex items-center gap-3 hover:text-white text-white/70"
               >
-                <Mail className="w-4 h-4" /> sales@bizarri.com
+                <Mail className="w-4 h-4" /> {contact.email}
               </a>
             </li>
             <li>
               <a
-                href="https://maps.app.goo.gl/5wjw1skfpqdnDhFa6"
+                href={contact.maps}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-3 hover:text-white text-white/70"
@@ -44,7 +47,7 @@ export function Footer() {
             </li>
             <li>
               <a
-                href="https://www.instagram.com/bizarri.chalet?igsh=N3Y2bDZ2ZHFnNDNz"
+                href={contact.instagram}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-3 hover:text-white text-white/70"

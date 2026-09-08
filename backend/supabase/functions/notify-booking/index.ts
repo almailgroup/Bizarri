@@ -5,6 +5,12 @@
  * notification is a consequence of the row existing rather than something the
  * browser has to remember to do — a guest closing the tab cannot lose it.
  *
+ * Recipients come from the `notify_emails` row in public.settings — editable
+ * from the admin panel's Site Settings tab — falling back to the
+ * NOTIFY_EMAILS secret if that row is empty or unreachable. SUPABASE_URL and
+ * SUPABASE_SERVICE_ROLE_KEY are provided automatically to every Edge
+ * Function; no extra secret is needed to read settings.
+ *
  * Set RESEND_API_KEY to enable delivery. Without it the function logs the
  * request and returns 200: a missing key must not make booking look broken.
  */
@@ -23,6 +29,31 @@ interface BookingRecord {
   guest_email: string;
   guests: number;
   notes: string | null;
+}
+
+/** Recipients from public.settings, so an admin editing them takes effect
+ *  immediately without redeploying a secret. Never throws — a settings read
+ *  failure falls through to the NOTIFY_EMAILS secret instead of dropping the
+ *  notification. */
+async function notifyEmailsFromSettings(): Promise<string[] | null> {
+  const url = Deno.env.get("SUPABASE_URL");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!url || !serviceKey) return null;
+
+  try {
+    const res = await fetch(
+      `${url}/rest/v1/settings?key=eq.notify_emails&select=value`,
+      { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } },
+    );
+    if (!res.ok) return null;
+    const rows = (await res.json()) as { value: unknown }[];
+    const value = rows[0]?.value;
+    if (!Array.isArray(value)) return null;
+    const emails = value.filter((v): v is string => typeof v === "string" && v.length > 0);
+    return emails.length > 0 ? emails : null;
+  } catch {
+    return null;
+  }
 }
 
 function esc(s: string): string {
@@ -72,10 +103,12 @@ Deno.serve(async (req: Request) => {
     if (!booking?.ref) return json({ error: "No booking in payload" }, 400, origin);
 
     const key = Deno.env.get("RESEND_API_KEY");
-    const to = (Deno.env.get("NOTIFY_EMAILS") ?? "sales@bizarri.com")
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
+    const to =
+      (await notifyEmailsFromSettings()) ??
+      (Deno.env.get("NOTIFY_EMAILS") ?? "sales@bizarri.com")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
     const from = Deno.env.get("NOTIFY_FROM") ?? "Bizarri Chalet <onboarding@resend.dev>";
 
     if (!key) {

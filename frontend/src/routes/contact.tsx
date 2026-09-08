@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { PageShell } from "@/components/PageShell";
 import { useI18n } from "@/lib/i18n";
 import { usePageMeta } from "@/hooks/use-page-meta";
+import { useContactInfo } from "@/lib/api";
 import { Phone, Mail, MapPin, Instagram, MessageCircle, ArrowUpRight } from "lucide-react";
 
 export const Route = createFileRoute("/contact")({ component: Contact });
@@ -14,36 +15,37 @@ function Contact() {
       ? "Reach Bizarri Chalet by phone, WhatsApp or email, or find us on the map."
       : "تواصل مع شاليه بيزاري عبر الهاتف أو واتساب أو البريد الإلكتروني.",
   );
+  const contact = useContactInfo();
   const items = [
     {
       icon: Phone,
       label: lang === "en" ? "Phone" : "هاتف",
-      value: "+965 94040955",
-      href: "tel:+96594040955",
+      value: contact.phone,
+      href: `tel:${contact.phone}`,
     },
     {
       icon: MessageCircle,
       label: "WhatsApp",
-      value: "+965 94040955",
-      href: "https://wa.me/96594040955",
+      value: contact.phone,
+      href: `https://wa.me/${contact.whatsapp}`,
     },
     {
       icon: Mail,
       label: lang === "en" ? "Email" : "البريد",
-      value: "sales@bizarri.com",
-      href: "mailto:sales@bizarri.com",
+      value: contact.email,
+      href: `mailto:${contact.email}`,
     },
     {
       icon: Instagram,
       label: "Instagram",
       value: "@bizarri.chalet",
-      href: "https://www.instagram.com/bizarri.chalet?igsh=N3Y2bDZ2ZHFnNDNz",
+      href: contact.instagram,
     },
     {
       icon: MapPin,
       label: tr("location"),
       value: lang === "en" ? "Open in Maps" : "فتح في الخرائط",
-      href: "https://maps.app.goo.gl/5wjw1skfpqdnDhFa6",
+      href: contact.maps,
     },
   ];
 
@@ -78,7 +80,7 @@ function Contact() {
             a guest nothing. Until we have the chalet's coordinates this links
             straight to the verified Maps entry instead of showing a wrong map. */}
         <a
-          href="https://maps.app.goo.gl/5wjw1skfpqdnDhFa6"
+          href={contact.maps}
           target="_blank"
           rel="noopener noreferrer"
           className="group mt-16 flex flex-wrap items-center justify-between gap-6 border border-border p-10 transition-colors hover:bg-black hover:text-white"

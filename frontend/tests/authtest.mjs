@@ -108,6 +108,9 @@ await p.locator("input[type=password]").fill("pw");
 await p.getByRole("button", { name: /^Login$/i }).click();
 await p.waitForTimeout(1400);
 ck("Admin reaches the dashboard", await p.getByText("Availability & Pricing").isVisible());
+// Requests now live under their own tab rather than being mounted by default.
+await p.getByRole("button", { name: "Booking Requests" }).click();
+await p.waitForTimeout(400);
 ck("Admin sees the booking list", await p.getByText("Confidential Guest").isVisible());
 
 // 2. sign out

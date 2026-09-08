@@ -162,6 +162,48 @@ export const t: Dict = {
     en: "No request matches that reference and email.",
     ar: "لا يوجد طلب مطابق لهذا الرقم والبريد الإلكتروني.",
   },
+
+  // Admin: navigation & new panels
+  overview: { en: "Overview", ar: "نظرة عامة" },
+  chaletsMgmt: { en: "Chalets", ar: "الشاليهات" },
+  activityLog: { en: "Activity Log", ar: "سجل النشاط" },
+  siteSettings: { en: "Site Settings", ar: "إعدادات الموقع" },
+  pendingRequests: { en: "Pending Requests", ar: "طلبات قيد الانتظار" },
+  upcomingCheckins: { en: "Upcoming Check-ins", ar: "الوصول القادم" },
+  revenueThisMonth: { en: "This Month's Revenue", ar: "إيرادات هذا الشهر" },
+  occupancyThisMonth: { en: "Occupancy This Month", ar: "الإشغال هذا الشهر" },
+  noUpcoming: { en: "Nothing on the calendar yet.", ar: "لا توجد إقامات قادمة بعد." },
+  searchRequests: {
+    en: "Search by name, phone, email or reference",
+    ar: "ابحث بالاسم أو الهاتف أو البريد أو رقم الحجز",
+  },
+  noMatches: { en: "No requests match your search.", ar: "لا توجد طلبات مطابقة للبحث." },
+  editDetails: { en: "Edit details", ar: "تعديل التفاصيل" },
+  internalNote: { en: "Internal note", ar: "ملاحظة داخلية" },
+  internalNoteHint: {
+    en: "Visible to admins only — never shown to the guest.",
+    ar: "تظهر للمسؤولين فقط — لا تظهر أبداً للضيف.",
+  },
+  saveChanges: { en: "Save changes", ar: "حفظ التغييرات" },
+  displayNameEn: { en: "Display name (English)", ar: "الاسم المعروض (إنجليزي)" },
+  displayNameAr: { en: "Display name (Arabic)", ar: "الاسم المعروض (عربي)" },
+  chaletActive: { en: "Bookable on the site", ar: "قابل للحجز على الموقع" },
+  chaletInactive: {
+    en: "Hidden from guests — existing requests are unaffected.",
+    ar: "مخفي عن الضيوف — الطلبات الحالية غير متأثرة.",
+  },
+  contactPhone: { en: "Phone", ar: "الهاتف" },
+  contactWhatsapp: { en: "WhatsApp number", ar: "رقم واتساب" },
+  contactEmail: { en: "Contact email", ar: "البريد الإلكتروني" },
+  contactInstagram: { en: "Instagram URL", ar: "رابط إنستغرام" },
+  contactMaps: { en: "Maps link", ar: "رابط الخريطة" },
+  notifyEmails: { en: "Booking notification emails", ar: "بريد إشعارات الحجوزات" },
+  notifyEmailsHint: {
+    en: "Comma-separated. Sent an email whenever a new booking request arrives.",
+    ar: "افصل بينها بفواصل. يُرسل بريد عند وصول طلب حجز جديد.",
+  },
+  savedTick: { en: "Saved", ar: "تم الحفظ" },
+  noActivity: { en: "No activity yet.", ar: "لا يوجد نشاط بعد." },
 };
 
 interface Ctx {

@@ -8,12 +8,14 @@
 import { useMutation, useQuery, useQueryClient, type UseQueryOptions } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type {
+  AuditRow,
   BookingRow,
   BookingStatus,
   CalendarDay,
   ChaletRow,
   NewsRow,
   RatesRow,
+  SettingRow,
 } from "@/integrations/supabase/types";
 import { DEFAULT_RATES, fmtDate, type Rates } from "@/lib/booking";
 
@@ -28,6 +30,8 @@ export const qk = {
   dayPrices: (chalet: number) => ["dayPrices", chalet] as const,
   news: (all: boolean) => ["news", all] as const,
   isAdmin: ["isAdmin"] as const,
+  settings: ["settings"] as const,
+  auditLog: ["auditLog"] as const,
 };
 
 /** Postgres errors arrive with a `message`; surface it rather than "[object Object]". */
@@ -391,6 +395,146 @@ export function useDeleteNews() {
       if (error) fail("Could not delete the news item", error);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["news"] }),
+  });
+}
+
+/* -------------------------------------------------------------- settings */
+
+export interface ContactInfo {
+  phone: string;
+  whatsapp: string;
+  email: string;
+  instagram: string;
+  maps: string;
+}
+
+/** Shown until the settings row loads, and whenever a field is left blank. */
+const DEFAULT_CONTACT: ContactInfo = {
+  phone: "+96594040955",
+  whatsapp: "96594040955",
+  email: "sales@bizarri.com",
+  instagram: "https://www.instagram.com/bizarri.chalet",
+  maps: "https://maps.app.goo.gl/5wjw1skfpqdnDhFa6",
+};
+
+/**
+ * Public site config (contact details, socials) as a { key: value } map.
+ * Readable by anyone — this table must never hold secrets.
+ */
+export function useSettings() {
+  return useQuery({
+    queryKey: qk.settings,
+    queryFn: async (): Promise<Record<string, SettingRow["value"]>> => {
+      const { data, error } = await supabase.from("settings").select("*");
+      if (error) fail("Could not load settings", error);
+      return Object.fromEntries((data ?? []).map((r) => [r.key, r.value]));
+    },
+    staleTime: 60_000,
+  });
+}
+
+/** Contact details for the public site (Footer, /contact), with sane
+ *  defaults so nothing renders blank before the settings row has loaded or
+ *  if it's never been edited. */
+export function useContactInfo(): ContactInfo {
+  const { data } = useSettings();
+  const value = data?.contact;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return DEFAULT_CONTACT;
+  const v = value as Record<string, unknown>;
+  const pick = (key: keyof ContactInfo) =>
+    typeof v[key] === "string" && (v[key] as string).length > 0
+      ? (v[key] as string)
+      : DEFAULT_CONTACT[key];
+  return {
+    phone: pick("phone"),
+    whatsapp: pick("whatsapp"),
+    email: pick("email"),
+    instagram: pick("instagram"),
+    maps: pick("maps"),
+  };
+}
+
+export function useSaveSetting() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ key, value }: { key: string; value: SettingRow["value"] }) => {
+      const { error } = await supabase
+        .from("settings")
+        .upsert({ key, value }, { onConflict: "key" });
+      if (error) fail("Could not save the setting", error);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.settings }),
+  });
+}
+
+/* --------------------------------------------------------------- chalets */
+
+export function useUpdateChalet() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      id,
+      patch,
+    }: {
+      id: number;
+      patch: Partial<Pick<ChaletRow, "name_en" | "name_ar" | "active" | "sort_order">>;
+    }) => {
+      const { error } = await supabase.from("chalets").update(patch).eq("id", id);
+      if (error) fail("Could not update the chalet", error);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.chalets });
+      qc.invalidateQueries({ queryKey: ["calendar"] });
+    },
+  });
+}
+
+/* ------------------------------------------------------------- bookings */
+
+/**
+ * Direct field edits from the admin panel (guest details, notes, a manual
+ * price override) — distinct from useSetBookingStatus(), which goes through
+ * set_booking_status() to get the overlap check on acceptance. Every changed
+ * field here is captured by the booking.edited audit trigger.
+ */
+export function useUpdateBookingDetails() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      id,
+      patch,
+    }: {
+      id: string;
+      patch: Partial<
+        Pick<
+          BookingRow,
+          "guest_name" | "guest_phone" | "guest_email" | "guests" | "notes" | "admin_note" | "total"
+        >
+      >;
+    }) => {
+      const { error } = await supabase.from("bookings").update(patch).eq("id", id);
+      if (error) fail("Could not save the changes", error);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.bookings }),
+  });
+}
+
+/* ------------------------------------------------------------- activity */
+
+/** Most recent admin actions: booking edits/status changes, settings, chalets. */
+export function useAuditLog(enabled: boolean) {
+  return useQuery({
+    queryKey: qk.auditLog,
+    enabled,
+    queryFn: async (): Promise<AuditRow[]> => {
+      const { data, error } = await supabase
+        .from("audit_log")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(200);
+      if (error) fail("Could not load the activity log", error);
+      return data ?? [];
+    },
   });
 }
 
