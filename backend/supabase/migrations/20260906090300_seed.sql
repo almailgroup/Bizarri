@@ -17,5 +17,5 @@ insert into public.settings (key, value) values
      'email', 'sales@bizarri.com',
      'instagram', 'https://www.instagram.com/bizarri.chalet',
      'maps', 'https://maps.app.goo.gl/5wjw1skfpqdnDhFa6')),
-  ('notify_emails', jsonb_build_array('sales@bizarri.com'))
+  ('notify_emails', jsonb_build_array('admin@almailgroup.com'))
 on conflict (key) do nothing;

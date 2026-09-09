@@ -105,7 +105,7 @@ intended behaviour rather than a bug.
 
 ```bash
 supabase secrets set RESEND_API_KEY=...         # optional: booking emails
-supabase secrets set NOTIFY_EMAILS=sales@bizarri.com
+supabase secrets set NOTIFY_EMAILS=admin@almailgroup.com
 supabase secrets set CALLMEBOT_PHONE=96594040955   # optional: booking WhatsApp alerts
 supabase secrets set CALLMEBOT_APIKEY=...
 supabase secrets set ALLOWED_ORIGINS=https://almailgroup.github.io

@@ -176,7 +176,7 @@ async function sendEmail(booking: BookingRecord): Promise<DeliveryResult> {
 
   const to =
     (await notifyEmailsFromSettings()) ??
-    (Deno.env.get("NOTIFY_EMAILS") ?? "sales@bizarri.com")
+    (Deno.env.get("NOTIFY_EMAILS") ?? "admin@almailgroup.com")
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean);

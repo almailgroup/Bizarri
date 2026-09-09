@@ -100,7 +100,7 @@ project — a fresh account, a new org, or the current project was deleted.
    ```bash
    supabase functions deploy notify-booking
    supabase secrets set RESEND_API_KEY=...          # optional: booking emails
-   supabase secrets set NOTIFY_EMAILS=sales@bizarri.com
+   supabase secrets set NOTIFY_EMAILS=admin@almailgroup.com
    supabase secrets set CALLMEBOT_PHONE=96594040955 # optional: booking WhatsApp alerts
    supabase secrets set CALLMEBOT_APIKEY=...
    supabase secrets set ALLOWED_ORIGINS=https://almailgroup.github.io
