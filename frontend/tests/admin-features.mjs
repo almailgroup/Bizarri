@@ -1,7 +1,7 @@
 import { chromium } from "playwright";
 
 const B = "http://localhost:4173/Bizarri/";
-const SUPA = /wpajjuavtebjzomptxcu\.supabase\.co/;
+const SUPA = /ycfvqzcnatwacwlcmiej\.supabase\.co/;
 const b = await chromium.launch(
   process.env.PLAYWRIGHT_CHROMIUM_PATH
     ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_PATH }
