@@ -26,7 +26,7 @@ export const t: Dict = {
   location: { en: "Location", ar: "الموقع" },
   heroIntro: {
     en: "A private modern chalet experience in Kuwait, designed for comfort, privacy, technology, and relaxation.",
-    ar: "تجربة شاليه عصري خاص في الكويت، مصمم للراحة والخصوصية والتقنية والاسترخاء.",
+    ar: "تجربة شاليه عصري خاص في الكويت، مصمم ليوفر لك الراحة والخصوصية والتقنيات الحديثة والاسترخاء.",
   },
   menu: { en: "Menu", ar: "القائمة" },
   close: { en: "Close", ar: "إغلاق" },
