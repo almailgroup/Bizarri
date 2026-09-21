@@ -82,6 +82,17 @@ export function daysBetween(start: Date, end: Date): number {
 
 /* -------------------------------------------------------------- pricing */
 
+/** A premium window (Eid and the like): a flat price for the whole window. */
+export interface Occasion {
+  id: string;
+  nameEn: string;
+  nameAr: string;
+  /** Inclusive yyyy-mm-dd bounds. */
+  start: string;
+  end: string;
+  price: number;
+}
+
 export interface Quote {
   total: number;
   days: number;
@@ -89,6 +100,8 @@ export interface Quote {
   packageKey: PackageKey | null;
   /** True when a custom daily override applied to at least one day. */
   hasCustom: boolean;
+  /** Set when a special occasion priced the stay. */
+  occasion: Occasion | null;
   breakdown: { date: string; price: number; custom: boolean }[];
 }
 
@@ -103,7 +116,7 @@ export function defaultDayRate(d: Date, rates: Rates): number {
 }
 
 /** The package a range matches exactly, by length and start/end weekday. */
-export function matchPackage(start: Date, end: Date): PackageKey | null {
+export function matchPackage(start: Date, end: Date): Exclude<PackageKey, "special"> | null {
   const len = daysBetween(start, end);
   const from = start.getDay();
   const to = end.getDay();
@@ -114,14 +127,20 @@ export function matchPackage(start: Date, end: Date): PackageKey | null {
 }
 
 /**
- * Price a stay.
- *
- * Custom daily prices win outright: if the admin has priced any day in the
- * range, the whole range is summed per-day so the override is never masked by
- * a flat package rate. Otherwise an exact package match uses the flat rate,
- * and anything else falls back to the per-day defaults.
+ * Price a stay. Mirrors quote_stay() in SQL, same precedence:
+ *   1. custom day prices — sum per day, so an override is never masked.
+ *   2. special occasion  — its flat price, plus per-day defaults for any days
+ *                          the stay extends beyond the window.
+ *   3. exact package     — fullWeek / weekend / weekday.
+ *   4. per-day defaults.
  */
-export function quote(start: Date, end: Date, prices: Record<string, number>, rates: Rates): Quote {
+export function quote(
+  start: Date,
+  end: Date,
+  prices: Record<string, number>,
+  rates: Rates,
+  occasions: Occasion[] = [],
+): Quote {
   const days = eachDay(start, end);
   const breakdown = days.map((d) => {
     const iso = fmtDate(d);
@@ -129,11 +148,38 @@ export function quote(start: Date, end: Date, prices: Record<string, number>, ra
     return { date: iso, price: custom ? prices[iso] : defaultDayRate(d, rates), custom };
   });
   const hasCustom = breakdown.some((b) => b.custom);
-  const packageKey = hasCustom ? null : matchPackage(start, end);
+  const perDay = breakdown.reduce((sum, b) => sum + b.price, 0);
 
-  const total = packageKey ? rates[packageKey] : breakdown.reduce((sum, b) => sum + b.price, 0);
+  if (hasCustom) {
+    return { total: perDay, days: days.length, packageKey: null, hasCustom, occasion: null, breakdown };
+  }
 
-  return { total, days: days.length, packageKey, hasCustom, breakdown };
+  const from = fmtDate(start);
+  const to = fmtDate(end);
+  // The server forbids overlapping active occasions, so at most one matches;
+  // the sort only decides a winner if that ever changes.
+  const occasion = occasions
+    .filter((o) => o.start <= to && o.end >= from)
+    .sort((a, b) => b.price - a.price)[0];
+
+  if (occasion) {
+    const outside = days
+      .filter((d) => fmtDate(d) < occasion.start || fmtDate(d) > occasion.end)
+      .reduce((sum, d) => sum + defaultDayRate(d, rates), 0);
+    return {
+      total: occasion.price + outside,
+      days: days.length,
+      packageKey: "special",
+      hasCustom: false,
+      occasion,
+      breakdown,
+    };
+  }
+
+  const packageKey = matchPackage(start, end);
+  const total = packageKey ? rates[packageKey] : perDay;
+
+  return { total, days: days.length, packageKey, hasCustom: false, occasion: null, breakdown };
 }
 
 /* -------------------------------------------------------- availability */

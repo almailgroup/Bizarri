@@ -16,8 +16,9 @@ import type {
   NewsRow,
   RatesRow,
   SettingRow,
+  SpecialOccasionRow,
 } from "@/integrations/supabase/types";
-import { DEFAULT_RATES, fmtDate, type Rates } from "@/lib/booking";
+import { DEFAULT_RATES, fmtDate, type Occasion, type Rates } from "@/lib/booking";
 
 /* ------------------------------------------------------------------- keys */
 
@@ -32,6 +33,7 @@ export const qk = {
   isAdmin: ["isAdmin"] as const,
   settings: ["settings"] as const,
   auditLog: ["auditLog"] as const,
+  occasions: ["occasions"] as const,
 };
 
 /** Postgres errors arrive with a `message`; surface it rather than "[object Object]". */
@@ -100,6 +102,37 @@ export function useAvailability(chaletId: number, from: Date, to: Date, enabled 
   });
 }
 
+/**
+ * Special occasion windows (Eid etc). Public-readable so the guest calendar can
+ * mirror the premium price; request_booking() still re-derives the real total.
+ */
+export function useSpecialOccasions() {
+  return useQuery({
+    queryKey: qk.occasions,
+    queryFn: async (): Promise<Occasion[]> => {
+      const { data, error } = await supabase
+        .from("special_occasions")
+        .select("*")
+        .eq("active", true)
+        .order("start_date");
+      if (error) fail("Could not load special occasions", error);
+      return (data ?? []).map(toOccasion);
+    },
+    staleTime: 5 * 60_000,
+  });
+}
+
+function toOccasion(o: SpecialOccasionRow): Occasion {
+  return {
+    id: o.id,
+    nameEn: o.name_en,
+    nameAr: o.name_ar,
+    start: o.start_date,
+    end: o.end_date,
+    price: Number(o.price),
+  };
+}
+
 export function usePublishedNews() {
   return useQuery({
     queryKey: qk.news(false),
@@ -126,6 +159,33 @@ export interface BookingRequestInput {
   email: string;
   guests: number;
   notes?: string;
+  /** Object path in the private civil-ids bucket, from uploadCivilId(). */
+  civilIdPath: string;
+  termsAccepted: boolean;
+}
+
+/**
+ * Put the guest's Civil ID in the private bucket and hand back its path.
+ *
+ * The name is random rather than derived from the guest: the bucket grants
+ * anon insert only, so a predictable name would be the one thing another
+ * visitor could overwrite.
+ */
+export async function uploadCivilId(file: File): Promise<string> {
+  const ext = (file.name.split(".").pop() ?? "jpg").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const path = `${crypto.randomUUID()}.${ext || "jpg"}`;
+  const { error } = await supabase.storage
+    .from("civil-ids")
+    .upload(path, file, { contentType: file.type || undefined, upsert: false });
+  if (error) fail("Could not upload the Civil ID", error);
+  return path;
+}
+
+/** Short-lived link so an admin can view an uploaded ID. */
+export async function civilIdUrl(path: string): Promise<string> {
+  const { data, error } = await supabase.storage.from("civil-ids").createSignedUrl(path, 120);
+  if (error) fail("Could not open the Civil ID", error);
+  return data.signedUrl;
 }
 
 /**
@@ -145,6 +205,8 @@ export function useRequestBooking() {
         p_guest_email: input.email,
         p_guests: input.guests,
         p_notes: input.notes ?? null,
+        p_civil_id_path: input.civilIdPath,
+        p_terms_accepted: input.termsAccepted,
       });
       if (error) fail("Booking failed", error);
       return data as unknown as BookingRow;
@@ -395,6 +457,62 @@ export function useDeleteNews() {
       if (error) fail("Could not delete the news item", error);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["news"] }),
+  });
+}
+
+/* ----------------------------------------------------- special occasions */
+
+/** Admin view: inactive windows included, so they can be re-enabled. */
+export function useAllOccasions(enabled: boolean) {
+  return useQuery({
+    queryKey: [...qk.occasions, "all"],
+    enabled,
+    queryFn: async (): Promise<SpecialOccasionRow[]> => {
+      const { data, error } = await supabase
+        .from("special_occasions")
+        .select("*")
+        .order("start_date");
+      if (error) fail("Could not load special occasions", error);
+      return data ?? [];
+    },
+  });
+}
+
+export function useSaveOccasion() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (item: Partial<SpecialOccasionRow> & { id?: string }) => {
+      const payload = {
+        name_en: (item.name_en ?? "").trim(),
+        name_ar: (item.name_ar ?? "").trim(),
+        start_date: item.start_date ?? "",
+        end_date: item.end_date ?? "",
+        price: Number(item.price ?? 900),
+        active: item.active ?? true,
+      };
+      const { error } = item.id
+        ? await supabase.from("special_occasions").update(payload).eq("id", item.id)
+        : await supabase.from("special_occasions").insert(payload);
+      if (error) fail("Could not save the occasion", error);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.occasions });
+      qc.invalidateQueries({ queryKey: ["calendar"] });
+    },
+  });
+}
+
+export function useDeleteOccasion() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("special_occasions").delete().eq("id", id);
+      if (error) fail("Could not delete the occasion", error);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.occasions });
+      qc.invalidateQueries({ queryKey: ["calendar"] });
+    },
   });
 }
 

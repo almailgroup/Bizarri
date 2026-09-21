@@ -1,6 +1,6 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Menu, X, Globe } from "lucide-react";
+import { Menu, X, Globe, Ticket } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import logo from "@/assets/bizarri-logo.png";
 import logoWhite from "@/assets/bizarri-logo-white.png";
@@ -17,6 +17,7 @@ const primaryNav = [
 
 const menuNav = [
   ...primaryNav.slice(0, 4),
+  { to: "/reservation", key: "yourReservation" as const },
   { to: "/news", key: "news" as const },
   { to: "/rules", key: "rules" as const },
   { to: "/contact", key: "contact" as const },
@@ -104,6 +105,19 @@ export function Header() {
           </nav>
 
           <div className="flex items-center gap-2">
+            {/* A shortcut rather than another nav item: returning guests come
+                back to check a status, not to browse. */}
+            <Link
+              to="/reservation"
+              className={`hidden items-center gap-1.5 border px-3 py-2 text-xs uppercase tracking-widest transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current sm:flex ${
+                overHero
+                  ? "border-white/30 text-white hover:bg-white hover:text-black"
+                  : "border-border hover:bg-foreground hover:text-background"
+              }`}
+            >
+              <Ticket className="h-3.5 w-3.5" />
+              {tr("yourReservation")}
+            </Link>
             <button
               onClick={() => setLang(lang === "en" ? "ar" : "en")}
               // Arabic is a first-class language here, not a setting buried in

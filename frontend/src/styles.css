@@ -248,3 +248,37 @@
 [dir="rtl"] [class*="uppercase"] {
   text-transform: none;
 }
+
+/* The admin dashboard is a tool, not a brochure. The marketing serif next to
+   dashboard tables reads as two different pages, so the whole admin surface
+   uses one family. Unlayered for the same reason as the RTL rules above: the
+   .font-display utility and the base h1-h4 rule both sit in layers, and a
+   layered rule always loses to Tailwind's utilities whatever its specificity. */
+.admin-ui,
+.admin-ui h1,
+.admin-ui h2,
+.admin-ui h3,
+.admin-ui h4,
+.admin-ui .font-display,
+.admin-ui .font-mono {
+  font-family: var(--font-sans);
+  letter-spacing: normal;
+}
+[dir="rtl"] .admin-ui,
+[dir="rtl"] .admin-ui h1,
+[dir="rtl"] .admin-ui h2,
+[dir="rtl"] .admin-ui h3,
+[dir="rtl"] .admin-ui h4,
+[dir="rtl"] .admin-ui .font-display,
+[dir="rtl"] .admin-ui .font-mono {
+  font-family: var(--font-arabic);
+}
+/* The serif carried the visual weight of a heading on its own; the sans needs
+   the weight set explicitly or admin headings read as body copy. */
+.admin-ui h1,
+.admin-ui h2,
+.admin-ui h3,
+.admin-ui h4,
+.admin-ui .font-display {
+  font-weight: 600;
+}

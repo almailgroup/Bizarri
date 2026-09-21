@@ -4,8 +4,8 @@ import { PageShell } from "@/components/PageShell";
 import { Reveal } from "@/components/Reveal";
 import { useI18n } from "@/lib/i18n";
 import { usePageMeta } from "@/hooks/use-page-meta";
-import { DEFAULT_RATES, formatMoney } from "@/lib/booking";
-import { useRates } from "@/lib/api";
+import { DEFAULT_RATES, fmtDate, formatMoney } from "@/lib/booking";
+import { useRates, useSpecialOccasions } from "@/lib/api";
 
 export const Route = createFileRoute("/offers")({ component: Offers });
 
@@ -20,6 +20,10 @@ function Offers() {
   // Rates are admin-editable, so read them rather than hard-coding the figures.
   const { data: stored } = useRates();
   const rates = stored ?? DEFAULT_RATES;
+  const { data: occasions } = useSpecialOccasions();
+  // Past windows are noise on a price list; only what is still bookable.
+  const today = fmtDate(new Date());
+  const upcoming = (occasions ?? []).filter((o) => o.end >= today);
 
   const packages = [
     {
@@ -112,6 +116,30 @@ function Offers() {
             </dl>
           </div>
         </Reveal>
+
+        {upcoming.length > 0 && (
+          <Reveal delay={140}>
+            <div className="mt-4 border border-border p-8">
+              <p className="text-xs uppercase tracking-widest text-muted-foreground">
+                {tr("specialOccasions")}
+              </p>
+              <p className="mt-3 max-w-lg text-muted-foreground">{tr("occasionsPublicIntro")}</p>
+              <dl className="mt-6 flex flex-wrap gap-x-14 gap-y-4">
+                {upcoming.map((o) => (
+                  <div key={o.id}>
+                    <dt className="text-xs uppercase tracking-widest text-muted-foreground">
+                      {lang === "en" ? o.nameEn : o.nameAr || o.nameEn}
+                    </dt>
+                    <dd className="mt-1 font-display text-2xl">{formatMoney(o.price, lang)}</dd>
+                    <dd className="text-sm text-muted-foreground" dir="ltr">
+                      {o.start} → {o.end}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          </Reveal>
+        )}
 
         <Reveal delay={160}>
           <Link

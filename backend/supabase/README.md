@@ -45,10 +45,31 @@ path that adds an admin.
 | Exact Sun–Wed (4 days) | `rates.weekday` |
 | Exact Thu–Sat (3 days) | `rates.weekend` |
 | Any other range | sum of per-day rates (Sun–Wed `daily_weekday`, Thu–Sat `daily_weekend`) |
+| **Overlaps a special occasion** | the occasion's flat price, plus per-day rates for days outside the window |
 | **Any custom day price in range** | per-day sum, overrides all of the above |
 
-A custom price always wins, so an override is never masked by a flat package
-rate.
+Precedence runs most-specific first: custom day prices, then special
+occasions, then an exact package, then per-day defaults. A custom price always
+wins, so an override is never masked by a flat rate.
+
+**Special occasions** (`special_occasions`) are premium windows — Eid and the
+like, typically a Thu–Sat — priced at a flat 900 by default instead of the 350
+weekend rate. Admins add them from the dashboard's Special Occasions tab; no
+migration needed for next year's Eid. Two *active* windows may not cover the
+same day, enforced by an exclusion constraint, so a day never has two prices.
+
+### Checkout requirements
+
+`request_booking()` refuses a request that does not carry both:
+
+- `p_civil_id_path` — the object path of an image the guest already uploaded to
+  the private `civil-ids` bucket, and
+- `p_terms_accepted` — recorded on the row as `terms_accepted_at`.
+
+Both are enforced in the function, not just the form: the form is not the
+security boundary. The bucket grants anon INSERT only — no select, update or
+delete — so an uploaded ID cannot be read back, overwritten or enumerated by
+another visitor. Admins read it through a short-lived signed URL.
 
 ## Files
 
@@ -65,6 +86,10 @@ backend/supabase/
     20260906090200_rls.sql            RLS policies, grants, audit trigger
     20260906090300_seed.sql           chalets, default rates, settings
     20260907120000_booking_guards.sql readable validation errors
+    20260908100000_audit_edits.sql    audit field edits, settings, chalets
+    20260921090000_occasions_and_checkout.sql
+                                      special occasions, Civil ID + terms gate,
+                                      civil-ids storage bucket and its policies
   functions/
     _shared/http.ts                   CORS headers, shared by notify-booking
     notify-booking/                   email on new booking request
@@ -149,8 +174,9 @@ Dashboard → Database → Webhooks → *Create*:
 
 ## Running the tests
 
-48 assertions covering pricing, availability, every RLS boundary, the booking
-RPC, double-booking prevention and the audit trail.
+77 assertions covering pricing (packages, custom days, special occasions),
+availability, every RLS boundary, the booking RPC, the Civil ID and terms
+gate, double-booking prevention and the audit trail.
 
 ```bash
 backend/supabase/tests/run.sh                # local cluster on :55432

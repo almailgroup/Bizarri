@@ -12,6 +12,7 @@ import { RequestsPanel } from "@/components/admin/RequestsPanel";
 import { ChaletsPanel } from "@/components/admin/ChaletsPanel";
 import { NewsPanel } from "@/components/admin/NewsPanel";
 import { SettingsPanel } from "@/components/admin/SettingsPanel";
+import { OccasionsPanel } from "@/components/admin/OccasionsPanel";
 import { ActivityPanel } from "@/components/admin/ActivityPanel";
 import { useChalets } from "@/lib/api";
 
@@ -58,7 +59,7 @@ function SignIn() {
   };
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center bg-black px-6 text-white">
+    <div className="admin-ui relative flex min-h-screen items-center justify-center bg-black px-6 text-white">
       <Link
         to="/"
         aria-label={tr("close")}
@@ -120,7 +121,7 @@ function NotAuthorised() {
   const { lang } = useI18n();
   const { signOut } = useAuth();
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-black px-6 text-center text-white">
+    <div className="admin-ui flex min-h-screen flex-col items-center justify-center gap-6 bg-black px-6 text-center text-white">
       <img src={logoWhite} alt="Bizarri" className="h-10 w-auto" />
       <p className="max-w-sm text-white/70">
         {lang === "en"
@@ -138,7 +139,15 @@ function NotAuthorised() {
 }
 
 type Tab =
-  "overview" | "requests" | "availability" | "rates" | "chalets" | "news" | "settings" | "activity";
+  | "overview"
+  | "requests"
+  | "availability"
+  | "rates"
+  | "occasions"
+  | "chalets"
+  | "news"
+  | "settings"
+  | "activity";
 
 function Dashboard() {
   const { tr, lang } = useI18n();
@@ -152,6 +161,7 @@ function Dashboard() {
     { key: "requests", label: tr("requests") },
     { key: "availability", label: tr("availability") },
     { key: "rates", label: tr("packageRates") },
+    { key: "occasions", label: tr("specialOccasions") },
     { key: "chalets", label: tr("chaletsMgmt") },
     { key: "news", label: lang === "en" ? "News" : "الأخبار" },
     { key: "settings", label: tr("siteSettings") },
@@ -159,7 +169,7 @@ function Dashboard() {
   ];
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="admin-ui min-h-screen bg-background">
       <header className="border-b border-border bg-black text-white">
         <div className="mx-auto flex h-20 max-w-7xl items-center justify-between gap-4 px-6">
           <div className="flex items-center gap-4">
@@ -230,6 +240,7 @@ function Dashboard() {
         {tab === "requests" && <RequestsPanel />}
         {tab === "availability" && <AvailabilityPanel chaletId={chaletId} />}
         {tab === "rates" && <RatesPanel />}
+        {tab === "occasions" && <OccasionsPanel />}
         {tab === "chalets" && <ChaletsPanel />}
         {tab === "news" && <NewsPanel />}
         {tab === "settings" && <SettingsPanel />}

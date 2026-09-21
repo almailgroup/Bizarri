@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
-import { Download, Pencil, Search, Trash2, X } from "lucide-react";
+import { Download, IdCard, Pencil, Search, Trash2, X } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { fmtDate, formatMoney } from "@/lib/booking";
-import { useBookings, useDeleteBooking, useSetBookingStatus } from "@/lib/api";
+import { civilIdUrl, useBookings, useDeleteBooking, useSetBookingStatus } from "@/lib/api";
 import type { BookingRow, BookingStatus } from "@/integrations/supabase/types";
 import { DeleteConfirm } from "./DeleteConfirm";
 import { EditBookingModal } from "./EditBookingModal";
@@ -37,7 +37,9 @@ export function RequestsPanel() {
         ? tr("weekendPkg")
         : key === "weekday"
           ? tr("weekdayPkg")
-          : "";
+          : key === "special"
+            ? tr("specialPkg")
+            : "";
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -201,6 +203,7 @@ export function RequestsPanel() {
                 {tr("guestsLabel")}: {b.guests}
               </span>
             </div>
+            <CivilIdLink path={b.civil_id_path} />
             {b.notes && <p className="mt-3 text-sm text-muted-foreground">{b.notes}</p>}
             {b.admin_note && (
               <p className="mt-2 border-s-2 border-foreground/30 ps-3 text-sm text-muted-foreground">
@@ -253,5 +256,43 @@ export function RequestsPanel() {
         />
       )}
     </section>
+  );
+}
+
+/**
+ * The bucket is private, so the image is reached through a short-lived signed
+ * URL minted on demand rather than a stored link that would outlive the view.
+ */
+function CivilIdLink({ path }: { path: string | null }) {
+  const { tr } = useI18n();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  if (!path) {
+    return <p className="mt-3 text-sm text-muted-foreground">{tr("noCivilId")}</p>;
+  }
+
+  return (
+    <div className="mt-3">
+      <button
+        type="button"
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          setError("");
+          try {
+            window.open(await civilIdUrl(path), "_blank", "noopener,noreferrer");
+          } catch (err) {
+            setError((err as Error).message);
+          } finally {
+            setBusy(false);
+          }
+        }}
+        className="flex items-center gap-2 border border-border px-4 py-2 text-xs uppercase tracking-widest transition-colors hover:bg-secondary disabled:opacity-50"
+      >
+        <IdCard className="h-4 w-4" /> {tr("viewCivilId")}
+      </button>
+      {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
+    </div>
   );
 }

@@ -1,11 +1,13 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
-import { Check, ChevronLeft, ChevronRight } from "lucide-react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
+import { Check, ChevronLeft, ChevronRight, Paperclip } from "lucide-react";
 import { PageShell } from "@/components/PageShell";
+import { BookingLookup, rememberBookingRef } from "@/components/BookingLookup";
 import { useI18n } from "@/lib/i18n";
 import { usePageMeta } from "@/hooks/use-page-meta";
 import {
   MIN_STAY_DAYS,
+  addDays,
   daysBetween,
   eachDay,
   fmtDate,
@@ -15,15 +17,27 @@ import {
   startOfToday,
 } from "@/lib/booking";
 import {
+  uploadCivilId,
   useAvailability,
   useChalets,
-  useLookupBooking,
   useRates,
   useRequestBooking,
+  useSpecialOccasions,
 } from "@/lib/api";
 import type { BookingRow } from "@/integrations/supabase/types";
 
 export const Route = createFileRoute("/booking")({ component: Booking });
+
+/** Which package shape the calendar is filtered to. */
+type DateFilter = "all" | "weekday" | "weekend";
+
+const FILTER_SHAPE: Record<Exclude<DateFilter, "all">, { startDow: number; length: number }> = {
+  weekday: { startDow: 0, length: 4 }, // Sun–Wed
+  weekend: { startDow: 4, length: 3 }, // Thu–Sat
+};
+
+const MAX_ID_BYTES = 5 * 1024 * 1024;
+const ID_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic", "application/pdf"];
 
 function Booking() {
   const { tr, lang } = useI18n();
@@ -57,6 +71,7 @@ function Booking() {
           <Calendar
             chaletId={chaletId}
             onDone={(b) => {
+              rememberBookingRef(b.ref);
               setConfirmed(b);
               setStage("done");
             }}
@@ -88,6 +103,14 @@ function Booking() {
               {lang === "en"
                 ? "Keep this reference. We will contact you shortly to confirm."
                 : "احتفظ بهذا الرقم. سوف نتواصل معكم قريباً للتأكيد."}
+            </p>
+            <p className="mt-6 text-sm">
+              <Link
+                to="/reservation"
+                className="underline underline-offset-4 text-muted-foreground hover:text-foreground"
+              >
+                {tr("yourReservation")}
+              </Link>
             </p>
           </div>
         )}
@@ -147,87 +170,9 @@ function Intro({
         {tr("bookNow")}
       </button>
 
-      <LookupPanel />
-    </div>
-  );
-}
-
-/** Guests get a reference on confirmation; this is how they use it later. */
-function LookupPanel() {
-  const { tr, lang } = useI18n();
-  const lookup = useLookupBooking();
-  const [ref, setRef] = useState("");
-  const [email, setEmail] = useState("");
-
-  const found = lookup.data?.[0];
-  const statusLabel = (s: string) =>
-    s === "accepted"
-      ? tr("statusAccepted")
-      : s === "rejected"
-        ? tr("statusRejected")
-        : s === "cancelled"
-          ? lang === "en"
-            ? "Cancelled"
-            : "ملغى"
-          : tr("statusPending");
-
-  return (
-    <div className="mt-16 border-t border-border pt-10">
-      <h2 className="font-display text-2xl">{tr("checkBooking")}</h2>
-      <p className="mt-2 text-sm text-muted-foreground">{tr("checkBookingHint")}</p>
-
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (!ref.trim() || !email.trim()) return;
-          lookup.mutate({ ref, email });
-        }}
-        className="mt-5 flex flex-wrap gap-3"
-      >
-        <input
-          value={ref}
-          onChange={(e) => setRef(e.target.value)}
-          placeholder="BZR-XXXXXX"
-          dir="ltr"
-          aria-label={tr("bookingRef")}
-          className="min-w-[10rem] flex-1 border border-border bg-secondary px-4 py-3 font-mono outline-none focus:border-foreground"
-        />
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder={tr("email")}
-          dir="ltr"
-          aria-label={tr("email")}
-          className="min-w-[12rem] flex-1 border border-border bg-secondary px-4 py-3 outline-none focus:border-foreground"
-        />
-        <button
-          type="submit"
-          disabled={lookup.isPending}
-          className="border border-foreground px-6 py-3 text-sm uppercase tracking-widest transition-colors hover:bg-foreground hover:text-background disabled:opacity-50"
-        >
-          {tr("checkStatus")}
-        </button>
-      </form>
-
-      {lookup.isSuccess && !found && (
-        <p className="mt-4 text-sm text-muted-foreground">{tr("bookingNotFound")}</p>
-      )}
-      {lookup.isError && (
-        <p className="mt-4 text-sm text-destructive">{(lookup.error as Error).message}</p>
-      )}
-      {found && (
-        <div className="mt-5 border border-border p-6">
-          <p className="font-mono text-xs text-muted-foreground" dir="ltr">
-            {found.ref}
-          </p>
-          <p className="mt-2 font-display text-2xl">{statusLabel(found.status)}</p>
-          <p className="mt-2 text-sm text-muted-foreground" dir="ltr">
-            Chalet {found.chalet_id} · {found.start_date} → {found.end_date} ({found.days}{" "}
-            {tr("nightsLabel")}) · {formatMoney(Number(found.total), lang)}
-          </p>
-        </div>
-      )}
+      <div className="mt-16 border-t border-border pt-10">
+        <BookingLookup />
+      </div>
     </div>
   );
 }
@@ -241,6 +186,7 @@ function Calendar({ chaletId, onDone }: { chaletId: number; onDone: (b: BookingR
   const [start, setStart] = useState<Date | null>(null);
   const [end, setEnd] = useState<Date | null>(null);
   const [error, setError] = useState("");
+  const [filter, setFilter] = useState<DateFilter>("all");
   const [showForm, setShowForm] = useState(false);
 
   // A year of availability in one request, so paging months is instant and the
@@ -252,6 +198,7 @@ function Calendar({ chaletId, onDone }: { chaletId: number; onDone: (b: BookingR
     error: loadError,
   } = useAvailability(chaletId, thisMonth, windowEnd);
   const { data: rates } = useRates();
+  const { data: occasions } = useSpecialOccasions();
 
   const byDay = useMemo(() => {
     const map = new Map<string, { blocked: boolean; price: number; custom: boolean }>();
@@ -264,12 +211,18 @@ function Calendar({ chaletId, onDone }: { chaletId: number; onDone: (b: BookingR
   // Days outside the fetched window count as unavailable rather than
   // optimistically bookable.
   const dayBlocked = (d: Date) => byDay.get(fmtDate(d))?.blocked ?? true;
+  const isPast = (d: Date) => d < today;
 
   const customPrices = useMemo(() => {
     const out: Record<string, number> = {};
     for (const [iso, v] of byDay) if (v.custom) out[iso] = v.price;
     return out;
   }, [byDay]);
+
+  const occasionFor = (d: Date) => {
+    const iso = fmtDate(d);
+    return (occasions ?? []).find((o) => o.start <= iso && o.end >= iso) ?? null;
+  };
 
   const atFirstMonth = month.getTime() <= thisMonth.getTime();
   // Availability is only known inside the fetched window. Without this the
@@ -291,13 +244,49 @@ function Calendar({ chaletId, onDone }: { chaletId: number; onDone: (b: BookingR
     return arr;
   }, [month]);
 
+  /**
+   * With a package filter on, every day that belongs to a complete, still-free
+   * stay of that shape maps to the whole window. Clicking any of them selects
+   * the stay in one tap instead of asking the guest to know that a weekend
+   * starts on Thursday.
+   */
+  const windows = useMemo(() => {
+    if (filter === "all") return null;
+    const { startDow, length } = FILTER_SHAPE[filter];
+    const map = new Map<string, { start: Date; end: Date }>();
+    // Pad either side so a window straddling a month boundary still resolves.
+    const from = addDays(new Date(month.getFullYear(), month.getMonth(), 1), -7);
+    const to = addDays(new Date(month.getFullYear(), month.getMonth() + 1, 0), 7);
+    for (let d = from; d <= to; d = addDays(d, 1)) {
+      if (d.getDay() !== startDow) continue;
+      const last = addDays(d, length - 1);
+      const span = eachDay(d, last);
+      if (span.some((x) => dayBlocked(x))) continue;
+      for (const x of span) map.set(fmtDate(x), { start: d, end: last });
+    }
+    return map;
+  }, [filter, month, byDay]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const monthHasWindow = useMemo(() => {
+    if (!windows) return true;
+    return cells.some((d) => d && windows.has(fmtDate(d)));
+  }, [windows, cells]);
+
   // Shown live while choosing; request_booking() re-derives it server-side and
   // its answer is what is stored.
-  const current = start && end && rates ? quote(start, end, customPrices, rates) : null;
+  const current =
+    start && end && rates ? quote(start, end, customPrices, rates, occasions ?? []) : null;
   const tooShort = current !== null && current.days < MIN_STAY_DAYS;
 
   const selectDay = (d: Date) => {
     setError("");
+    if (windows) {
+      const w = windows.get(fmtDate(d));
+      if (!w) return;
+      setStart(w.start);
+      setEnd(w.end);
+      return;
+    }
     if (!start || end || d < start) {
       setStart(d);
       setEnd(null);
@@ -337,12 +326,16 @@ function Calendar({ chaletId, onDone }: { chaletId: number; onDone: (b: BookingR
     );
   }
 
+  const changeMonth = (delta: number) => {
+    setMonth(new Date(month.getFullYear(), month.getMonth() + delta, 1));
+  };
+
   return (
     <div className="animate-fade-up">
       <h1 className="mb-2 font-display text-4xl md:text-5xl">{tr("selectDates")}</h1>
       <p className="mb-6 text-sm text-muted-foreground">
         {chaletId === 1 ? tr("bizarri1") : tr("bizarri2")} ·{" "}
-        {!start || end ? tr("pickStart") : tr("pickEnd")}
+        {filter !== "all" ? tr("filterHint") : !start || end ? tr("pickStart") : tr("pickEnd")}
       </p>
 
       {loadError && (
@@ -350,6 +343,30 @@ function Calendar({ chaletId, onDone }: { chaletId: number; onDone: (b: BookingR
           {(loadError as Error).message}
         </p>
       )}
+
+      {/* Package filter, above the calendar. */}
+      <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label={tr("filterAll")}>
+        {(["all", "weekday", "weekend"] as DateFilter[]).map((f) => (
+          <button
+            key={f}
+            type="button"
+            onClick={() => {
+              setFilter(f);
+              setStart(null);
+              setEnd(null);
+              setError("");
+            }}
+            aria-pressed={filter === f}
+            className={`border px-4 py-2 text-xs uppercase tracking-widest transition-colors ${
+              filter === f
+                ? "border-foreground bg-foreground text-background"
+                : "border-border hover:border-foreground/50"
+            }`}
+          >
+            {f === "all" ? tr("filterAll") : f === "weekday" ? tr("filterWeekday") : tr("filterWeekend")}
+          </button>
+        ))}
+      </div>
 
       <div className="relative border border-border p-6 md:p-8">
         {isLoading && (
@@ -360,7 +377,7 @@ function Calendar({ chaletId, onDone }: { chaletId: number; onDone: (b: BookingR
 
         <div className="mb-6 flex items-center justify-between">
           <button
-            onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}
+            onClick={() => changeMonth(-1)}
             disabled={atFirstMonth}
             aria-label={lang === "en" ? "Previous month" : "الشهر السابق"}
             className="p-2 enabled:hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-25"
@@ -369,7 +386,7 @@ function Calendar({ chaletId, onDone }: { chaletId: number; onDone: (b: BookingR
           </button>
           <p className="font-display text-2xl capitalize">{monthName}</p>
           <button
-            onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}
+            onClick={() => changeMonth(1)}
             disabled={atLastMonth}
             aria-label={lang === "en" ? "Next month" : "الشهر التالي"}
             className="p-2 enabled:hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-25"
@@ -390,39 +407,53 @@ function Calendar({ chaletId, onDone }: { chaletId: number; onDone: (b: BookingR
           {cells.map((d, i) => {
             if (!d) return <div key={`pad-${i}`} />;
             const iso = fmtDate(d);
-            const blocked = dayBlocked(d);
+            const past = isPast(d);
+            // A future day the server refuses is held by a booking or blocked
+            // by the admin — that is what black means. Past days are simply
+            // gone, and are faded instead.
+            const reserved = !past && dayBlocked(d);
+            const offPackage = !!windows && !windows.has(iso);
+            const disabled = past || reserved || offPackage;
             const selected = isEdge(d);
             const within = inRange(d);
             const priced = byDay.get(iso)?.custom === true;
+            const occ = occasionFor(d);
             const dayLabel = d.toLocaleDateString(lang === "ar" ? "ar-EG" : "en-US", {
               weekday: "long",
               day: "numeric",
               month: "long",
             });
+
+            const tone = reserved
+              ? "bg-black text-white cursor-not-allowed"
+              : past
+                ? "cursor-not-allowed text-muted-foreground/30"
+                : selected
+                  ? "bg-background font-semibold ring-2 ring-inset ring-foreground"
+                  : within
+                    ? "bg-secondary"
+                    : offPackage
+                      ? "cursor-not-allowed text-muted-foreground/30"
+                      : occ
+                        ? "ring-1 ring-inset ring-foreground/25 hover:bg-secondary"
+                        : "hover:bg-secondary";
+
             return (
               <button
                 key={iso}
                 type="button"
-                disabled={blocked}
+                disabled={disabled}
                 onClick={() => selectDay(d)}
-                aria-label={`${dayLabel}${blocked ? ` — ${tr("unavailableLabel")}` : ""}`}
-                aria-pressed={!!selected}
-                className={`relative flex aspect-square flex-col items-center justify-center text-sm transition-colors ${
-                  blocked
-                    ? "cursor-not-allowed text-muted-foreground/40 line-through"
-                    : selected
-                      ? "bg-black text-white"
-                      : within
-                        ? "bg-secondary"
-                        : "hover:bg-secondary"
+                aria-label={`${dayLabel}${reserved ? ` — ${tr("reservedLabel")}` : ""}${
+                  occ ? ` — ${lang === "en" ? occ.nameEn : occ.nameAr || occ.nameEn}` : ""
                 }`}
+                aria-pressed={!!selected}
+                className={`relative flex aspect-square flex-col items-center justify-center text-sm transition-colors ${tone}`}
               >
                 {d.getDate()}
-                {priced && !blocked && (
+                {priced && !reserved && !past && (
                   <span
-                    className={`absolute bottom-1 h-1 w-1 rounded-full ${
-                      selected ? "bg-white" : "bg-foreground/50"
-                    }`}
+                    className="absolute bottom-1 h-1 w-1 rounded-full bg-foreground/50"
                     aria-hidden="true"
                   />
                 )}
@@ -431,18 +462,24 @@ function Calendar({ chaletId, onDone }: { chaletId: number; onDone: (b: BookingR
           })}
         </div>
 
+        {!monthHasWindow && (
+          <p className="mt-4 text-xs text-muted-foreground">{tr("filterNoneLeft")}</p>
+        )}
         {atLastMonth && <p className="mt-4 text-xs text-muted-foreground">{tr("horizonNote")}</p>}
 
         <div className="mt-6 flex flex-wrap gap-4 text-xs text-muted-foreground">
           <span className="flex items-center gap-2">
-            <span className="h-3 w-3 bg-black" /> {tr("selectedLabel")}
+            <span className="h-3 w-3 bg-black" /> {tr("reservedLabel")}
+          </span>
+          <span className="flex items-center gap-2">
+            <span className="h-3 w-3 ring-2 ring-inset ring-foreground" /> {tr("selectedLabel")}
           </span>
           <span className="flex items-center gap-2">
             <span className="h-3 w-3 border border-border bg-secondary" />{" "}
             {lang === "en" ? "In stay" : "ضمن الإقامة"}
           </span>
           <span className="flex items-center gap-2">
-            <span className="line-through">12</span> {tr("unavailableLabel")}
+            <span className="h-3 w-3 ring-1 ring-inset ring-foreground/25" /> {tr("specialPkg")}
           </span>
           <span className="flex items-center gap-2">
             <span className="h-1 w-1 rounded-full bg-foreground/50" /> {tr("customPricing")}
@@ -480,7 +517,15 @@ function Calendar({ chaletId, onDone }: { chaletId: number; onDone: (b: BookingR
         </div>
       </div>
 
-      {current && !tooShort && current.packageKey && (
+      {current && !tooShort && current.occasion && (
+        <p className="mt-3 text-sm text-muted-foreground">
+          {tr("specialPkg")} ·{" "}
+          {lang === "en"
+            ? current.occasion.nameEn
+            : current.occasion.nameAr || current.occasion.nameEn}
+        </p>
+      )}
+      {current && !tooShort && current.packageKey && current.packageKey !== "special" && (
         <p className="mt-3 text-sm text-muted-foreground">
           {current.packageKey === "fullWeek"
             ? tr("fullWeekPkg")
@@ -546,10 +591,27 @@ function BookingForm({
   const { tr, lang } = useI18n();
   const request = useRequestBooking();
   const [form, setForm] = useState({ name: "", phone: "", email: "", guests: "2", notes: "" });
-  const [errors, setErrors] = useState<Partial<Record<keyof typeof form, string>>>({});
+  const [civilId, setCivilId] = useState<File | null>(null);
+  const [terms, setTerms] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [errors, setErrors] = useState<
+    Partial<Record<keyof typeof form | "civilId" | "terms", string>>
+  >({});
+
+  // Release the object URL when the chosen file changes or the form unmounts.
+  const [preview, setPreview] = useState<string | null>(null);
+  useEffect(() => {
+    if (!civilId || !civilId.type.startsWith("image/")) {
+      setPreview(null);
+      return;
+    }
+    const url = URL.createObjectURL(civilId);
+    setPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [civilId]);
 
   const validate = () => {
-    const next: Partial<Record<keyof typeof form, string>> = {};
+    const next: typeof errors = {};
     if (form.name.trim().length < 2) {
       next.name = lang === "en" ? "Please enter your full name." : "يرجى إدخال الاسم الكامل.";
     }
@@ -564,13 +626,35 @@ function BookingForm({
     if (!Number.isInteger(guests) || guests < 1 || guests > 20) {
       next.guests = lang === "en" ? "Between 1 and 20 guests." : "بين ١ و ٢٠ ضيفاً.";
     }
+    if (!civilId) {
+      next.civilId = tr("civilIdMissing");
+    } else if (civilId.size > MAX_ID_BYTES) {
+      next.civilId = tr("civilIdTooBig");
+    } else if (civilId.type && !ID_TYPES.includes(civilId.type)) {
+      next.civilId = tr("civilIdWrongType");
+    }
+    if (!terms) {
+      next.terms = tr("acceptTermsRequired");
+    }
     setErrors(next);
     return Object.keys(next).length === 0;
   };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validate()) return;
+    if (!validate() || !civilId) return;
+
+    let civilIdPath: string;
+    setUploading(true);
+    try {
+      civilIdPath = await uploadCivilId(civilId);
+    } catch (err) {
+      setErrors({ civilId: (err as Error).message });
+      return;
+    } finally {
+      setUploading(false);
+    }
+
     const booking = await request.mutateAsync({
       chaletId,
       start,
@@ -580,6 +664,8 @@ function BookingForm({
       email: form.email,
       guests: Number(form.guests),
       notes: form.notes,
+      civilIdPath,
+      termsAccepted: terms,
     });
     onDone(booking);
   };
@@ -590,6 +676,8 @@ function BookingForm({
     { key: "email", label: tr("email"), type: "email" },
     { key: "guests", label: tr("guests"), type: "number" },
   ];
+
+  const busy = uploading || request.isPending;
 
   return (
     // noValidate: the browser's own bubbles fire first and are unlocalised,
@@ -659,6 +747,72 @@ function BookingForm({
         />
       </label>
 
+      {/* Civil ID — mandatory for checkout. */}
+      <div>
+        <span className="text-xs uppercase tracking-widest text-muted-foreground">
+          {tr("civilId")}
+        </span>
+        <p className="mt-1 text-sm text-muted-foreground">{tr("civilIdHint")}</p>
+        <label
+          className={`mt-2 flex cursor-pointer items-center gap-3 border bg-secondary px-4 py-3 transition-colors hover:border-foreground/50 ${
+            errors.civilId ? "border-destructive" : "border-border"
+          }`}
+        >
+          <Paperclip className="h-4 w-4 shrink-0" />
+          <span className="truncate text-sm">{civilId ? civilId.name : tr("civilIdChoose")}</span>
+          <input
+            type="file"
+            accept={ID_TYPES.join(",")}
+            aria-label={tr("civilId")}
+            aria-invalid={!!errors.civilId}
+            onChange={(e) => {
+              setCivilId(e.target.files?.[0] ?? null);
+              if (errors.civilId) setErrors({ ...errors, civilId: undefined });
+            }}
+            className="sr-only"
+          />
+        </label>
+        {preview && (
+          <img
+            src={preview}
+            alt=""
+            className="mt-3 max-h-40 border border-border object-contain"
+          />
+        )}
+        {errors.civilId && (
+          <span className="mt-1 block text-sm text-destructive">{errors.civilId}</span>
+        )}
+      </div>
+
+      {/* Terms — mandatory for checkout. */}
+      <div>
+        <label className="flex items-start gap-3">
+          <input
+            type="checkbox"
+            checked={terms}
+            aria-invalid={!!errors.terms}
+            onChange={(e) => {
+              setTerms(e.target.checked);
+              if (errors.terms) setErrors({ ...errors, terms: undefined });
+            }}
+            className="mt-1 h-4 w-4 shrink-0 accent-black"
+          />
+          <span className="text-sm">
+            {tr("acceptTerms")}{" "}
+            <Link
+              to="/rules"
+              target="_blank"
+              className="underline underline-offset-4 hover:opacity-70"
+            >
+              {tr("readTerms")}
+            </Link>
+          </span>
+        </label>
+        {errors.terms && (
+          <span className="mt-1 block text-sm text-destructive">{errors.terms}</span>
+        )}
+      </div>
+
       {/* Server-side rejections (dates taken since you picked them, rate limit) */}
       {request.isError && (
         <p className="border border-destructive p-4 text-sm text-destructive">
@@ -669,15 +823,22 @@ function BookingForm({
       <div className="flex flex-wrap gap-3">
         <button
           type="submit"
-          disabled={request.isPending}
+          disabled={busy}
           className="bg-black px-10 py-4 text-sm uppercase tracking-widest text-white hover:opacity-90 disabled:opacity-50"
         >
-          {request.isPending ? (lang === "en" ? "Sending…" : "جارٍ الإرسال…") : tr("submit")}
+          {uploading
+            ? tr("civilIdUploading")
+            : request.isPending
+              ? lang === "en"
+                ? "Sending…"
+                : "جارٍ الإرسال…"
+              : tr("submit")}
         </button>
         <button
           type="button"
           onClick={onBack}
-          className="border border-border px-8 py-4 text-sm uppercase tracking-widest hover:bg-secondary"
+          disabled={busy}
+          className="border border-border px-8 py-4 text-sm uppercase tracking-widest hover:bg-secondary disabled:opacity-50"
         >
           {lang === "en" ? "Back" : "رجوع"}
         </button>

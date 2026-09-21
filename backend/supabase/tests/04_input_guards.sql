@@ -13,34 +13,34 @@ begin
   -- zero guests
   begin
     b := public.request_booking(1::smallint, date '2026-12-06', date '2026-12-09',
-          'Zero Guests', '+96599999999', 'zero@example.com', 0::smallint);
+          'Zero Guests', '+96599999999', 'zero@example.com', 0::smallint, null, 'ids/zero.jpg', true);
     perform pg_temp.ok('Zero guests rejected', false, 'accepted');
   exception when others then
-    perform pg_temp.ok('Zero guests rejected', true, left(sqlerrm, 40));
+    perform pg_temp.ok('Zero guests rejected', sqlerrm like '%between 1 and 20 guests%', left(sqlerrm, 40));
   end;
 
   -- 999 guests
   begin
     b := public.request_booking(1::smallint, date '2026-12-13', date '2026-12-16',
-          'Many Guests', '+96599999999', 'many@example.com', 999::smallint);
+          'Many Guests', '+96599999999', 'many@example.com', 999::smallint, null, 'ids/many.jpg', true);
     perform pg_temp.ok('Absurd guest count rejected', false, 'accepted');
   exception when others then
-    perform pg_temp.ok('Absurd guest count rejected', true, left(sqlerrm, 40));
+    perform pg_temp.ok('Absurd guest count rejected', sqlerrm like '%between 1 and 20 guests%', left(sqlerrm, 40));
   end;
 
   -- reversed dates
   begin
     b := public.request_booking(1::smallint, date '2026-12-20', date '2026-12-10',
-          'Backwards', '+96599999999', 'back@example.com', 2::smallint);
+          'Backwards', '+96599999999', 'back@example.com', 2::smallint, null, 'ids/back.jpg', true);
     perform pg_temp.ok('Reversed date range rejected', false, 'accepted');
   exception when others then
-    perform pg_temp.ok('Reversed date range rejected', true, left(sqlerrm, 40));
+    perform pg_temp.ok('Reversed date range rejected', sqlerrm like '%on or after the check-in date%', left(sqlerrm, 40));
   end;
 
   -- a stay starting today
   begin
     b := public.request_booking(1::smallint, current_date, current_date + 3,
-          'Same Day', '+96599999999', 'today@example.com', 2::smallint);
+          'Same Day', '+96599999999', 'today@example.com', 2::smallint, null, 'ids/today.jpg', true);
     perform pg_temp.ok('Stay starting today is allowed', b.ref is not null, b.ref);
   exception when others then
     perform pg_temp.ok('Stay starting today is allowed', false, left(sqlerrm, 60));
@@ -49,17 +49,59 @@ begin
   -- a stay starting yesterday
   begin
     b := public.request_booking(1::smallint, current_date - 1, current_date + 3,
-          'Past Start', '+96599999999', 'past@example.com', 2::smallint);
+          'Past Start', '+96599999999', 'past@example.com', 2::smallint, null, 'ids/past.jpg', true);
     perform pg_temp.ok('Stay starting in the past rejected', false, 'accepted');
   exception when others then
-    perform pg_temp.ok('Stay starting in the past rejected', true, left(sqlerrm, 40));
+    perform pg_temp.ok('Stay starting in the past rejected', sqlerrm like '%no longer available%', left(sqlerrm, 40));
+  end;
+
+  -- terms not accepted
+  begin
+    b := public.request_booking(1::smallint, date '2026-12-27', date '2026-12-30',
+          'No Terms', '+96599999999', 'noterms@example.com', 2::smallint, null, 'ids/t.jpg', false);
+    perform pg_temp.ok('Booking without accepting terms rejected', false, 'accepted');
+  exception when others then
+    perform pg_temp.ok('Booking without accepting terms rejected',
+      sqlerrm like '%terms and regulations%', left(sqlerrm, 40));
+  end;
+
+  -- civil ID missing
+  begin
+    b := public.request_booking(1::smallint, date '2026-12-27', date '2026-12-30',
+          'No ID', '+96599999999', 'noid@example.com', 2::smallint, null, '   ', true);
+    perform pg_temp.ok('Booking without a Civil ID rejected', false, 'accepted');
+  exception when others then
+    perform pg_temp.ok('Booking without a Civil ID rejected',
+      sqlerrm like '%Civil ID image is required%', left(sqlerrm, 40));
+  end;
+
+  -- civil ID path that is not a storage path
+  begin
+    b := public.request_booking(1::smallint, date '2026-12-27', date '2026-12-30',
+          'Bad ID', '+96599999999', 'badid@example.com', 2::smallint, null,
+          'https://evil.example.com/x?a=1', true);
+    perform pg_temp.ok('Malformed Civil ID path rejected', false, 'accepted');
+  exception when others then
+    perform pg_temp.ok('Malformed Civil ID path rejected',
+      sqlerrm like '%not valid%', left(sqlerrm, 40));
+  end;
+
+  -- the happy path stores both
+  begin
+    b := public.request_booking(1::smallint, date '2026-12-27', date '2026-12-30',
+          'Complete Guest', '+96599999999', 'complete@example.com', 2::smallint, null,
+          'ids/complete.jpg', true);
+    perform pg_temp.ok('Civil ID path is stored', b.civil_id_path = 'ids/complete.jpg', b.civil_id_path);
+    perform pg_temp.ok('Terms acceptance is timestamped', b.terms_accepted_at is not null, '');
+  exception when others then
+    perform pg_temp.ok('Civil ID path is stored', false, left(sqlerrm, 60));
   end;
 
   -- flood guard
   for i in 1..6 loop
     begin
       b := public.request_booking(1::smallint, date '2027-01-03' + i*7, date '2027-01-06' + i*7,
-            'Flooder', '+96599999999', 'flood@example.com', 2::smallint);
+            'Flooder', '+96599999999', 'flood@example.com', 2::smallint, null, 'ids/flood.jpg', true);
     exception when others then
       perform pg_temp.ok('Flood guard trips after 5 requests/hour', sqlerrm like '%Too many%', left(sqlerrm,40));
       exit;

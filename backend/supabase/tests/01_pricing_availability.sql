@@ -48,6 +48,65 @@ begin
 end $$;
 delete from public.day_prices where day = '2026-10-05';
 
+-- =================== special occasions (Eid etc) ============================
+-- 2027-05-13..15 is a Thu-Sat, which would normally price as the 350 weekend
+-- package; as an occasion it is a flat 900.
+insert into public.special_occasions (name_en, name_ar, start_date, end_date, price)
+  values ('Eid Test', 'عيد', '2027-05-13', '2027-05-15', 900);
+do $$
+declare q record;
+begin
+  select * into q from public.quote_stay(1::smallint, date '2027-05-13', date '2027-05-15');
+  perform pg_temp.ok('Occasion Thu-Sat = 900, not the 350 weekend rate',
+    q.total = 900 and q.package_key = 'special', format('got %s/%s', q.total, q.package_key));
+  perform pg_temp.ok('Occasion name is returned for the UI',
+    q.occasion = 'Eid Test', coalesce(q.occasion, 'null'));
+
+  -- Wed-Sat: the occasion window plus one weekday night at the per-day rate.
+  select * into q from public.quote_stay(1::smallint, date '2027-05-12', date '2027-05-15');
+  perform pg_temp.ok('Days outside the occasion are added at the per-day rate',
+    q.total = 975, format('got %s (expected 900 + 75)', q.total));
+
+  -- An identical Thu-Sat a week later is untouched by the occasion.
+  select * into q from public.quote_stay(1::smallint, date '2027-05-20', date '2027-05-22');
+  perform pg_temp.ok('A Thu-Sat outside the window still costs 350',
+    q.total = 350 and q.package_key = 'weekend', format('got %s/%s', q.total, q.package_key));
+end $$;
+
+-- A custom day price is more specific than the occasion and still wins.
+insert into public.day_prices (chalet_id, day, price) values (1, '2027-05-13', 50);
+do $$
+declare q record;
+begin
+  select * into q from public.quote_stay(1::smallint, date '2027-05-13', date '2027-05-15');
+  perform pg_temp.ok('Custom day price still beats an occasion',
+    q.total = 290 and q.has_custom and q.package_key is null, format('got %s', q.total));
+end $$;
+delete from public.day_prices where day = '2027-05-13';
+
+-- Two active occasions may not cover the same day.
+do $$
+begin
+  begin
+    insert into public.special_occasions (name_en, start_date, end_date, price)
+      values ('Clashing', '2027-05-14', '2027-05-16', 800);
+    perform pg_temp.ok('Overlapping active occasions are refused', false, 'accepted');
+  exception when exclusion_violation then
+    perform pg_temp.ok('Overlapping active occasions are refused', true, '');
+  end;
+end $$;
+
+-- Deactivating one frees the window again.
+update public.special_occasions set active = false where name_en = 'Eid Test';
+do $$
+declare q record;
+begin
+  select * into q from public.quote_stay(1::smallint, date '2027-05-13', date '2027-05-15');
+  perform pg_temp.ok('An inactive occasion does not price anything',
+    q.total = 350 and q.package_key = 'weekend', format('got %s/%s', q.total, q.package_key));
+end $$;
+delete from public.special_occasions where name_en = 'Eid Test';
+
 -- ======================== availability ======================================
 insert into public.blocked_dates (chalet_id, day) values (1, '2026-10-06');
 do $$

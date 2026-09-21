@@ -121,6 +121,77 @@ export const t: Dict = {
   continueLabel: { en: "Continue", ar: "متابعة" },
   customPricing: { en: "Custom pricing", ar: "تسعير مخصص" },
   bookingRef: { en: "Booking reference", ar: "رقم الحجز" },
+  reservedLabel: { en: "Reserved", ar: "محجوز" },
+  filterAll: { en: "All dates", ar: "كل التواريخ" },
+  filterWeekday: { en: "Weekday · Sun – Wed", ar: "أيام الأسبوع · الأحد – الأربعاء" },
+  filterWeekend: { en: "Weekend · Thu – Sat", ar: "نهاية الأسبوع · الخميس – السبت" },
+  filterHint: {
+    en: "Pick a package and tap any highlighted day to select the whole stay.",
+    ar: "اختر باقة ثم اضغط على أي يوم مميّز لتحديد الإقامة كاملة.",
+  },
+  filterNoneLeft: {
+    en: "No complete stay of this type is left in this month.",
+    ar: "لا توجد إقامة كاملة من هذا النوع متبقية في هذا الشهر.",
+  },
+  specialPkg: { en: "Special occasion", ar: "مناسبة خاصة" },
+  specialOccasions: { en: "Special Occasions", ar: "المناسبات الخاصة" },
+  occasionsHint: {
+    en: "Premium windows such as Eid. The price is a flat total for the whole window, and it replaces the normal package rate.",
+    ar: "فترات مميزة مثل الأعياد. السعر إجمالي ثابت للفترة كاملة، ويحل محل سعر الباقة المعتاد.",
+  },
+  occasionsPublicIntro: {
+    en: "Eid and other peak dates are priced as a flat rate for the whole window.",
+    ar: "تُسعَّر الأعياد والمواسم المميزة بسعر ثابت للفترة كاملة.",
+  },
+  occasionName: { en: "Occasion", ar: "المناسبة" },
+  occasionNameAr: { en: "Occasion (Arabic)", ar: "المناسبة (بالعربية)" },
+  addOccasion: { en: "Add occasion", ar: "إضافة مناسبة" },
+  noOccasions: { en: "No special occasions yet.", ar: "لا توجد مناسبات خاصة بعد." },
+  occasionOverlaps: {
+    en: "Those dates overlap another active occasion. Adjust the dates or deactivate the other one.",
+    ar: "هذه التواريخ تتداخل مع مناسبة أخرى مفعّلة. عدّل التواريخ أو عطّل الأخرى.",
+  },
+  activeLabel: { en: "Active", ar: "مفعّل" },
+  startDate: { en: "Start", ar: "من" },
+  endDate: { en: "End", ar: "إلى" },
+  priceLabel: { en: "Price", ar: "السعر" },
+
+  // Checkout requirements
+  civilId: { en: "Civil ID image", ar: "صورة البطاقة المدنية" },
+  civilIdHint: {
+    en: "Required to confirm your stay. JPG, PNG or PDF, up to 5 MB.",
+    ar: "مطلوبة لتأكيد إقامتك. JPG أو PNG أو PDF، بحد أقصى ٥ ميجابايت.",
+  },
+  civilIdChoose: { en: "Choose file", ar: "اختر ملفاً" },
+  civilIdMissing: { en: "Please attach your Civil ID image.", ar: "يرجى إرفاق صورة البطاقة المدنية." },
+  civilIdTooBig: { en: "That file is larger than 5 MB.", ar: "حجم الملف يتجاوز ٥ ميجابايت." },
+  civilIdWrongType: {
+    en: "Please attach a JPG, PNG or PDF.",
+    ar: "يرجى إرفاق ملف JPG أو PNG أو PDF.",
+  },
+  civilIdUploading: { en: "Uploading…", ar: "جارٍ الرفع…" },
+  viewCivilId: { en: "View Civil ID", ar: "عرض البطاقة المدنية" },
+  noCivilId: { en: "No Civil ID on file", ar: "لا توجد بطاقة مدنية" },
+  acceptTerms: {
+    en: "I have read and accept the terms and regulations.",
+    ar: "لقد قرأت وأوافق على الشروط والأحكام.",
+  },
+  acceptTermsRequired: {
+    en: "You must accept the terms and regulations.",
+    ar: "يجب الموافقة على الشروط والأحكام.",
+  },
+  readTerms: { en: "Read them here", ar: "اقرأها هنا" },
+
+  // Reservation shortcut
+  yourReservation: { en: "Your Reservation", ar: "حجزك" },
+  yourReservationIntro: {
+    en: "Already requested a stay? Look it up with your reference and email.",
+    ar: "هل طلبت إقامة بالفعل؟ تتبعها برقم الحجز والبريد الإلكتروني.",
+  },
+  savedRefNote: {
+    en: "We filled in the reference from your last request on this device.",
+    ar: "تمت تعبئة رقم الحجز من طلبك الأخير على هذا الجهاز.",
+  },
 
   // Admin
   availability: { en: "Availability & Pricing", ar: "التوفر والأسعار" },

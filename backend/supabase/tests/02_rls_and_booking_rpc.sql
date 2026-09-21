@@ -67,7 +67,7 @@ do $$
 declare b public.bookings; q record;
 begin
   b := public.request_booking(1::smallint, date '2026-10-11', date '2026-10-17',
-        'Aisha Al-Sabah', '+96594040955', 'Aisha@Example.com ', 6::smallint, ' late check-in ');
+        'Aisha Al-Sabah', '+96594040955', 'Aisha@Example.com ', 6::smallint, ' late check-in ', 'ids/aisha.jpg', true);
   perform pg_temp.ok('anon CAN request a booking via RPC', b.ref like 'BZR-%', b.ref);
   perform pg_temp.ok('Server prices the stay (600, not client-supplied)', b.total = 600, b.total::text);
   perform pg_temp.ok('Status forced to pending', b.status = 'pending');
@@ -78,7 +78,7 @@ begin
   -- min stay
   begin
     b := public.request_booking(1::smallint, date '2026-11-02', date '2026-11-03',
-          'Too Short', '+96599999999', 'short@example.com', 2::smallint);
+          'Too Short', '+96599999999', 'short@example.com', 2::smallint, null, 'ids/short.jpg', true);
     perform pg_temp.ok('Two-day request rejected', false, 'accepted');
   exception when others then
     perform pg_temp.ok('Two-day request rejected', sqlerrm like '%Minimum stay%', sqlerrm);
@@ -87,7 +87,7 @@ begin
   -- unknown chalet
   begin
     b := public.request_booking(9::smallint, date '2026-11-08', date '2026-11-11',
-          'Ghost', '+96599999999', 'g@example.com', 2::smallint);
+          'Ghost', '+96599999999', 'g@example.com', 2::smallint, null, 'ids/ghost.jpg', true);
     perform pg_temp.ok('Unknown chalet rejected', false, 'accepted');
   exception when others then
     perform pg_temp.ok('Unknown chalet rejected', sqlerrm like '%Unknown chalet%', sqlerrm);
@@ -96,7 +96,7 @@ begin
   -- bad email fails the column constraint
   begin
     b := public.request_booking(1::smallint, date '2026-11-08', date '2026-11-11',
-          'Bad Email', '+96599999999', 'nope@bad', 2::smallint);
+          'Bad Email', '+96599999999', 'nope@bad', 2::smallint, null, 'ids/bad.jpg', true);
     perform pg_temp.ok('Malformed email rejected', false, 'accepted');
   exception when others then
     perform pg_temp.ok('Malformed email rejected', true, 'constraint violated');

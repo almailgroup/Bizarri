@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as RulesRouteImport } from './routes/rules'
+import { Route as ReservationRouteImport } from './routes/reservation'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as PhotosRouteImport } from './routes/photos'
 import { Route as OffersRouteImport } from './routes/offers'
@@ -24,6 +25,11 @@ import { Route as IndexRouteImport } from './routes/index'
 const RulesRoute = RulesRouteImport.update({
   id: '/rules',
   path: '/rules',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReservationRoute = ReservationRouteImport.update({
+  id: '/reservation',
+  path: '/reservation',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PrivacyRoute = PrivacyRouteImport.update({
@@ -88,6 +94,7 @@ export interface FileRoutesByFullPath {
   '/offers': typeof OffersRoute
   '/photos': typeof PhotosRoute
   '/privacy': typeof PrivacyRoute
+  '/reservation': typeof ReservationRoute
   '/rules': typeof RulesRoute
 }
 export interface FileRoutesByTo {
@@ -101,6 +108,7 @@ export interface FileRoutesByTo {
   '/offers': typeof OffersRoute
   '/photos': typeof PhotosRoute
   '/privacy': typeof PrivacyRoute
+  '/reservation': typeof ReservationRoute
   '/rules': typeof RulesRoute
 }
 export interface FileRoutesById {
@@ -115,6 +123,7 @@ export interface FileRoutesById {
   '/offers': typeof OffersRoute
   '/photos': typeof PhotosRoute
   '/privacy': typeof PrivacyRoute
+  '/reservation': typeof ReservationRoute
   '/rules': typeof RulesRoute
 }
 export interface FileRouteTypes {
@@ -130,6 +139,7 @@ export interface FileRouteTypes {
     | '/offers'
     | '/photos'
     | '/privacy'
+    | '/reservation'
     | '/rules'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -143,6 +153,7 @@ export interface FileRouteTypes {
     | '/offers'
     | '/photos'
     | '/privacy'
+    | '/reservation'
     | '/rules'
   id:
     | '__root__'
@@ -156,6 +167,7 @@ export interface FileRouteTypes {
     | '/offers'
     | '/photos'
     | '/privacy'
+    | '/reservation'
     | '/rules'
   fileRoutesById: FileRoutesById
 }
@@ -170,6 +182,7 @@ export interface RootRouteChildren {
   OffersRoute: typeof OffersRoute
   PhotosRoute: typeof PhotosRoute
   PrivacyRoute: typeof PrivacyRoute
+  ReservationRoute: typeof ReservationRoute
   RulesRoute: typeof RulesRoute
 }
 
@@ -180,6 +193,13 @@ declare module '@tanstack/react-router' {
       path: '/rules'
       fullPath: '/rules'
       preLoaderRoute: typeof RulesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reservation': {
+      id: '/reservation'
+      path: '/reservation'
+      fullPath: '/reservation'
+      preLoaderRoute: typeof ReservationRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/privacy': {
@@ -266,6 +286,7 @@ const rootRouteChildren: RootRouteChildren = {
   OffersRoute: OffersRoute,
   PhotosRoute: PhotosRoute,
   PrivacyRoute: PrivacyRoute,
+  ReservationRoute: ReservationRoute,
   RulesRoute: RulesRoute,
 }
 export const routeTree = rootRouteImport

@@ -12,7 +12,7 @@
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export type BookingStatus = "pending" | "accepted" | "rejected" | "cancelled";
-export type PackageKey = "fullWeek" | "weekend" | "weekday";
+export type PackageKey = "fullWeek" | "weekend" | "weekday" | "special";
 
 export type ChaletRow = {
   id: number;
@@ -55,6 +55,19 @@ export type DayPriceRow = {
   updated_by: string | null;
 };
 
+export type SpecialOccasionRow = {
+  id: string;
+  name_en: string;
+  name_ar: string;
+  start_date: string;
+  end_date: string;
+  price: number;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+  updated_by: string | null;
+};
+
 export type BookingRow = {
   id: string;
   ref: string;
@@ -76,6 +89,8 @@ export type BookingRow = {
   updated_at: string;
   decided_at: string | null;
   decided_by: string | null;
+  civil_id_path: string | null;
+  terms_accepted_at: string | null;
 };
 
 export type NewsRow = {
@@ -121,6 +136,7 @@ export type QuoteRow = {
   package_key: PackageKey | null;
   days: number;
   has_custom: boolean;
+  occasion: string | null;
 };
 
 export type Database = {
@@ -149,6 +165,16 @@ export type Database = {
         Row: BlockedDateRow;
         Insert: { chalet_id: number; day: string; reason?: string | null };
         Update: Partial<BlockedDateRow>;
+        Relationships: [];
+      };
+      special_occasions: {
+        Row: SpecialOccasionRow;
+        Insert: Partial<SpecialOccasionRow> & {
+          name_en: string;
+          start_date: string;
+          end_date: string;
+        };
+        Update: Partial<SpecialOccasionRow>;
         Relationships: [];
       };
       day_prices: {
@@ -202,6 +228,8 @@ export type Database = {
           p_guest_email: string;
           p_guests: number;
           p_notes?: string | null;
+          p_civil_id_path: string;
+          p_terms_accepted: boolean;
         };
         Returns: BookingRow;
       };

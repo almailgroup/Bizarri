@@ -95,6 +95,12 @@ project — a fresh account, a new org, or the current project was deleted.
    supabase db push
    ```
 
+   **Without the CLI:** `backend/supabase/bundle.sh > schema.sql` concatenates
+   the migrations into one script to paste into the Supabase SQL editor
+   (Dashboard → SQL Editor → New query → Run). It is idempotent, so running it
+   twice is harmless. This also creates the private `civil-ids` storage bucket
+   and its policies.
+
 4. **Deploy the Edge Functions and their secrets:**
 
    ```bash
@@ -126,15 +132,19 @@ project — a fresh account, a new org, or the current project was deleted.
    that's the intended behavior, not a bug: being authenticated and being an
    admin are checked separately.
 
-6. **(Optional) Wire up booking email notifications.** Dashboard → Database →
+6. **Check the storage bucket.** Dashboard → Storage should list a private
+   `civil-ids` bucket, created by step 3. Guests upload their Civil ID there
+   at checkout; only admins can read it, through a signed URL.
+
+7. **(Optional) Wire up booking email notifications.** Dashboard → Database →
    Webhooks → *Create*: table `public.bookings`, event **Insert**, type
    **Supabase Edge Function**, function `notify-booking`.
 
-7. **Commit and deploy.** Push the updated `frontend/.env` — it's safe to
+8. **Commit and deploy.** Push the updated `frontend/.env` — it's safe to
    commit, see above — to the branch GitHub Pages builds from. The next
    deploy picks up the new project automatically.
 
-8. **Verify.** Visit the live site: `/offers` and `/news` should load without
+9. **Verify.** Visit the live site: `/offers` and `/news` should load without
    errors, `/booking` should show an availability calendar, and `/admin`
    should let the account from step 5 sign in and reach the dashboard.
 

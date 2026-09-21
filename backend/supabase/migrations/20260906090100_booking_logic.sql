@@ -42,7 +42,11 @@ $$;
  * a flat package rate. Otherwise an exact package match uses the flat rate and
  * anything else sums the per-day defaults.
  */
-create or replace function public.quote_stay(
+-- Dropped first, not just replaced: a later migration widens the return type,
+-- and "create or replace" cannot change one. Without this, re-applying the
+-- migrations in order over an up-to-date database fails here.
+drop function if exists public.quote_stay(smallint, date, date);
+create function public.quote_stay(
   p_chalet_id smallint,
   p_start     date,
   p_end       date

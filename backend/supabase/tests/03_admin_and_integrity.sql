@@ -90,7 +90,7 @@ begin
   -- the RPC refuses it
   begin
     b := public.request_booking(1::smallint, date '2026-10-12', date '2026-10-16',
-          'Second Guest', '+96588888888', 'second@example.com', 2::smallint);
+          'Second Guest', '+96588888888', 'second@example.com', 2::smallint, null, 'ids/second.jpg', true);
     perform pg_temp.ok('RPC refuses an overlapping request', false, 'accepted');
   exception when others then
     perform pg_temp.ok('RPC refuses an overlapping request', sqlerrm like '%no longer available%', sqlerrm);

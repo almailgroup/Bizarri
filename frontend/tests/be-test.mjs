@@ -18,11 +18,19 @@ function mock(ctx, state) {
     const req = route.request();
     const url = new URL(req.url());
     const path = url.pathname.replace("/rest/v1/", "").replace("/auth/v1/", "auth:");
-    const body = req.postDataJSON?.() ?? null;
+    let body = null;
+    try {
+      body = req.postDataJSON?.() ?? null;
+    } catch {
+      body = null; // multipart storage upload, not JSON
+    }
     state.calls.push({ method: req.method(), path, body });
     const send = (data, status = 200) =>
       route.fulfill({ status, contentType: "application/json", body: JSON.stringify(data) });
 
+    if (url.pathname.startsWith("/storage/v1/object/civil-ids/")) {
+      return send({ Key: url.pathname.replace("/storage/v1/object/", ""), Id: "obj-1" });
+    }
     if (path.startsWith("auth:")) return send({ session: null, user: null }, 400);
     if (path === "chalets") return send(state.chalets);
     if (path === "rates") return send(state.rates);
@@ -202,6 +210,13 @@ await p.locator("input[type=text]").first().fill("Aisha Al-Sabah");
 await p.locator("input[type=tel]").fill("+96594040955");
 await p.locator("input[type=email]").fill("aisha@example.com");
 await p.locator("input[type=number]").fill("6");
+// Checkout now requires a Civil ID image and an explicit terms acceptance.
+await p.locator("input[type=file]").setInputFiles({
+  name: "civil-id.png",
+  mimeType: "image/png",
+  buffer: Buffer.from("89504e470d0a1a0a", "hex"),
+});
+await p.locator("input[type=checkbox]").check();
 await p.getByRole("button", { name: /submit booking request/i }).click();
 await p.waitForTimeout(900);
 const rb = st.calls.find((c) => c.path === "rpc/request_booking");
