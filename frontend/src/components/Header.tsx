@@ -2,6 +2,7 @@ import { Link, useLocation } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Menu, X, Globe, Ticket } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
+import { BrandHomeLink } from "@/components/BrandHomeLink";
 import logo from "@/assets/bizarri-logo.png";
 import logoWhite from "@/assets/bizarri-logo-white.png";
 
@@ -67,11 +68,9 @@ export function Header() {
         }`}
       >
         <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-6">
-          <Link
-            to="/"
+          <BrandHomeLink
             className="flex items-center gap-3 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-current"
-            onClick={() => setOpen(false)}
-            aria-label={tr("brand")}
+            onNavigate={() => setOpen(false)}
           >
             <img
               src={overHero ? logoWhite : logo}
@@ -87,7 +86,7 @@ export function Header() {
               width={1400}
               height={510}
             />
-          </Link>
+          </BrandHomeLink>
 
           <nav className="hidden items-center gap-6 lg:flex xl:gap-8">
             {primaryNav.map((n) => (
@@ -155,7 +154,9 @@ export function Header() {
           aria-label={tr("menu")}
         >
           <div className="sticky top-0 z-10 mx-auto flex h-20 max-w-7xl items-center justify-between bg-black px-6">
-            <img src={logoWhite} alt="Bizarri" className="h-11" />
+            <BrandHomeLink onNavigate={() => setOpen(false)}>
+              <img src={logoWhite} alt="Bizarri" className="h-11" />
+            </BrandHomeLink>
             <button
               onClick={() => setOpen(false)}
               className="p-2.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"

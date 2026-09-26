@@ -151,7 +151,14 @@ export function quote(
   const perDay = breakdown.reduce((sum, b) => sum + b.price, 0);
 
   if (hasCustom) {
-    return { total: perDay, days: days.length, packageKey: null, hasCustom, occasion: null, breakdown };
+    return {
+      total: perDay,
+      days: days.length,
+      packageKey: null,
+      hasCustom,
+      occasion: null,
+      breakdown,
+    };
   }
 
   const from = fmtDate(start);

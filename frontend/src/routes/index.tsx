@@ -4,7 +4,7 @@ import { Reveal } from "@/components/Reveal";
 import { useI18n } from "@/lib/i18n";
 import { usePageMeta } from "@/hooks/use-page-meta";
 import logoWhite from "@/assets/bizarri-logo-white.png";
-import heroImg from "@/assets/room-3.jpg";
+import heroImg from "@/assets/banner.jpg";
 import room1 from "@/assets/room-1.jpg";
 import room4 from "@/assets/room-4.jpg";
 import room5 from "@/assets/room-5.jpg";
@@ -39,12 +39,15 @@ function Home() {
           alt=""
           aria-hidden="true"
           fetchPriority="high"
-          width={1206}
-          height={833}
-          className="absolute inset-0 h-full w-full scale-105 object-cover opacity-70"
+          width={2400}
+          height={1350}
+          className="absolute inset-0 h-full w-full scale-105 object-cover"
         />
-        {/* Two-stop scrim: keeps the type legible without flattening the photo. */}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/45 to-black/85" />
+        {/* The building is lit and centred, which is exactly where the type
+            sits, so the scrim is strongest through the middle rather than at
+            the edges — the usual top/bottom vignette would leave the wordmark
+            over bright windows. */}
+        <div className="absolute inset-0 bg-gradient-to-b from-black/75 via-black/65 to-black/80" />
 
         <div className="relative z-10 mx-auto max-w-3xl px-6 text-center">
           <p className="animate-fade-in mb-8 text-xs uppercase tracking-[0.5em] text-white/60">

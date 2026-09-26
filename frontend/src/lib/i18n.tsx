@@ -163,7 +163,10 @@ export const t: Dict = {
     ar: "مطلوبة لتأكيد إقامتك. JPG أو PNG أو PDF، بحد أقصى ٥ ميجابايت.",
   },
   civilIdChoose: { en: "Choose file", ar: "اختر ملفاً" },
-  civilIdMissing: { en: "Please attach your Civil ID image.", ar: "يرجى إرفاق صورة البطاقة المدنية." },
+  civilIdMissing: {
+    en: "Please attach your Civil ID image.",
+    ar: "يرجى إرفاق صورة البطاقة المدنية.",
+  },
   civilIdTooBig: { en: "That file is larger than 5 MB.", ar: "حجم الملف يتجاوز ٥ ميجابايت." },
   civilIdWrongType: {
     en: "Please attach a JPG, PNG or PDF.",

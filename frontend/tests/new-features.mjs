@@ -72,8 +72,22 @@ const session = () => ({
 function makeState() {
   return {
     chalets: [
-      { id: 1, slug: "b1", name_en: "Bizarri Chalet 1", name_ar: "شاليه بيزاري ١", active: true, sort_order: 1 },
-      { id: 2, slug: "b2", name_en: "Bizarri Chalet 2", name_ar: "شاليه بيزاري ٢", active: true, sort_order: 2 },
+      {
+        id: 1,
+        slug: "b1",
+        name_en: "Bizarri Chalet 1",
+        name_ar: "شاليه بيزاري ١",
+        active: true,
+        sort_order: 1,
+      },
+      {
+        id: 2,
+        slug: "b2",
+        name_en: "Bizarri Chalet 2",
+        name_ar: "شاليه بيزاري ٢",
+        active: true,
+        sort_order: 2,
+      },
     ],
     occasions: [
       {
@@ -224,7 +238,11 @@ function mock(ctx, state) {
 
     if (path === "rpc/lookup_booking") {
       const hit = state.bookings.find(
-        (x) => x.ref.toLowerCase() === String(body.p_ref ?? "").trim().toLowerCase(),
+        (x) =>
+          x.ref.toLowerCase() ===
+          String(body.p_ref ?? "")
+            .trim()
+            .toLowerCase(),
       );
       return send(hit ? [hit] : []);
     }
@@ -305,10 +323,17 @@ const bg = (loc) => loc.evaluate((el) => getComputedStyle(el).backgroundColor);
   const reservedCell = dayCell(p, reservedFrom);
   const freeCell = dayCell(p, thuA);
 
-  ck("Reserved day is rendered solid black", (await bg(reservedCell)) === "rgb(0, 0, 0)", await bg(reservedCell));
+  ck(
+    "Reserved day is rendered solid black",
+    (await bg(reservedCell)) === "rgb(0, 0, 0)",
+    await bg(reservedCell),
+  );
   ck("Reserved day is not selectable", await reservedCell.isDisabled());
   ck("Free day is not black", (await bg(freeCell)) !== "rgb(0, 0, 0)", await bg(freeCell));
-  ck("Legend explains the black cells", await p.getByText("Reserved", { exact: true }).first().isVisible());
+  ck(
+    "Legend explains the black cells",
+    await p.getByText("Reserved", { exact: true }).first().isVisible(),
+  );
 
   // Selection must no longer use black, or it would read as reserved.
   await freeCell.click();
@@ -354,10 +379,7 @@ const bg = (loc) => loc.evaluate((el) => getComputedStyle(el).backgroundColor);
   await p.getByRole("button", { name: /Weekend/i }).click();
   await p.waitForTimeout(250);
   const monday = firstDow(nextMonth, 1);
-  ck(
-    "Weekend filter disables days outside a Thu-Sat stay",
-    await dayCell(p, monday).isDisabled(),
-  );
+  ck("Weekend filter disables days outside a Thu-Sat stay", await dayCell(p, monday).isDisabled());
   await dayCell(p, thuA).click();
   await p.waitForTimeout(250);
   const checkIn = await p.locator("text=Check-in").locator("..").innerText();
@@ -414,10 +436,16 @@ const bg = (loc) => loc.evaluate((el) => getComputedStyle(el).backgroundColor);
   await p.getByRole("button", { name: /^Continue$/i }).click();
   await p.waitForTimeout(400);
 
-  ck("Civil ID field is on the checkout form", await p.getByText("Civil ID image").first().isVisible());
+  ck(
+    "Civil ID field is on the checkout form",
+    await p.getByText("Civil ID image").first().isVisible(),
+  );
   ck(
     "Terms checkbox is on the checkout form",
-    await p.getByText(/accept the terms and regulations/i).first().isVisible(),
+    await p
+      .getByText(/accept the terms and regulations/i)
+      .first()
+      .isVisible(),
   );
 
   // Fill the guest details but neither requirement.
@@ -441,17 +469,21 @@ const bg = (loc) => loc.evaluate((el) => getComputedStyle(el).backgroundColor);
   );
 
   // Now satisfy both.
-  await p.locator('input[type=file]').setInputFiles({
+  await p.locator("input[type=file]").setInputFiles({
     name: "civil-id.png",
     mimeType: "image/png",
     buffer: Buffer.from("89504e470d0a1a0a", "hex"),
   });
-  await p.locator('input[type=checkbox]').check();
+  await p.locator("input[type=checkbox]").check();
   await p.waitForTimeout(150);
   await p.getByRole("button", { name: /^Submit/i }).click();
   await p.waitForTimeout(900);
 
-  ck("The Civil ID is uploaded to the private bucket", state.uploads.length === 1, state.uploads[0]);
+  ck(
+    "The Civil ID is uploaded to the private bucket",
+    state.uploads.length === 1,
+    state.uploads[0],
+  );
   ck(
     "The upload goes to the civil-ids bucket",
     (state.uploads[0] ?? "").startsWith("civil-ids/"),
@@ -484,7 +516,7 @@ const bg = (loc) => loc.evaluate((el) => getComputedStyle(el).backgroundColor);
   );
 
   await p.locator('input[placeholder="BZR-XXXXXX"]').fill("BZR-AAA111");
-  await p.locator('input[type=email]').fill("aisha@example.com");
+  await p.locator("input[type=email]").fill("aisha@example.com");
   await p.getByRole("button", { name: /Check status/i }).click();
   await p.waitForTimeout(600);
   ck("Looking up a reference shows its status", await p.getByText("Accepted").first().isVisible());
@@ -540,15 +572,24 @@ async function adminPage(state, tab) {
 {
   const state = makeState();
   const { p, ctx } = await adminPage(state, /Special Occasions/i);
-  ck("Occasions tab lists the existing window", await p.getByText("Eid Al-Fitr").first().isVisible());
+  ck(
+    "Occasions tab lists the existing window",
+    await p.getByText("Eid Al-Fitr").first().isVisible(),
+  );
   ck(
     "…with its flat price",
     (await p.locator("li", { hasText: "Eid Al-Fitr" }).first().innerText()).includes("900"),
   );
 
   await p.getByPlaceholder("Eid Al-Fitr").fill("National Day");
-  await p.locator('input[type=date]').first().fill(iso(addDays(occFrom, 60)));
-  await p.locator('input[type=date]').nth(1).fill(iso(addDays(occFrom, 62)));
+  await p
+    .locator("input[type=date]")
+    .first()
+    .fill(iso(addDays(occFrom, 60)));
+  await p
+    .locator("input[type=date]")
+    .nth(1)
+    .fill(iso(addDays(occFrom, 62)));
   await p.getByRole("button", { name: /Add occasion/i }).click();
   await p.waitForTimeout(600);
 
@@ -566,14 +607,22 @@ async function adminPage(state, tab) {
   const { p, ctx } = await adminPage(state, /Booking Requests/i);
   ck(
     "A booking with an ID offers to open it",
-    await p.locator("li", { hasText: "Aisha Al-Sabah" }).getByRole("button", { name: /View Civil ID/i }).isVisible(),
+    await p
+      .locator("li", { hasText: "Aisha Al-Sabah" })
+      .getByRole("button", { name: /View Civil ID/i })
+      .isVisible(),
   );
   ck(
     "A booking without one says so",
-    (await p.locator("li", { hasText: "Legacy Guest" }).innerText()).includes("No Civil ID on file"),
+    (await p.locator("li", { hasText: "Legacy Guest" }).innerText()).includes(
+      "No Civil ID on file",
+    ),
   );
 
-  await p.locator("li", { hasText: "Aisha Al-Sabah" }).getByRole("button", { name: /View Civil ID/i }).click();
+  await p
+    .locator("li", { hasText: "Aisha Al-Sabah" })
+    .getByRole("button", { name: /View Civil ID/i })
+    .click();
   await p.waitForTimeout(500);
   const signed = state.calls.find((c) => c.path.includes("object/sign/civil-ids"));
   ck("Opening it mints a short-lived signed URL", !!signed, signed?.path);
@@ -608,7 +657,10 @@ async function adminPage(state, tab) {
     await p.goto(B + path, { waitUntil: "domcontentloaded" });
     await p.waitForTimeout(600);
     if (lang === "ar") {
-      await p.getByRole("button", { name: /العربية/ }).first().click();
+      await p
+        .getByRole("button", { name: /العربية/ })
+        .first()
+        .click();
       await p.waitForTimeout(600);
     }
     await p.evaluate(() => document.fonts.ready);
@@ -627,14 +679,14 @@ async function adminPage(state, tab) {
 
   const homeEn = await familiesOn("", "en");
   ck("The homepage renders exactly one font family", homeEn.length === 1, homeEn.join(" | "));
-  ck(
-    "…and it is IBM Plex Sans Arabic",
-    /IBM Plex Sans Arabic/.test(homeEn[0] ?? ""),
-    homeEn[0],
-  );
+  ck("…and it is IBM Plex Sans Arabic", /IBM Plex Sans Arabic/.test(homeEn[0] ?? ""), homeEn[0]);
 
   const bookingEn = await familiesOn("booking", "en");
-  ck("The booking page renders exactly one font family", bookingEn.length === 1, bookingEn.join(" | "));
+  ck(
+    "The booking page renders exactly one font family",
+    bookingEn.length === 1,
+    bookingEn.join(" | "),
+  );
 
   const homeAr = await familiesOn("", "ar");
   ck("The Arabic site renders exactly one font family", homeAr.length === 1, homeAr.join(" | "));
@@ -643,7 +695,10 @@ async function adminPage(state, tab) {
   // No serif anywhere. (?<!sans-) so the stack's own "sans-serif" fallback
   // is not counted as a match.
   const SERIF = /Cormorant|Playfair|El Messiri|(?<!sans-)serif/i;
-  ck("No serif family survives anywhere", !SERIF.test([...homeEn, ...homeAr, ...bookingEn].join(" ")));
+  ck(
+    "No serif family survives anywhere",
+    !SERIF.test([...homeEn, ...homeAr, ...bookingEn].join(" ")),
+  );
 
   // The rules above prove the CSS asks for one family. This proves the file
   // behind it actually arrives and covers both scripts.
@@ -672,31 +727,38 @@ async function adminPage(state, tab) {
       `Google Fonts unreachable from here: ${css ? `HTTP ${css[0]}` : "no response"}`,
     );
   } else {
-  ck("The font stylesheet loads", css[0] === 200, JSON.stringify(css));
-  ck(
-    "Only one family is requested",
-    (css[1].match(/family=/g) ?? []).length === 1,
-    css[1].split("?")[1],
-  );
+    ck("The font stylesheet loads", css[0] === 200, JSON.stringify(css));
+    ck(
+      "Only one family is requested",
+      (css[1].match(/family=/g) ?? []).length === 1,
+      css[1].split("?")[1],
+    );
 
-  const faces = await fp.evaluate(() =>
-    [...document.fonts].map((f) => ({ family: f.family, status: f.status, range: f.unicodeRange })),
-  );
-  const plex = faces.filter((f) => /IBM Plex Sans Arabic/.test(f.family));
-  ck("The browser has the family", plex.length > 0, `${faces.length} faces registered`);
-  ck(
-    "Its files are actually downloaded",
-    plex.some((f) => f.status === "loaded"),
-    [...new Set(plex.map((f) => f.status))].join(", "),
-  );
-  // U+0600 is Arabic. A Latin-only font would register no face covering it.
-  ck(
-    "The same family covers Arabic, so nothing is substituted",
-    plex.some((f) => f.status === "loaded" && /0600|0750|FB50|FE70/i.test(f.range ?? "")),
-    plex.filter((f) => f.status === "loaded").map((f) => (f.range ?? "").slice(0, 40)).join(" / "),
-  );
-  const woff = seen.filter(([, u]) => u.includes("gstatic.com") && u.endsWith(".woff2"));
-  ck("Font files came over the wire", woff.length > 0, `${woff.length} woff2 files`);
+    const faces = await fp.evaluate(() =>
+      [...document.fonts].map((f) => ({
+        family: f.family,
+        status: f.status,
+        range: f.unicodeRange,
+      })),
+    );
+    const plex = faces.filter((f) => /IBM Plex Sans Arabic/.test(f.family));
+    ck("The browser has the family", plex.length > 0, `${faces.length} faces registered`);
+    ck(
+      "Its files are actually downloaded",
+      plex.some((f) => f.status === "loaded"),
+      [...new Set(plex.map((f) => f.status))].join(", "),
+    );
+    // U+0600 is Arabic. A Latin-only font would register no face covering it.
+    ck(
+      "The same family covers Arabic, so nothing is substituted",
+      plex.some((f) => f.status === "loaded" && /0600|0750|FB50|FE70/i.test(f.range ?? "")),
+      plex
+        .filter((f) => f.status === "loaded")
+        .map((f) => (f.range ?? "").slice(0, 40))
+        .join(" / "),
+    );
+    const woff = seen.filter(([, u]) => u.includes("gstatic.com") && u.endsWith(".woff2"));
+    ck("Font files came over the wire", woff.length > 0, `${woff.length} woff2 files`);
   }
   await netCtx.close();
 
@@ -730,7 +792,11 @@ async function adminPage(state, tab) {
       ),
     ].sort(),
   );
-  ck("The dashboard renders exactly one font family", adminFams.length === 1, adminFams.join(" | "));
+  ck(
+    "The dashboard renders exactly one font family",
+    adminFams.length === 1,
+    adminFams.join(" | "),
+  );
   ck("…the same one as the public site", adminFams[0] === homeEn[0], adminFams[0]);
   await adminCtx.close();
   await ctx.close();
@@ -742,7 +808,10 @@ async function adminPage(state, tab) {
   const { p, ctx } = await guestPage(state, "booking");
   // These labels are CSS-uppercased, so compare case-insensitively.
   const introText = (await p.locator("body").innerText()).toLowerCase();
-  ck("The flow shows all three steps", ["dates", "your details", "confirmed"].every((x) => introText.includes(x)));
+  ck(
+    "The flow shows all three steps",
+    ["dates", "your details", "confirmed"].every((x) => introText.includes(x)),
+  );
   ck(
     "Step 1 is the current step",
     (await p.locator('[aria-current="step"]').first().innerText()).toLowerCase().includes("dates"),
@@ -750,7 +819,10 @@ async function adminPage(state, tab) {
   ck("Rates are shown before committing to anything", introText.includes("rates at a glance"));
   ck(
     "The intro says no payment is taken",
-    await p.getByText(/No payment now/i).first().isVisible(),
+    await p
+      .getByText(/No payment now/i)
+      .first()
+      .isVisible(),
   );
   ck(
     "The CTA describes what it does, rather than 'Book Now'",
@@ -935,11 +1007,11 @@ async function adminPage(state, tab) {
   await p.getByRole("button", { name: /^Submit/i }).click();
   await p.waitForTimeout(900);
 
-  ck("The confirmation explains what happens next", await p.getByText("What happens next").isVisible());
   ck(
-    "…including how payment is handled",
-    await p.getByText(/Payment is arranged/i).isVisible(),
+    "The confirmation explains what happens next",
+    await p.getByText("What happens next").isVisible(),
   );
+  ck("…including how payment is handled", await p.getByText(/Payment is arranged/i).isVisible());
   ck("…and marks the flow complete", await p.getByText("Confirmed").first().isVisible());
   await ctx.close();
 }
@@ -1012,14 +1084,20 @@ const leaks = (text) => {
 {
   const state = makeState();
   const { p, ctx } = await guestPage(state, "reservation");
-  ck("No raw i18n keys on the reservation page", leaks(await p.locator("body").innerText()).length === 0);
+  ck(
+    "No raw i18n keys on the reservation page",
+    leaks(await p.locator("body").innerText()).length === 0,
+  );
   await ctx.close();
 }
 
 {
   const state = makeState();
   const { p, ctx } = await guestPage(state, "offers");
-  ck("No raw i18n keys on the offers page", leaks(await p.locator("body").innerText()).length === 0);
+  ck(
+    "No raw i18n keys on the offers page",
+    leaks(await p.locator("body").innerText()).length === 0,
+  );
   await ctx.close();
 }
 

@@ -71,7 +71,11 @@ function Booking() {
         </p>
 
         {stage === "intro" && (
-          <Intro chaletId={chaletId} setChaletId={setChaletId} onNext={() => setStage("calendar")} />
+          <Intro
+            chaletId={chaletId}
+            setChaletId={setChaletId}
+            onNext={() => setStage("calendar")}
+          />
         )}
 
         {stage === "calendar" && (
@@ -495,259 +499,264 @@ function Calendar({
           fixed descendants — the bar would scroll with the page instead of
           staying pinned. */}
       <div className="animate-fade-up pb-28 lg:pb-0">
-      <Steps current={1} />
-      <h1 className="mb-2 font-display text-4xl md:text-5xl">{tr("selectDates")}</h1>
-      <p className="mb-4 text-sm text-muted-foreground">
-        {filter !== "all" ? tr("filterHint") : !start || end ? tr("pickStart") : tr("pickEnd")}
-      </p>
-
-      {/* Switch chalet without losing your place in the flow. */}
-      <div className="mb-6 flex flex-wrap items-center gap-3">
-        <span className="text-xs uppercase tracking-widest text-muted-foreground">
-          {tr("changeChalet")}
-        </span>
-        <ChaletPicker
-          chaletId={chaletId}
-          setChaletId={(id) => {
-            setChaletId(id);
-            setStart(null);
-            setEnd(null);
-            setError("");
-          }}
-          compact
-        />
-      </div>
-
-      {loadError && (
-        <p className="mb-4 border border-destructive p-4 text-sm text-destructive">
-          {(loadError as Error).message}
+        <Steps current={1} />
+        <h1 className="mb-2 font-display text-4xl md:text-5xl">{tr("selectDates")}</h1>
+        <p className="mb-4 text-sm text-muted-foreground">
+          {filter !== "all" ? tr("filterHint") : !start || end ? tr("pickStart") : tr("pickEnd")}
         </p>
-      )}
 
-      {/* Package filter, above the calendar. */}
-      <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label={tr("filterAll")}>
-        {(["all", "weekday", "weekend"] as DateFilter[]).map((f) => (
-          <button
-            key={f}
-            type="button"
-            onClick={() => {
-              setFilter(f);
+        {/* Switch chalet without losing your place in the flow. */}
+        <div className="mb-6 flex flex-wrap items-center gap-3">
+          <span className="text-xs uppercase tracking-widest text-muted-foreground">
+            {tr("changeChalet")}
+          </span>
+          <ChaletPicker
+            chaletId={chaletId}
+            setChaletId={(id) => {
+              setChaletId(id);
               setStart(null);
               setEnd(null);
               setError("");
             }}
-            aria-pressed={filter === f}
-            className={`border px-4 py-2 text-xs uppercase tracking-widest transition-colors ${
-              filter === f
-                ? "border-foreground bg-foreground text-background"
-                : "border-border hover:border-foreground/50"
-            }`}
-          >
-            {f === "all"
-              ? tr("filterAll")
-              : f === "weekday"
-                ? tr("filterWeekday")
-                : tr("filterWeekend")}
-          </button>
-        ))}
-      </div>
-
-      {jumped && (
-        <p className="mb-4 border border-border bg-secondary p-4 text-sm">{tr("noneThisMonth")}</p>
-      )}
-
-      <div className="relative border border-border p-6 md:p-8">
-        {isLoading && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/70 text-sm uppercase tracking-widest text-muted-foreground">
-            {lang === "en" ? "Loading availability…" : "جارٍ تحميل التوفر…"}
-          </div>
-        )}
-
-        <div className="mb-6 flex items-center justify-between">
-          <button
-            onClick={() => changeMonth(-1)}
-            disabled={atFirstMonth}
-            aria-label={lang === "en" ? "Previous month" : "الشهر السابق"}
-            className="p-2 enabled:hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-25"
-          >
-            <ChevronLeft className="h-5 w-5 rtl:rotate-180" />
-          </button>
-          <p className="font-display text-2xl capitalize">{monthName}</p>
-          <button
-            onClick={() => changeMonth(1)}
-            disabled={atLastMonth}
-            aria-label={lang === "en" ? "Next month" : "الشهر التالي"}
-            className="p-2 enabled:hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-25"
-          >
-            <ChevronRight className="h-5 w-5 rtl:rotate-180" />
-          </button>
+            compact
+          />
         </div>
 
-        <div className="mb-2 grid grid-cols-7 gap-1 text-center text-xs uppercase tracking-wider text-muted-foreground">
-          {weekdayLabels.map((w) => (
-            <div key={w} className="py-2">
-              {w}
-            </div>
+        {loadError && (
+          <p className="mb-4 border border-destructive p-4 text-sm text-destructive">
+            {(loadError as Error).message}
+          </p>
+        )}
+
+        {/* Package filter, above the calendar. */}
+        <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label={tr("filterAll")}>
+          {(["all", "weekday", "weekend"] as DateFilter[]).map((f) => (
+            <button
+              key={f}
+              type="button"
+              onClick={() => {
+                setFilter(f);
+                setStart(null);
+                setEnd(null);
+                setError("");
+              }}
+              aria-pressed={filter === f}
+              className={`border px-4 py-2 text-xs uppercase tracking-widest transition-colors ${
+                filter === f
+                  ? "border-foreground bg-foreground text-background"
+                  : "border-border hover:border-foreground/50"
+              }`}
+            >
+              {f === "all"
+                ? tr("filterAll")
+                : f === "weekday"
+                  ? tr("filterWeekday")
+                  : tr("filterWeekend")}
+            </button>
           ))}
         </div>
 
-        <div className="grid grid-cols-7 gap-1">
-          {cells.map((d, i) => {
-            if (!d) return <div key={`pad-${i}`} />;
-            const iso = fmtDate(d);
-            const past = isPast(d);
-            // A future day the server refuses is held by a booking or blocked
-            // by the admin — that is what black means. Past days are simply
-            // gone, and are faded instead.
-            const reserved = !past && dayBlocked(d);
-            const offPackage = !!windows && !windows.has(iso);
-            const disabled = past || reserved || offPackage;
-            const selected = isEdge(d);
-            const within = inRange(d);
-            const priced = byDay.get(iso)?.custom === true;
-            const occ = occasionFor(d);
-            const dayLabel = d.toLocaleDateString(lang === "ar" ? "ar-EG" : "en-US", {
-              weekday: "long",
-              day: "numeric",
-              month: "long",
-            });
-
-            const tone = reserved
-              ? "bg-black text-white cursor-not-allowed"
-              : past
-                ? "cursor-not-allowed text-muted-foreground/30"
-                : selected
-                  ? "bg-background font-semibold ring-2 ring-inset ring-foreground"
-                  : within
-                    ? "bg-secondary"
-                    : offPackage
-                      ? "cursor-not-allowed text-muted-foreground/30"
-                      : occ
-                        ? "ring-1 ring-inset ring-foreground/25 hover:bg-secondary"
-                        : "hover:bg-secondary";
-
-            return (
-              <button
-                key={iso}
-                type="button"
-                disabled={disabled}
-                onClick={() => selectDay(d)}
-                aria-label={`${dayLabel}${reserved ? ` — ${tr("reservedLabel")}` : ""}${
-                  occ ? ` — ${lang === "en" ? occ.nameEn : occ.nameAr || occ.nameEn}` : ""
-                }`}
-                aria-pressed={!!selected}
-                className={`relative flex aspect-square flex-col items-center justify-center text-sm transition-colors ${tone}`}
-              >
-                {d.getDate()}
-                {priced && !reserved && !past && (
-                  <span
-                    className="absolute bottom-1 h-1 w-1 rounded-full bg-foreground/50"
-                    aria-hidden="true"
-                  />
-                )}
-              </button>
-            );
-          })}
-        </div>
-
-        {!monthHasWindow && (
-          <p className="mt-4 text-xs text-muted-foreground">{tr("filterNoneLeft")}</p>
+        {jumped && (
+          <p className="mb-4 border border-border bg-secondary p-4 text-sm">
+            {tr("noneThisMonth")}
+          </p>
         )}
-        {atLastMonth && <p className="mt-4 text-xs text-muted-foreground">{tr("horizonNote")}</p>}
 
-        <div className="mt-6 flex flex-wrap gap-4 text-xs text-muted-foreground">
-          <span className="flex items-center gap-2">
-            <span className="h-3 w-3 bg-black" /> {tr("reservedLabel")}
-          </span>
-          <span className="flex items-center gap-2">
-            <span className="h-3 w-3 ring-2 ring-inset ring-foreground" /> {tr("selectedLabel")}
-          </span>
-          <span className="flex items-center gap-2">
-            <span className="h-3 w-3 border border-border bg-secondary" />{" "}
-            {lang === "en" ? "In stay" : "ضمن الإقامة"}
-          </span>
-          <span className="flex items-center gap-2">
-            <span className="h-3 w-3 ring-1 ring-inset ring-foreground/25" /> {tr("specialPkg")}
-          </span>
-          <span className="flex items-center gap-2">
-            <span className="h-1 w-1 rounded-full bg-foreground/50" /> {tr("customPricing")}
-          </span>
+        <div className="relative border border-border p-6 md:p-8">
+          {isLoading && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/70 text-sm uppercase tracking-widest text-muted-foreground">
+              {lang === "en" ? "Loading availability…" : "جارٍ تحميل التوفر…"}
+            </div>
+          )}
+
+          <div className="mb-6 flex items-center justify-between">
+            <button
+              onClick={() => changeMonth(-1)}
+              disabled={atFirstMonth}
+              aria-label={lang === "en" ? "Previous month" : "الشهر السابق"}
+              className="p-2 enabled:hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-25"
+            >
+              <ChevronLeft className="h-5 w-5 rtl:rotate-180" />
+            </button>
+            <p className="font-display text-2xl capitalize">{monthName}</p>
+            <button
+              onClick={() => changeMonth(1)}
+              disabled={atLastMonth}
+              aria-label={lang === "en" ? "Next month" : "الشهر التالي"}
+              className="p-2 enabled:hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-25"
+            >
+              <ChevronRight className="h-5 w-5 rtl:rotate-180" />
+            </button>
+          </div>
+
+          <div className="mb-2 grid grid-cols-7 gap-1 text-center text-xs uppercase tracking-wider text-muted-foreground">
+            {weekdayLabels.map((w) => (
+              <div key={w} className="py-2">
+                {w}
+              </div>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-7 gap-1">
+            {cells.map((d, i) => {
+              if (!d) return <div key={`pad-${i}`} />;
+              const iso = fmtDate(d);
+              const past = isPast(d);
+              // A future day the server refuses is held by a booking or blocked
+              // by the admin — that is what black means. Past days are simply
+              // gone, and are faded instead.
+              const reserved = !past && dayBlocked(d);
+              const offPackage = !!windows && !windows.has(iso);
+              const disabled = past || reserved || offPackage;
+              const selected = isEdge(d);
+              const within = inRange(d);
+              const priced = byDay.get(iso)?.custom === true;
+              const occ = occasionFor(d);
+              const dayLabel = d.toLocaleDateString(lang === "ar" ? "ar-EG" : "en-US", {
+                weekday: "long",
+                day: "numeric",
+                month: "long",
+              });
+
+              const tone = reserved
+                ? "bg-black text-white cursor-not-allowed"
+                : past
+                  ? "cursor-not-allowed text-muted-foreground/30"
+                  : selected
+                    ? "bg-background font-semibold ring-2 ring-inset ring-foreground"
+                    : within
+                      ? "bg-secondary"
+                      : offPackage
+                        ? "cursor-not-allowed text-muted-foreground/30"
+                        : occ
+                          ? "ring-1 ring-inset ring-foreground/25 hover:bg-secondary"
+                          : "hover:bg-secondary";
+
+              return (
+                <button
+                  key={iso}
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => selectDay(d)}
+                  aria-label={`${dayLabel}${reserved ? ` — ${tr("reservedLabel")}` : ""}${
+                    occ ? ` — ${lang === "en" ? occ.nameEn : occ.nameAr || occ.nameEn}` : ""
+                  }`}
+                  aria-pressed={!!selected}
+                  className={`relative flex aspect-square flex-col items-center justify-center text-sm transition-colors ${tone}`}
+                >
+                  {d.getDate()}
+                  {priced && !reserved && !past && (
+                    <span
+                      className="absolute bottom-1 h-1 w-1 rounded-full bg-foreground/50"
+                      aria-hidden="true"
+                    />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {!monthHasWindow && (
+            <p className="mt-4 text-xs text-muted-foreground">{tr("filterNoneLeft")}</p>
+          )}
+          {atLastMonth && <p className="mt-4 text-xs text-muted-foreground">{tr("horizonNote")}</p>}
+
+          <div className="mt-6 flex flex-wrap gap-4 text-xs text-muted-foreground">
+            <span className="flex items-center gap-2">
+              <span className="h-3 w-3 bg-black" /> {tr("reservedLabel")}
+            </span>
+            <span className="flex items-center gap-2">
+              <span className="h-3 w-3 ring-2 ring-inset ring-foreground" /> {tr("selectedLabel")}
+            </span>
+            <span className="flex items-center gap-2">
+              <span className="h-3 w-3 border border-border bg-secondary" />{" "}
+              {lang === "en" ? "In stay" : "ضمن الإقامة"}
+            </span>
+            <span className="flex items-center gap-2">
+              <span className="h-3 w-3 ring-1 ring-inset ring-foreground/25" /> {tr("specialPkg")}
+            </span>
+            <span className="flex items-center gap-2">
+              <span className="h-1 w-1 rounded-full bg-foreground/50" /> {tr("customPricing")}
+            </span>
+          </div>
         </div>
-      </div>
 
-      <div className="mt-6 grid gap-3 sm:grid-cols-3">
-        <div className="border border-border p-4">
-          <p className="text-xs uppercase tracking-widest text-muted-foreground">{tr("checkIn")}</p>
-          <p className="mt-1 font-display text-xl" dir="ltr">
-            {start ? fmtDate(start) : "—"}
-          </p>
+        <div className="mt-6 grid gap-3 sm:grid-cols-3">
+          <div className="border border-border p-4">
+            <p className="text-xs uppercase tracking-widest text-muted-foreground">
+              {tr("checkIn")}
+            </p>
+            <p className="mt-1 font-display text-xl" dir="ltr">
+              {start ? fmtDate(start) : "—"}
+            </p>
+          </div>
+          <div className="border border-border p-4">
+            <p className="text-xs uppercase tracking-widest text-muted-foreground">
+              {tr("checkOut")}
+            </p>
+            <p className="mt-1 font-display text-xl" dir="ltr">
+              {end ? fmtDate(end) : "—"}
+            </p>
+          </div>
+          <div
+            className={`border p-4 ${
+              tooShort ? "border-destructive" : "border-foreground bg-foreground text-background"
+            }`}
+          >
+            <p className="text-xs uppercase tracking-widest opacity-70">
+              {tr("total")}
+              {current ? ` · ${current.days} ${tr("nightsLabel")}` : ""}
+            </p>
+            <p className="mt-1 font-display text-xl">
+              {current && !tooShort ? formatMoney(current.total, lang) : "—"}
+            </p>
+          </div>
         </div>
-        <div className="border border-border p-4">
-          <p className="text-xs uppercase tracking-widest text-muted-foreground">{tr("checkOut")}</p>
-          <p className="mt-1 font-display text-xl" dir="ltr">
-            {end ? fmtDate(end) : "—"}
+
+        {current && !tooShort && current.occasion && (
+          <p className="mt-3 text-sm text-muted-foreground">
+            {tr("specialPkg")} ·{" "}
+            {lang === "en"
+              ? current.occasion.nameEn
+              : current.occasion.nameAr || current.occasion.nameEn}
           </p>
+        )}
+        {current && !tooShort && current.packageKey && current.packageKey !== "special" && (
+          <p className="mt-3 text-sm text-muted-foreground">
+            {current.packageKey === "fullWeek"
+              ? tr("fullWeekPkg")
+              : current.packageKey === "weekend"
+                ? tr("weekendPkg")
+                : tr("weekdayPkg")}
+          </p>
+        )}
+        {current && !tooShort && current.hasCustom && (
+          <p className="mt-3 text-sm text-muted-foreground">{tr("customPricing")}</p>
+        )}
+
+        {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
+
+        <div className="mt-8 flex flex-wrap gap-3">
+          <button
+            onClick={goToForm}
+            disabled={!ready}
+            className="bg-black px-8 py-4 text-sm uppercase tracking-widest text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-30"
+          >
+            {tr("continueLabel")}
+          </button>
+          <button
+            onClick={() => {
+              setStart(null);
+              setEnd(null);
+              setError("");
+            }}
+            className="border border-border px-8 py-4 text-sm uppercase tracking-widest hover:bg-secondary"
+          >
+            {tr("clear")}
+          </button>
         </div>
-        <div
-          className={`border p-4 ${
-            tooShort ? "border-destructive" : "border-foreground bg-foreground text-background"
-          }`}
-        >
-          <p className="text-xs uppercase tracking-widest opacity-70">
-            {tr("total")}
-            {current ? ` · ${current.days} ${tr("nightsLabel")}` : ""}
-          </p>
-          <p className="mt-1 font-display text-xl">
-            {current && !tooShort ? formatMoney(current.total, lang) : "—"}
-          </p>
-        </div>
-      </div>
 
-      {current && !tooShort && current.occasion && (
-        <p className="mt-3 text-sm text-muted-foreground">
-          {tr("specialPkg")} ·{" "}
-          {lang === "en"
-            ? current.occasion.nameEn
-            : current.occasion.nameAr || current.occasion.nameEn}
-        </p>
-      )}
-      {current && !tooShort && current.packageKey && current.packageKey !== "special" && (
-        <p className="mt-3 text-sm text-muted-foreground">
-          {current.packageKey === "fullWeek"
-            ? tr("fullWeekPkg")
-            : current.packageKey === "weekend"
-              ? tr("weekendPkg")
-              : tr("weekdayPkg")}
-        </p>
-      )}
-      {current && !tooShort && current.hasCustom && (
-        <p className="mt-3 text-sm text-muted-foreground">{tr("customPricing")}</p>
-      )}
-
-      {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
-
-      <div className="mt-8 flex flex-wrap gap-3">
-        <button
-          onClick={goToForm}
-          disabled={!ready}
-          className="bg-black px-8 py-4 text-sm uppercase tracking-widest text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-30"
-        >
-          {tr("continueLabel")}
-        </button>
-        <button
-          onClick={() => {
-            setStart(null);
-            setEnd(null);
-            setError("");
-          }}
-          className="border border-border px-8 py-4 text-sm uppercase tracking-widest hover:bg-secondary"
-        >
-          {tr("clear")}
-        </button>
-      </div>
-
-      <p className="mt-6 text-sm text-muted-foreground">{tr("noPaymentNow")}</p>
-
+        <p className="mt-6 text-sm text-muted-foreground">{tr("noPaymentNow")}</p>
       </div>
 
       {/* Mobile keeps the running total and the way forward in view; on a
@@ -1023,7 +1032,9 @@ function BookingForm({
             </Link>
           </span>
         </label>
-        {errors.terms && <span className="mt-1 block text-sm text-destructive">{errors.terms}</span>}
+        {errors.terms && (
+          <span className="mt-1 block text-sm text-destructive">{errors.terms}</span>
+        )}
       </div>
 
       <div className="flex items-start gap-3 border border-border p-4 text-sm text-muted-foreground">

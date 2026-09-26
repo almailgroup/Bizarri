@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { Instagram, Phone, MapPin, Mail } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
+import { BrandHomeLink } from "@/components/BrandHomeLink";
 import { useContactInfo } from "@/lib/api";
 import logoWhite from "@/assets/bizarri-logo-white.png";
 
@@ -11,7 +12,9 @@ export function Footer() {
     <footer className="bg-black text-white">
       <div className="max-w-7xl mx-auto px-6 py-20 grid md:grid-cols-4 gap-12">
         <div className="md:col-span-2">
-          <img src={logoWhite} alt="Bizarri Chalet" className="h-14 mb-6" />
+          <BrandHomeLink className="mb-6 inline-block">
+            <img src={logoWhite} alt="Bizarri Chalet" className="h-14" />
+          </BrandHomeLink>
           <p className="text-white/60 max-w-sm leading-relaxed">{tr("tagline")}</p>
         </div>
 
