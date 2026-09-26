@@ -107,7 +107,7 @@ async function mk(tz) {
 
 // ── fix 1: confirmation dates in a timezone behind UTC ──
 let { p, ctx } = await mk("America/New_York");
-await p.getByRole("button", { name: /book now/i }).click();
+await p.getByRole("button", { name: /check availability/i }).click();
 await p.waitForTimeout(900);
 await p.getByRole("button", { name: "Next month" }).click();
 await p.waitForTimeout(400);
@@ -140,7 +140,7 @@ await ctx.close();
 
 // ── fix 2: month horizon ──
 ({ p, ctx } = await mk("Asia/Kuwait"));
-await p.getByRole("button", { name: /book now/i }).click();
+await p.getByRole("button", { name: /check availability/i }).click();
 await p.waitForTimeout(900);
 let clicks = 0;
 for (let i = 0; i < 20; i++) {

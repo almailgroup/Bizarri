@@ -151,7 +151,7 @@ ck(
   "Booking fetches chalets",
   st.calls.some((c) => c.path === "chalets"),
 );
-await p.getByRole("button", { name: /book now/i }).click();
+await p.getByRole("button", { name: /check availability/i }).click();
 await p.waitForTimeout(900);
 const calCall = st.calls.find((c) => c.path === "rpc/availability_calendar");
 ck("Calendar calls availability_calendar RPC", !!calCall, JSON.stringify(calCall?.body));

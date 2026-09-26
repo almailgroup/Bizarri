@@ -182,6 +182,51 @@ export const t: Dict = {
   },
   readTerms: { en: "Read them here", ar: "اقرأها هنا" },
 
+  // Booking flow guidance
+  checkAvailability: { en: "Check availability", ar: "عرض التواريخ المتاحة" },
+  stepDates: { en: "Dates", ar: "التواريخ" },
+  stepDetails: { en: "Your details", ar: "بياناتك" },
+  stepDone: { en: "Confirmed", ar: "التأكيد" },
+  stepOf: { en: "Step", ar: "الخطوة" },
+  changeChalet: { en: "Change chalet", ar: "تغيير الشاليه" },
+  ratesAtAGlance: { en: "Rates at a glance", ar: "الأسعار باختصار" },
+  noPaymentNow: {
+    en: "No payment now — this is a request, not a charge.",
+    ar: "لا يوجد دفع الآن — هذا طلب حجز وليس عملية دفع.",
+  },
+  weReplyIn: {
+    en: "We confirm most requests within 24 hours.",
+    ar: "نؤكد معظم الطلبات خلال ٢٤ ساعة.",
+  },
+  whyCivilId: {
+    en: "Kuwait chalet rentals require ID on file. It is stored privately and seen only by our team.",
+    ar: "يتطلب تأجير الشاليهات في الكويت حفظ إثبات الهوية. تُحفظ بشكل خاص ولا يطّلع عليها سوى فريقنا.",
+  },
+  whatHappensNext: { en: "What happens next", ar: "الخطوات التالية" },
+  nextStep1: {
+    en: "We check the dates and confirm by phone or email.",
+    ar: "نتحقق من التواريخ ونؤكد عبر الهاتف أو البريد الإلكتروني.",
+  },
+  nextStep2: {
+    en: "Payment is arranged once your dates are confirmed.",
+    ar: "يتم ترتيب الدفع بعد تأكيد التواريخ.",
+  },
+  nextStep3: {
+    en: "Track your request any time from Your Reservation.",
+    ar: "تابع طلبك في أي وقت من صفحة حجزك.",
+  },
+  noneThisMonth: {
+    en: "Nothing free this month — showing the next month with availability.",
+    ar: "لا يوجد متاح هذا الشهر — نعرض الشهر التالي المتاح.",
+  },
+  minStayNote: {
+    en: "Minimum stay 3 days.",
+    ar: "الحد الأدنى للإقامة ٣ أيام.",
+  },
+  yourStay: { en: "Your stay", ar: "إقامتك" },
+  optionalLabel: { en: "Optional", ar: "اختياري" },
+  requiredLabel: { en: "Required", ar: "مطلوب" },
+
   // Reservation shortcut
   yourReservation: { en: "Your Reservation", ar: "حجزك" },
   yourReservationIntro: {

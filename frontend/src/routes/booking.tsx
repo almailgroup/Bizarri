@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
-import { Check, ChevronLeft, ChevronRight, Paperclip } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Check, ChevronLeft, ChevronRight, Paperclip, ShieldCheck } from "lucide-react";
 import { PageShell } from "@/components/PageShell";
 import { BookingLookup, rememberBookingRef } from "@/components/BookingLookup";
 import { useI18n } from "@/lib/i18n";
@@ -39,6 +39,17 @@ const FILTER_SHAPE: Record<Exclude<DateFilter, "all">, { startDow: number; lengt
 const MAX_ID_BYTES = 5 * 1024 * 1024;
 const ID_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic", "application/pdf"];
 
+/** Guest details, held by Calendar so stepping back does not wipe them. */
+interface GuestDetails {
+  name: string;
+  phone: string;
+  email: string;
+  guests: string;
+  notes: string;
+}
+
+const BLANK_DETAILS: GuestDetails = { name: "", phone: "", email: "", guests: "2", notes: "" };
+
 function Booking() {
   const { tr, lang } = useI18n();
   usePageMeta(
@@ -60,16 +71,13 @@ function Booking() {
         </p>
 
         {stage === "intro" && (
-          <Intro
-            chaletId={chaletId}
-            setChaletId={setChaletId}
-            onNext={() => setStage("calendar")}
-          />
+          <Intro chaletId={chaletId} setChaletId={setChaletId} onNext={() => setStage("calendar")} />
         )}
 
         {stage === "calendar" && (
           <Calendar
             chaletId={chaletId}
+            setChaletId={setChaletId}
             onDone={(b) => {
               rememberBookingRef(b.ref);
               setConfirmed(b);
@@ -78,44 +86,141 @@ function Booking() {
           />
         )}
 
-        {stage === "done" && confirmed && (
-          <div className="animate-fade-up py-20 text-center">
-            <div className="mx-auto mb-8 flex h-20 w-20 items-center justify-center rounded-full bg-black text-white">
-              <Check className="h-10 w-10" />
-            </div>
-            <h1 className="mb-4 font-display text-4xl md:text-5xl">{tr("thankYou")}</h1>
-            <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
-              {tr("bookingRef")}
-            </p>
-            <p className="mt-2 font-mono text-2xl" dir="ltr">
-              {confirmed.ref}
-            </p>
-            <p className="mt-6 text-muted-foreground">
-              {/* Render the server's date strings as-is. new Date("2026-10-11")
-                  parses as UTC midnight, so reading it back with local getters
-                  showed the previous day for anyone behind UTC. */}
-              <span dir="ltr">
-                {confirmed.start_date} → {confirmed.end_date}
-              </span>{" "}
-              · {formatMoney(Number(confirmed.total), lang)}
-            </p>
-            <p className="mt-8 text-muted-foreground">
-              {lang === "en"
-                ? "Keep this reference. We will contact you shortly to confirm."
-                : "احتفظ بهذا الرقم. سوف نتواصل معكم قريباً للتأكيد."}
-            </p>
-            <p className="mt-6 text-sm">
-              <Link
-                to="/reservation"
-                className="underline underline-offset-4 text-muted-foreground hover:text-foreground"
-              >
-                {tr("yourReservation")}
-              </Link>
-            </p>
-          </div>
-        )}
+        {stage === "done" && confirmed && <Confirmation booking={confirmed} />}
       </section>
     </PageShell>
+  );
+}
+
+/** Where the guest is in the flow, so the page never feels open-ended. */
+function Steps({ current }: { current: 1 | 2 | 3 }) {
+  const { tr } = useI18n();
+  const labels = [tr("stepDates"), tr("stepDetails"), tr("stepDone")];
+  return (
+    <ol className="mb-8 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs uppercase tracking-widest">
+      {labels.map((label, i) => {
+        const n = (i + 1) as 1 | 2 | 3;
+        const done = n < current;
+        const active = n === current;
+        return (
+          <li key={label} className="flex items-center gap-3">
+            <span
+              aria-current={active ? "step" : undefined}
+              className={`flex items-center gap-2 ${
+                active ? "text-foreground" : "text-muted-foreground"
+              }`}
+            >
+              <span
+                className={`flex h-6 w-6 items-center justify-center border text-[11px] ${
+                  active
+                    ? "border-foreground bg-foreground text-background"
+                    : done
+                      ? "border-foreground/40 text-foreground/60"
+                      : "border-border"
+                }`}
+              >
+                {done ? <Check className="h-3 w-3" /> : n}
+              </span>
+              {label}
+            </span>
+            {n < 3 && <span aria-hidden="true" className="h-px w-5 bg-border" />}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+/** The package rates, so nobody has to leave the flow to find out what it costs. */
+function RatesStrip() {
+  const { tr, lang } = useI18n();
+  const { data: rates } = useRates();
+  const { data: occasions } = useSpecialOccasions();
+  if (!rates) return null;
+
+  const today = fmtDate(new Date());
+  const upcoming = (occasions ?? []).filter((o) => o.end >= today).slice(0, 2);
+
+  const items = [
+    { label: tr("weekdayPkg"), price: rates.weekday },
+    { label: tr("weekendPkg"), price: rates.weekend },
+    { label: tr("fullWeekPkg"), price: rates.fullWeek },
+    ...upcoming.map((o) => ({
+      label: lang === "en" ? o.nameEn : o.nameAr || o.nameEn,
+      price: o.price,
+    })),
+  ];
+
+  return (
+    <div className="mb-6 border border-border p-5">
+      <p className="mb-3 text-xs uppercase tracking-widest text-muted-foreground">
+        {tr("ratesAtAGlance")}
+      </p>
+      <dl className="flex flex-wrap gap-x-8 gap-y-3">
+        {items.map((it) => (
+          <div key={it.label}>
+            <dt className="text-xs text-muted-foreground">{it.label}</dt>
+            <dd className="mt-0.5 text-lg font-medium">{formatMoney(it.price, lang)}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="mt-3 text-xs text-muted-foreground">{tr("minStayNote")}</p>
+    </div>
+  );
+}
+
+function ChaletPicker({
+  chaletId,
+  setChaletId,
+  compact = false,
+}: {
+  chaletId: number;
+  setChaletId: (id: number) => void;
+  compact?: boolean;
+}) {
+  const { lang } = useI18n();
+  const { data: chalets } = useChalets();
+
+  if (compact) {
+    return (
+      <div className="flex flex-wrap gap-2">
+        {(chalets ?? []).map((c) => (
+          <button
+            key={c.id}
+            type="button"
+            onClick={() => setChaletId(c.id)}
+            aria-pressed={chaletId === c.id}
+            className={`border px-4 py-2 text-xs uppercase tracking-widest transition-colors ${
+              chaletId === c.id
+                ? "border-foreground bg-foreground text-background"
+                : "border-border hover:border-foreground/50"
+            }`}
+          >
+            {lang === "en" ? c.name_en : c.name_ar}
+          </button>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      {(chalets ?? []).map((c) => (
+        <button
+          key={c.id}
+          onClick={() => setChaletId(c.id)}
+          aria-pressed={chaletId === c.id}
+          className={`border p-6 text-start transition-colors ${
+            chaletId === c.id
+              ? "border-foreground bg-foreground text-background"
+              : "border-border hover:border-foreground/50"
+          }`}
+        >
+          <p className="text-xs uppercase tracking-widest opacity-70">Chalet {c.id}</p>
+          <p className="mt-2 font-display text-2xl">{lang === "en" ? c.name_en : c.name_ar}</p>
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -129,45 +234,32 @@ function Intro({
   onNext: () => void;
 }) {
   const { tr, lang } = useI18n();
-  const { data: chalets } = useChalets();
 
   return (
     <div className="animate-fade-up">
-      <h1 className="mb-8 font-display text-5xl md:text-6xl">{tr("startBooking")}</h1>
-      <p className="mb-4 max-w-xl text-lg text-muted-foreground">
+      <Steps current={1} />
+      <h1 className="mb-4 font-display text-5xl md:text-6xl">{tr("startBooking")}</h1>
+      <p className="mb-6 max-w-xl text-lg text-muted-foreground">
         {lang === "en"
-          ? "Choose your chalet, then pick your dates. Minimum stay is 3 days."
-          : "اختر الشاليه، ثم حدد التواريخ. الحد الأدنى للإقامة ٣ أيام."}
+          ? "Choose your chalet, then pick your dates."
+          : "اختر الشاليه، ثم حدد التواريخ."}{" "}
+        {tr("noPaymentNow")}
       </p>
+
+      <RatesStrip />
 
       <div className="my-8">
         <p className="mb-3 text-xs uppercase tracking-widest text-muted-foreground">
           {tr("pickChalet")}
         </p>
-        <div className="grid gap-4 sm:grid-cols-2">
-          {(chalets ?? []).map((c) => (
-            <button
-              key={c.id}
-              onClick={() => setChaletId(c.id)}
-              aria-pressed={chaletId === c.id}
-              className={`border p-6 text-start transition-colors ${
-                chaletId === c.id
-                  ? "border-foreground bg-foreground text-background"
-                  : "border-border hover:border-foreground/50"
-              }`}
-            >
-              <p className="text-xs uppercase tracking-widest opacity-70">Chalet {c.id}</p>
-              <p className="mt-2 font-display text-2xl">{lang === "en" ? c.name_en : c.name_ar}</p>
-            </button>
-          ))}
-        </div>
+        <ChaletPicker chaletId={chaletId} setChaletId={setChaletId} />
       </div>
 
       <button
         onClick={onNext}
         className="bg-black px-8 py-4 text-sm uppercase tracking-widest text-white hover:opacity-90"
       >
-        {tr("bookNow")}
+        {tr("checkAvailability")}
       </button>
 
       <div className="mt-16 border-t border-border pt-10">
@@ -177,7 +269,15 @@ function Intro({
   );
 }
 
-function Calendar({ chaletId, onDone }: { chaletId: number; onDone: (b: BookingRow) => void }) {
+function Calendar({
+  chaletId,
+  setChaletId,
+  onDone,
+}: {
+  chaletId: number;
+  setChaletId: (id: number) => void;
+  onDone: (b: BookingRow) => void;
+}) {
   const { tr, lang } = useI18n();
   const today = useMemo(startOfToday, []);
   const thisMonth = useMemo(() => startOfMonth(today), [today]);
@@ -188,6 +288,13 @@ function Calendar({ chaletId, onDone }: { chaletId: number; onDone: (b: BookingR
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<DateFilter>("all");
   const [showForm, setShowForm] = useState(false);
+  const [jumped, setJumped] = useState(false);
+
+  // Held here, not in BookingForm: stepping back to change dates used to
+  // unmount the form and silently discard everything the guest had typed.
+  const [details, setDetails] = useState<GuestDetails>(BLANK_DETAILS);
+  const [civilId, setCivilId] = useState<File | null>(null);
+  const [terms, setTerms] = useState(false);
 
   // A year of availability in one request, so paging months is instant and the
   // blocked set always comes from the server rather than the browser.
@@ -234,6 +341,32 @@ function Calendar({ chaletId, onDone }: { chaletId: number; onDone: (b: BookingR
   );
   const atLastMonth = month.getTime() >= lastMonth.getTime();
 
+  const monthHasFreeDay = (m: Date) => {
+    const last = new Date(m.getFullYear(), m.getMonth() + 1, 0);
+    for (let d = new Date(m); d <= last; d = addDays(d, 1)) {
+      if (!dayBlocked(d) && !isPast(d)) return true;
+    }
+    return false;
+  };
+
+  // Landing on a month with nothing left reads as "fully booked". Move to the
+  // first month that has something, once, and say so.
+  const autoJumped = useRef(false);
+  useEffect(() => {
+    if (autoJumped.current || !calendar || calendar.length === 0) return;
+    autoJumped.current = true;
+    if (monthHasFreeDay(thisMonth)) return;
+    for (let m = new Date(thisMonth), i = 0; i < 13; i++, m = addDays(startOfMonth(m), 32)) {
+      const candidate = startOfMonth(m);
+      if (candidate > lastMonth) break;
+      if (monthHasFreeDay(candidate)) {
+        setMonth(candidate);
+        setJumped(true);
+        return;
+      }
+    }
+  }, [calendar]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const cells = useMemo(() => {
     const first = new Date(month.getFullYear(), month.getMonth(), 1);
     const last = new Date(month.getFullYear(), month.getMonth() + 1, 0);
@@ -277,6 +410,7 @@ function Calendar({ chaletId, onDone }: { chaletId: number; onDone: (b: BookingR
   const current =
     start && end && rates ? quote(start, end, customPrices, rates, occasions ?? []) : null;
   const tooShort = current !== null && current.days < MIN_STAY_DAYS;
+  const ready = !!start && !!end && !tooShort;
 
   const selectDay = (d: Date) => {
     setError("");
@@ -313,6 +447,18 @@ function Calendar({ chaletId, onDone }: { chaletId: number; onDone: (b: BookingR
       ? ["أحد", "اثنين", "ثلاثاء", "أربعاء", "خميس", "جمعة", "سبت"]
       : ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+  const goToForm = () => {
+    if (!start || !end) {
+      setError(tr("pickStart"));
+      return;
+    }
+    if (daysBetween(start, end) < MIN_STAY_DAYS) {
+      setError(tr("minStay"));
+      return;
+    }
+    setShowForm(true);
+  };
+
   if (showForm && start && end && current) {
     return (
       <BookingForm
@@ -320,6 +466,12 @@ function Calendar({ chaletId, onDone }: { chaletId: number; onDone: (b: BookingR
         start={start}
         end={end}
         total={current.total}
+        details={details}
+        setDetails={setDetails}
+        civilId={civilId}
+        setCivilId={setCivilId}
+        terms={terms}
+        setTerms={setTerms}
         onBack={() => setShowForm(false)}
         onDone={onDone}
       />
@@ -327,16 +479,44 @@ function Calendar({ chaletId, onDone }: { chaletId: number; onDone: (b: BookingR
   }
 
   const changeMonth = (delta: number) => {
+    setJumped(false);
     setMonth(new Date(month.getFullYear(), month.getMonth() + delta, 1));
   };
 
+  const rangeLabel = start
+    ? `${fmtDate(start)}${end ? ` → ${fmtDate(end)}` : ""}`
+    : tr("pickStart");
+
   return (
-    <div className="animate-fade-up">
+    <>
+      {/* The bar below is position:fixed, so it must sit OUTSIDE the animated
+          wrapper: animate-fade-up leaves a transform on the element (fill-mode
+          both), and a transformed ancestor becomes the containing block for
+          fixed descendants — the bar would scroll with the page instead of
+          staying pinned. */}
+      <div className="animate-fade-up pb-28 lg:pb-0">
+      <Steps current={1} />
       <h1 className="mb-2 font-display text-4xl md:text-5xl">{tr("selectDates")}</h1>
-      <p className="mb-6 text-sm text-muted-foreground">
-        {chaletId === 1 ? tr("bizarri1") : tr("bizarri2")} ·{" "}
+      <p className="mb-4 text-sm text-muted-foreground">
         {filter !== "all" ? tr("filterHint") : !start || end ? tr("pickStart") : tr("pickEnd")}
       </p>
+
+      {/* Switch chalet without losing your place in the flow. */}
+      <div className="mb-6 flex flex-wrap items-center gap-3">
+        <span className="text-xs uppercase tracking-widest text-muted-foreground">
+          {tr("changeChalet")}
+        </span>
+        <ChaletPicker
+          chaletId={chaletId}
+          setChaletId={(id) => {
+            setChaletId(id);
+            setStart(null);
+            setEnd(null);
+            setError("");
+          }}
+          compact
+        />
+      </div>
 
       {loadError && (
         <p className="mb-4 border border-destructive p-4 text-sm text-destructive">
@@ -363,10 +543,18 @@ function Calendar({ chaletId, onDone }: { chaletId: number; onDone: (b: BookingR
                 : "border-border hover:border-foreground/50"
             }`}
           >
-            {f === "all" ? tr("filterAll") : f === "weekday" ? tr("filterWeekday") : tr("filterWeekend")}
+            {f === "all"
+              ? tr("filterAll")
+              : f === "weekday"
+                ? tr("filterWeekday")
+                : tr("filterWeekend")}
           </button>
         ))}
       </div>
+
+      {jumped && (
+        <p className="mb-4 border border-border bg-secondary p-4 text-sm">{tr("noneThisMonth")}</p>
+      )}
 
       <div className="relative border border-border p-6 md:p-8">
         {isLoading && (
@@ -495,9 +683,7 @@ function Calendar({ chaletId, onDone }: { chaletId: number; onDone: (b: BookingR
           </p>
         </div>
         <div className="border border-border p-4">
-          <p className="text-xs uppercase tracking-widest text-muted-foreground">
-            {tr("checkOut")}
-          </p>
+          <p className="text-xs uppercase tracking-widest text-muted-foreground">{tr("checkOut")}</p>
           <p className="mt-1 font-display text-xl" dir="ltr">
             {end ? fmtDate(end) : "—"}
           </p>
@@ -542,18 +728,8 @@ function Calendar({ chaletId, onDone }: { chaletId: number; onDone: (b: BookingR
 
       <div className="mt-8 flex flex-wrap gap-3">
         <button
-          onClick={() => {
-            if (!start || !end) {
-              setError(tr("pickStart"));
-              return;
-            }
-            if (daysBetween(start, end) < MIN_STAY_DAYS) {
-              setError(tr("minStay"));
-              return;
-            }
-            setShowForm(true);
-          }}
-          disabled={!start || !end || tooShort}
+          onClick={goToForm}
+          disabled={!ready}
           className="bg-black px-8 py-4 text-sm uppercase tracking-widest text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-30"
         >
           {tr("continueLabel")}
@@ -569,7 +745,38 @@ function Calendar({ chaletId, onDone }: { chaletId: number; onDone: (b: BookingR
           {tr("clear")}
         </button>
       </div>
-    </div>
+
+      <p className="mt-6 text-sm text-muted-foreground">{tr("noPaymentNow")}</p>
+
+      </div>
+
+      {/* Mobile keeps the running total and the way forward in view; on a
+          phone the tiles above scroll out of sight as soon as you pick dates. */}
+      {start && (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 px-5 py-3 backdrop-blur lg:hidden">
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="truncate text-[11px] uppercase tracking-widest text-muted-foreground">
+                {tr("yourStay")}
+              </p>
+              <p className="truncate text-sm" dir="ltr">
+                {rangeLabel}
+              </p>
+              <p className="text-sm font-semibold">
+                {current && !tooShort ? formatMoney(current.total, lang) : "—"}
+              </p>
+            </div>
+            <button
+              onClick={goToForm}
+              disabled={!ready}
+              className="shrink-0 bg-black px-6 py-3 text-xs uppercase tracking-widest text-white disabled:opacity-30"
+            >
+              {tr("continueLabel")}
+            </button>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -578,6 +785,12 @@ function BookingForm({
   start,
   end,
   total,
+  details,
+  setDetails,
+  civilId,
+  setCivilId,
+  terms,
+  setTerms,
   onBack,
   onDone,
 }: {
@@ -585,17 +798,20 @@ function BookingForm({
   start: Date;
   end: Date;
   total: number;
+  details: GuestDetails;
+  setDetails: (d: GuestDetails) => void;
+  civilId: File | null;
+  setCivilId: (f: File | null) => void;
+  terms: boolean;
+  setTerms: (v: boolean) => void;
   onBack: () => void;
   onDone: (b: BookingRow) => void;
 }) {
   const { tr, lang } = useI18n();
   const request = useRequestBooking();
-  const [form, setForm] = useState({ name: "", phone: "", email: "", guests: "2", notes: "" });
-  const [civilId, setCivilId] = useState<File | null>(null);
-  const [terms, setTerms] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [errors, setErrors] = useState<
-    Partial<Record<keyof typeof form | "civilId" | "terms", string>>
+    Partial<Record<keyof GuestDetails | "civilId" | "terms", string>>
   >({});
 
   // Release the object URL when the chosen file changes or the form unmounts.
@@ -612,17 +828,17 @@ function BookingForm({
 
   const validate = () => {
     const next: typeof errors = {};
-    if (form.name.trim().length < 2) {
+    if (details.name.trim().length < 2) {
       next.name = lang === "en" ? "Please enter your full name." : "يرجى إدخال الاسم الكامل.";
     }
-    if (form.phone.replace(/\D/g, "").length < 8) {
+    if (details.phone.replace(/\D/g, "").length < 8) {
       next.phone = lang === "en" ? "Enter a valid phone number." : "يرجى إدخال رقم هاتف صحيح.";
     }
-    if (!/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(form.email.trim())) {
+    if (!/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(details.email.trim())) {
       next.email =
         lang === "en" ? "Enter a valid email address." : "يرجى إدخال بريد إلكتروني صحيح.";
     }
-    const guests = Number(form.guests);
+    const guests = Number(details.guests);
     if (!Number.isInteger(guests) || guests < 1 || guests > 20) {
       next.guests = lang === "en" ? "Between 1 and 20 guests." : "بين ١ و ٢٠ ضيفاً.";
     }
@@ -659,23 +875,29 @@ function BookingForm({
       chaletId,
       start,
       end,
-      name: form.name,
-      phone: form.phone,
-      email: form.email,
-      guests: Number(form.guests),
-      notes: form.notes,
+      name: details.name,
+      phone: details.phone,
+      email: details.email,
+      guests: Number(details.guests),
+      notes: details.notes,
       civilIdPath,
       termsAccepted: terms,
     });
     onDone(booking);
   };
 
-  const fields: { key: keyof typeof form; label: string; type?: string }[] = [
-    { key: "name", label: tr("fullName") },
-    { key: "phone", label: tr("phone"), type: "tel" },
-    { key: "email", label: tr("email"), type: "email" },
-    { key: "guests", label: tr("guests"), type: "number" },
-  ];
+  const set = (key: keyof GuestDetails, value: string) => {
+    setDetails({ ...details, [key]: value });
+    if (errors[key]) setErrors({ ...errors, [key]: undefined });
+  };
+
+  const fields: { key: keyof GuestDetails; label: string; type?: string; autoComplete?: string }[] =
+    [
+      { key: "name", label: tr("fullName"), autoComplete: "name" },
+      { key: "phone", label: tr("phone"), type: "tel", autoComplete: "tel" },
+      { key: "email", label: tr("email"), type: "email", autoComplete: "email" },
+      { key: "guests", label: tr("guests"), type: "number" },
+    ];
 
   const busy = uploading || request.isPending;
 
@@ -683,25 +905,22 @@ function BookingForm({
     // noValidate: the browser's own bubbles fire first and are unlocalised,
     // so validate() owns the messages instead.
     <form onSubmit={submit} noValidate className="animate-fade-up space-y-6">
+      <Steps current={2} />
       <h1 className="mb-4 font-display text-4xl md:text-5xl">
         {lang === "en" ? "Guest Information" : "معلومات الضيف"}
       </h1>
 
       <div className="space-y-1 border border-border bg-secondary p-4 text-sm">
+        <p className="mb-2 text-xs uppercase tracking-widest text-muted-foreground">
+          {tr("yourStay")}
+        </p>
         <p>
-          <span className="text-muted-foreground">{tr("pickChalet")}: </span>
           <span className="font-medium">Bizarri Chalet {chaletId}</span>
         </p>
-        <p>
-          <span className="text-muted-foreground">{tr("selectedDates")}: </span>
-          <span className="font-medium" dir="ltr">
-            {fmtDate(start)} → {fmtDate(end)} ({daysBetween(start, end)} {tr("nightsLabel")})
-          </span>
+        <p dir="ltr">
+          {fmtDate(start)} → {fmtDate(end)} ({daysBetween(start, end)} {tr("nightsLabel")})
         </p>
-        <p>
-          <span className="text-muted-foreground">{tr("total")}: </span>
-          <span className="font-medium">{formatMoney(total, lang)}</span>
-        </p>
+        <p className="pt-1 text-base font-semibold">{formatMoney(total, lang)}</p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -713,15 +932,14 @@ function BookingForm({
             <input
               required
               type={f.type || "text"}
+              autoComplete={f.autoComplete}
+              inputMode={f.key === "phone" ? "tel" : undefined}
               min={f.key === "guests" ? 1 : undefined}
               max={f.key === "guests" ? 20 : undefined}
-              value={form[f.key]}
+              value={details[f.key]}
               aria-invalid={!!errors[f.key]}
               aria-describedby={errors[f.key] ? `err-${f.key}` : undefined}
-              onChange={(e) => {
-                setForm({ ...form, [f.key]: e.target.value });
-                if (errors[f.key]) setErrors({ ...errors, [f.key]: undefined });
-              }}
+              onChange={(e) => set(f.key, e.target.value)}
               className={`mt-2 w-full border bg-secondary px-4 py-3 outline-none focus:border-foreground ${
                 errors[f.key] ? "border-destructive" : "border-border"
               }`}
@@ -737,12 +955,12 @@ function BookingForm({
 
       <label className="block">
         <span className="text-xs uppercase tracking-widest text-muted-foreground">
-          {tr("notes")}
+          {tr("notes")} · {tr("optionalLabel")}
         </span>
         <textarea
-          rows={4}
-          value={form.notes}
-          onChange={(e) => setForm({ ...form, notes: e.target.value })}
+          rows={3}
+          value={details.notes}
+          onChange={(e) => set("notes", e.target.value)}
           className="mt-2 w-full border border-border bg-secondary px-4 py-3 outline-none focus:border-foreground"
         />
       </label>
@@ -750,9 +968,10 @@ function BookingForm({
       {/* Civil ID — mandatory for checkout. */}
       <div>
         <span className="text-xs uppercase tracking-widest text-muted-foreground">
-          {tr("civilId")}
+          {tr("civilId")} · {tr("requiredLabel")}
         </span>
-        <p className="mt-1 text-sm text-muted-foreground">{tr("civilIdHint")}</p>
+        <p className="mt-1 text-sm text-muted-foreground">{tr("whyCivilId")}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{tr("civilIdHint")}</p>
         <label
           className={`mt-2 flex cursor-pointer items-center gap-3 border bg-secondary px-4 py-3 transition-colors hover:border-foreground/50 ${
             errors.civilId ? "border-destructive" : "border-border"
@@ -773,11 +992,7 @@ function BookingForm({
           />
         </label>
         {preview && (
-          <img
-            src={preview}
-            alt=""
-            className="mt-3 max-h-40 border border-border object-contain"
-          />
+          <img src={preview} alt="" className="mt-3 max-h-40 border border-border object-contain" />
         )}
         {errors.civilId && (
           <span className="mt-1 block text-sm text-destructive">{errors.civilId}</span>
@@ -808,9 +1023,14 @@ function BookingForm({
             </Link>
           </span>
         </label>
-        {errors.terms && (
-          <span className="mt-1 block text-sm text-destructive">{errors.terms}</span>
-        )}
+        {errors.terms && <span className="mt-1 block text-sm text-destructive">{errors.terms}</span>}
+      </div>
+
+      <div className="flex items-start gap-3 border border-border p-4 text-sm text-muted-foreground">
+        <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
+        <span>
+          {tr("noPaymentNow")} {tr("weReplyIn")}
+        </span>
       </div>
 
       {/* Server-side rejections (dates taken since you picked them, rate limit) */}
@@ -844,5 +1064,56 @@ function BookingForm({
         </button>
       </div>
     </form>
+  );
+}
+
+function Confirmation({ booking }: { booking: BookingRow }) {
+  const { tr, lang } = useI18n();
+  return (
+    <div className="animate-fade-up py-12 text-center">
+      <Steps current={3} />
+      <div className="mx-auto mb-8 flex h-20 w-20 items-center justify-center rounded-full bg-black text-white">
+        <Check className="h-10 w-10" />
+      </div>
+      <h1 className="mb-4 font-display text-4xl md:text-5xl">{tr("thankYou")}</h1>
+      <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">{tr("bookingRef")}</p>
+      <p className="mt-2 font-mono text-2xl" dir="ltr">
+        {booking.ref}
+      </p>
+      <p className="mt-6 text-muted-foreground">
+        {/* Render the server's date strings as-is. new Date("2026-10-11")
+            parses as UTC midnight, so reading it back with local getters
+            showed the previous day for anyone behind UTC. */}
+        <span dir="ltr">
+          {booking.start_date} → {booking.end_date}
+        </span>{" "}
+        · {formatMoney(Number(booking.total), lang)}
+      </p>
+
+      <div className="mx-auto mt-10 max-w-md border border-border p-6 text-start">
+        <p className="mb-4 text-xs uppercase tracking-widest text-muted-foreground">
+          {tr("whatHappensNext")}
+        </p>
+        <ol className="space-y-3 text-sm">
+          {[tr("nextStep1"), tr("nextStep2"), tr("nextStep3")].map((s, i) => (
+            <li key={s} className="flex gap-3">
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center border border-border text-[11px]">
+                {i + 1}
+              </span>
+              <span className="text-muted-foreground">{s}</span>
+            </li>
+          ))}
+        </ol>
+      </div>
+
+      <p className="mt-8 text-sm">
+        <Link
+          to="/reservation"
+          className="underline underline-offset-4 text-muted-foreground hover:text-foreground"
+        >
+          {tr("yourReservation")}
+        </Link>
+      </p>
+    </div>
   );
 }

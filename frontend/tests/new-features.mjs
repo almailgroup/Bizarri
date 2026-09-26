@@ -275,7 +275,7 @@ async function guestPage(state, route = "booking") {
 
 /** Advance the guest calendar from this month to next month. */
 async function toCalendarNextMonth(p) {
-  await p.getByRole("button", { name: /^Book Now$/i }).click();
+  await p.getByRole("button", { name: /check availability/i }).click();
   await p.waitForTimeout(700);
   await p.getByRole("button", { name: /Next month/i }).click();
   await p.waitForTimeout(250);
@@ -320,7 +320,7 @@ const bg = (loc) => loc.evaluate((el) => getComputedStyle(el).backgroundColor);
 {
   const state = makeState();
   const { p, ctx } = await guestPage(state);
-  await p.getByRole("button", { name: /^Book Now$/i }).click();
+  await p.getByRole("button", { name: /check availability/i }).click();
   await p.waitForTimeout(700);
   if (today.getDate() > 1) {
     const yesterday = addDays(today, -1);
@@ -604,6 +604,214 @@ async function adminPage(state, tab) {
     .first()
     .evaluate((el) => getComputedStyle(el).fontFamily);
   ck("The public site keeps its display serif", SERIF.test(marketing), marketing);
+  await ctx.close();
+}
+
+// ================================================ usability: orientation
+{
+  const state = makeState();
+  const { p, ctx } = await guestPage(state, "booking");
+  // These labels are CSS-uppercased, so compare case-insensitively.
+  const introText = (await p.locator("body").innerText()).toLowerCase();
+  ck("The flow shows all three steps", ["dates", "your details", "confirmed"].every((x) => introText.includes(x)));
+  ck(
+    "Step 1 is the current step",
+    (await p.locator('[aria-current="step"]').first().innerText()).toLowerCase().includes("dates"),
+  );
+  ck("Rates are shown before committing to anything", introText.includes("rates at a glance"));
+  ck(
+    "The intro says no payment is taken",
+    await p.getByText(/No payment now/i).first().isVisible(),
+  );
+  ck(
+    "The CTA describes what it does, rather than 'Book Now'",
+    await p.getByRole("button", { name: /check availability/i }).isVisible(),
+  );
+  await ctx.close();
+}
+
+// ============================ usability: details survive going back
+{
+  const state = makeState();
+  const { p, ctx } = await guestPage(state);
+  await toCalendarNextMonth(p);
+  await p.getByRole("button", { name: /Weekend/i }).click();
+  await p.waitForTimeout(200);
+  await dayCell(p, thuA).click();
+  await p.waitForTimeout(200);
+  await p.getByRole("button", { name: /^Continue$/i }).click();
+  await p.waitForTimeout(400);
+
+  await p.getByLabel("Full Name").fill("Returning Guest");
+  await p.getByLabel("Phone Number", { exact: true }).fill("+96599997777");
+  await p.getByLabel("Email", { exact: true }).fill("returning@example.com");
+  await p.locator("input[type=checkbox]").check();
+  await p.waitForTimeout(150);
+
+  // Changing your mind about the dates must not cost you the form.
+  await p.getByRole("button", { name: /^Back$/i }).click();
+  await p.waitForTimeout(400);
+  await p.getByRole("button", { name: /^Continue$/i }).click();
+  await p.waitForTimeout(400);
+
+  ck(
+    "Going back and forward keeps the guest name",
+    (await p.getByLabel("Full Name").inputValue()) === "Returning Guest",
+    await p.getByLabel("Full Name").inputValue(),
+  );
+  ck(
+    "…keeps the phone number",
+    (await p.getByLabel("Phone Number", { exact: true }).inputValue()) === "+96599997777",
+  );
+  ck(
+    "…keeps the email",
+    (await p.getByLabel("Email", { exact: true }).inputValue()) === "returning@example.com",
+  );
+  ck("…and keeps the accepted terms", await p.locator("input[type=checkbox]").isChecked());
+  await ctx.close();
+}
+
+// ==================================== usability: chalet switch mid-flow
+{
+  const state = makeState();
+  const { p, ctx } = await guestPage(state);
+  await toCalendarNextMonth(p);
+  ck(
+    "The chalet can be switched from the calendar",
+    await p.getByText("Change chalet").first().isVisible(),
+  );
+  await dayCell(p, thuA).click();
+  await p.waitForTimeout(200);
+  await p.getByRole("button", { name: /Bizarri Chalet 2/i }).click();
+  await p.waitForTimeout(500);
+  const calls = state.calls.filter((c) => c.path === "rpc/availability_calendar");
+  ck(
+    "Switching chalet reloads that chalet's availability",
+    calls.some((c) => c.body.p_chalet_id === 2),
+    `chalets queried: ${[...new Set(calls.map((c) => c.body.p_chalet_id))].join(",")}`,
+  );
+  ck(
+    "Switching chalet clears a selection made for the other one",
+    (await p.locator("text=Check-in").locator("..").innerText()).includes("—"),
+  );
+  await ctx.close();
+}
+
+// ================================= usability: sticky summary on mobile
+{
+  const state = makeState();
+  const ctx = await b.newContext({ viewport: { width: 390, height: 844 } });
+  await ctx.route(/^https?:\/\/(?!localhost)/, (r) =>
+    SUPA.test(r.request().url()) ? r.fallback() : r.abort(),
+  );
+  await mock(ctx, state);
+  await ctx.addInitScript(() => sessionStorage.setItem("bizarri_intro_seen", "1"));
+  const p = await ctx.newPage();
+  await p.goto(B + "booking", { waitUntil: "domcontentloaded" });
+  await p.waitForTimeout(500);
+  await toCalendarNextMonth(p);
+
+  const bar = p.locator("div.fixed.bottom-0", { hasText: "Your stay" });
+  ck("No summary bar before any dates are picked", (await bar.count()) === 0);
+
+  await p.getByRole("button", { name: /Weekend/i }).click();
+  await p.waitForTimeout(200);
+  await dayCell(p, thuA).click();
+  await p.waitForTimeout(300);
+
+  ck("A summary bar appears once dates are picked", await bar.isVisible());
+
+  // isVisible() alone is not enough: the bar was once nested inside an
+  // animate-fade-up wrapper, whose lingering transform made it the containing
+  // block for position:fixed, so the "sticky" bar quietly scrolled away.
+  const vh = p.viewportSize().height;
+  const pinned = async () => {
+    const box = await bar.boundingBox();
+    return { box, ok: box && Math.abs(box.y + box.height - vh) < 2 && box.x < 2 };
+  };
+  const before = await pinned();
+  ck("The bar is pinned to the bottom of the viewport", before.ok, JSON.stringify(before.box));
+  await p.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  await p.waitForTimeout(400);
+  const after = await pinned();
+  ck("…and stays pinned after scrolling to the bottom", after.ok, JSON.stringify(after.box));
+  await p.evaluate(() => window.scrollTo(0, 0));
+  await p.waitForTimeout(300);
+
+  const barText = await bar.innerText();
+  ck("The bar carries the running total", barText.includes("350"), barText.replace(/\n/g, " | "));
+  ck("The bar carries the dates", barText.includes(iso(thuA)), barText.replace(/\n/g, " | "));
+  ck(
+    "The bar can move the guest forward",
+    await bar.getByRole("button", { name: /^Continue$/i }).isVisible(),
+  );
+  await bar.getByRole("button", { name: /^Continue$/i }).click();
+  await p.waitForTimeout(400);
+  ck("…and it actually advances", await p.getByText("Civil ID image").first().isVisible());
+  await ctx.close();
+}
+
+// ============================ usability: dead month is skipped, and said so
+{
+  const state = makeState();
+  // Everything for the next 60 days is taken: landing on a month with nothing
+  // free reads as "fully booked" rather than "look further ahead".
+  state.bookings.push({
+    ...state.bookings[0],
+    id: "b-block",
+    ref: "BZR-BLOCK1",
+    start_date: iso(today),
+    end_date: iso(addDays(today, 60)),
+    status: "accepted",
+  });
+  const { p, ctx } = await guestPage(state);
+  await p.getByRole("button", { name: /check availability/i }).click();
+  await p.waitForTimeout(900);
+  ck(
+    "A fully-booked month is skipped rather than shown empty",
+    await p.getByText(/next month with availability/i).isVisible(),
+  );
+  await ctx.close();
+}
+
+// ======================================== usability: what happens next
+{
+  const state = makeState();
+  const { p, ctx } = await guestPage(state);
+  await toCalendarNextMonth(p);
+  await p.getByRole("button", { name: /Weekend/i }).click();
+  await p.waitForTimeout(200);
+  await dayCell(p, thuA).click();
+  await p.waitForTimeout(200);
+  await p.getByRole("button", { name: /^Continue$/i }).click();
+  await p.waitForTimeout(400);
+  ck(
+    "The form explains why a Civil ID is needed",
+    await p.getByText(/require ID on file/i).isVisible(),
+  );
+  ck(
+    "The form reassures about payment before submitting",
+    await p.getByText(/within 24 hours/i).isVisible(),
+  );
+
+  await p.getByLabel("Full Name").fill("Next Steps");
+  await p.getByLabel("Phone Number", { exact: true }).fill("+96599996666");
+  await p.getByLabel("Email", { exact: true }).fill("next@example.com");
+  await p.locator("input[type=file]").setInputFiles({
+    name: "id.png",
+    mimeType: "image/png",
+    buffer: Buffer.from("89504e470d0a1a0a", "hex"),
+  });
+  await p.locator("input[type=checkbox]").check();
+  await p.getByRole("button", { name: /^Submit/i }).click();
+  await p.waitForTimeout(900);
+
+  ck("The confirmation explains what happens next", await p.getByText("What happens next").isVisible());
+  ck(
+    "…including how payment is handled",
+    await p.getByText(/Payment is arranged/i).isVisible(),
+  );
+  ck("…and marks the flow complete", await p.getByText("Confirmed").first().isVisible());
   await ctx.close();
 }
 
