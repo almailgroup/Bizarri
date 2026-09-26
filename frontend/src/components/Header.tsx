@@ -75,14 +75,7 @@ export function Header() {
             <img
               src={overHero ? logoWhite : logo}
               alt="Bizarri"
-              className="h-11 w-auto dark:hidden"
-              width={1400}
-              height={510}
-            />
-            <img
-              src={logoWhite}
-              alt="Bizarri"
-              className="hidden h-11 w-auto dark:block"
+              className="h-11 w-auto"
               width={1400}
               height={510}
             />

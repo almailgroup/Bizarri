@@ -125,7 +125,7 @@ async function check(label, page, locator) {
   // An inner page: plain white background, so the dark-ink variant must win.
   await p.goto(B + "contact", { waitUntil: "load" });
   await p.waitForTimeout(900);
-  const header = p.locator("header img:visible").first();
+  const header = p.locator("header img").first();
   const c = await check("Header logo on a light page", p, header);
   ck("…and it is the dark-ink variant", c.dark < 90, `darkest ${c.dark}`);
   ck(
@@ -144,7 +144,7 @@ async function check(label, page, locator) {
   await p.waitForTimeout(1200);
 
   // The header sits transparently over the dark hero photo before scrolling.
-  await check("Header logo over the hero photo", p, p.locator("header img:visible").first());
+  await check("Header logo over the hero photo", p, p.locator("header img").first());
   // The hero wordmark itself.
   await check("Hero wordmark", p, p.locator("h1 img").first());
   // Footer, on black.
@@ -157,7 +157,7 @@ async function check(label, page, locator) {
   const scrolled = await check(
     "Header logo after scrolling onto white",
     p,
-    p.locator("header img:visible").first(),
+    p.locator("header img").first(),
   );
   ck("…swaps to the dark-ink variant", scrolled.dark < 90, `darkest ${scrolled.dark}`);
   await ctx.close();
@@ -187,46 +187,7 @@ async function check(label, page, locator) {
   await p.locator("input[type=password]").fill("pw");
   await p.getByRole("button", { name: /^Login$/i }).click();
   await p.waitForTimeout(1200);
-  await check("Logo in the dashboard header", p, p.locator("header img:visible").first());
-  await ctx.close();
-}
-
-// ================================================ forced .dark colour scheme
-{
-  const ctx = await newCtx();
-  const p = await ctx.newPage();
-  // Nothing toggles .dark today, but the palette exists; if it is ever turned
-  // on, the header must not render dark ink on a dark page.
-  //
-  // The class is set after load, not in an init script: an init script runs
-  // against the pre-parse document, and the parser then replaces <html> with
-  // its own attributes, silently dropping the class — which made this whole
-  // block pass against a page that was still in light mode.
-  await p.goto(B + "contact", { waitUntil: "load" });
-  await p.waitForTimeout(800);
-  await p.evaluate(() => document.documentElement.classList.add("dark"));
-  await p.waitForTimeout(600);
-
-  ck(
-    "The .dark class survives on the document",
-    await p.evaluate(() => document.documentElement.classList.contains("dark")),
-  );
-  // Measure the colour rather than matching its text form: the computed value
-  // comes back as oklch() here, so a regex for "255,255,255" never matched
-  // white and the check passed on a light page.
-  const bgLum = await p.evaluate(() => {
-    const el = document.createElement("div");
-    el.style.cssText = "width:10px;height:10px;position:fixed;top:0;left:0;z-index:-1";
-    el.style.backgroundColor = getComputedStyle(document.body).backgroundColor;
-    document.body.append(el);
-    const c = getComputedStyle(el).backgroundColor;
-    el.remove();
-    const m = c.match(/\d+(\.\d+)?/g).map(Number);
-    return 0.2126 * m[0] + 0.7152 * m[1] + 0.0722 * m[2];
-  });
-  ck("The .dark palette actually applies", bgLum < 60, `background luminance ${Math.round(bgLum)}`);
-  const c = await check("Header logo in dark mode", p, p.locator("header img:visible").first());
-  ck("…and it is the light-ink variant", c.light > 170, `lightest ${c.light}`);
+  await check("Logo in the dashboard header", p, p.locator("header img").first());
   await ctx.close();
 }
 
@@ -247,6 +208,28 @@ async function check(label, page, locator) {
   await check("Hero intro copy over the banner", p, p.getByText(/private modern chalet/i).first());
   await check("Hero primary button", p, p.getByRole("link", { name: /book now/i }).first());
 
+  // A phone keeps only about a quarter of a 16:9 frame's width, so the hero
+  // swaps to a portrait crop rather than showing an anonymous slice of wall.
+  const mob = await b.newContext({ viewport: { width: 390, height: 844 } });
+  await mob.route(/^https?:\/\/(?!localhost)/, (r) =>
+    /fonts\.(googleapis|gstatic)\.com/.test(r.request().url()) ? r.continue() : r.abort(),
+  );
+  await mob.addInitScript(() => sessionStorage.setItem("bizarri_intro_seen", "1"));
+  const mp = await mob.newPage();
+  await mp.goto(B, { waitUntil: "load" });
+  await mp.waitForTimeout(1200);
+  const mobSrc = await mp
+    .locator("section img")
+    .first()
+    .evaluate((el) => el.currentSrc);
+  ck("Phones get the portrait crop of the hero", /portrait/.test(mobSrc), mobSrc.split("/").pop());
+  const deskSrc = await p
+    .locator("section img")
+    .first()
+    .evaluate((el) => el.currentSrc);
+  ck("…and desktop keeps the wide one", !/portrait/.test(deskSrc), deskSrc.split("/").pop());
+  await mob.close();
+
   const bytes = await p.evaluate(async (u) => {
     const r = await fetch(u);
     return (await r.blob()).size;
@@ -265,7 +248,7 @@ async function check(label, page, locator) {
   // From an inner page.
   await p.goto(B + "contact", { waitUntil: "load" });
   await p.waitForTimeout(800);
-  await p.locator("header img:visible").first().click();
+  await p.locator("header img").first().click();
   await p.waitForTimeout(900);
   ck(
     "Clicking the header logo on an inner page goes home",
@@ -280,7 +263,7 @@ async function check(label, page, locator) {
   const before = await p.evaluate(() => window.scrollY);
   ck("Scrolled down the homepage", before > 800, `scrollY ${Math.round(before)}`);
 
-  await p.locator("header img:visible").first().click();
+  await p.locator("header img").first().click();
   await p.waitForTimeout(1600);
   const after = await p.evaluate(() => window.scrollY);
   ck(

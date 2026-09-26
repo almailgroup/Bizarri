@@ -5,6 +5,7 @@ import { useI18n } from "@/lib/i18n";
 import { usePageMeta } from "@/hooks/use-page-meta";
 import logoWhite from "@/assets/bizarri-logo-white.png";
 import heroImg from "@/assets/banner.jpg";
+import heroImgPortrait from "@/assets/banner-portrait.jpg";
 import room1 from "@/assets/room-1.jpg";
 import room4 from "@/assets/room-4.jpg";
 import room5 from "@/assets/room-5.jpg";
@@ -34,15 +35,18 @@ function Home() {
     <PageShell>
       {/* ---------------------------------------------------------------- Hero */}
       <section className="relative -mt-20 flex min-h-screen items-center justify-center overflow-hidden bg-black text-white">
-        <img
-          src={heroImg}
-          alt=""
-          aria-hidden="true"
-          fetchPriority="high"
-          width={2400}
-          height={1350}
-          className="absolute inset-0 h-full w-full scale-105 object-cover"
-        />
+        <picture>
+          <source media="(max-width: 640px)" srcSet={heroImgPortrait} />
+          <img
+            src={heroImg}
+            alt=""
+            aria-hidden="true"
+            fetchPriority="high"
+            width={2400}
+            height={1350}
+            className="absolute inset-0 h-full w-full scale-105 object-cover"
+          />
+        </picture>
         {/* The building is lit and centred, which is exactly where the type
             sits, so the scrim is strongest through the middle rather than at
             the edges — the usual top/bottom vignette would leave the wordmark

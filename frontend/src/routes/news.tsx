@@ -4,7 +4,7 @@ import { useI18n } from "@/lib/i18n";
 import { usePublishedNews } from "@/lib/api";
 import { usePageMeta } from "@/hooks/use-page-meta";
 
-import { Newspaper } from "lucide-react";
+import { AlertCircle, Newspaper } from "lucide-react";
 
 export const Route = createFileRoute("/news")({ component: News });
 
@@ -16,7 +16,7 @@ function News() {
       ? "Latest news and announcements from Bizarri Chalet."
       : "آخر الأخبار والإعلانات من شاليه بيزاري.",
   );
-  const { data: items } = usePublishedNews();
+  const { data: items, isError, isLoading, refetch } = usePublishedNews();
   const sorted = items ?? [];
 
   return (
@@ -27,7 +27,26 @@ function News() {
         </p>
         <h1 className="font-display text-5xl md:text-6xl mb-12">{tr("latestNews")}</h1>
 
-        {sorted.length === 0 && (
+        {isLoading && (
+          <p className="text-sm text-muted-foreground">
+            {lang === "en" ? "Loading…" : "جارٍ التحميل…"}
+          </p>
+        )}
+
+        {isError && (
+          <div className="border border-destructive p-16 text-center">
+            <AlertCircle className="mx-auto mb-4 h-10 w-10 text-destructive" />
+            <p className="text-muted-foreground">{tr("newsUnavailable")}</p>
+            <button
+              onClick={() => refetch()}
+              className="mt-6 border border-border px-6 py-3 text-xs uppercase tracking-widest hover:bg-secondary"
+            >
+              {tr("tryAgain")}
+            </button>
+          </div>
+        )}
+
+        {!isError && !isLoading && sorted.length === 0 && (
           <div className="border border-border p-16 text-center">
             <Newspaper className="w-10 h-10 mx-auto mb-4 text-muted-foreground" />
             <p className="text-muted-foreground">{tr("noNews")}</p>

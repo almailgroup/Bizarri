@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronLeft, ChevronRight, Paperclip, ShieldCheck } from "lucide-react";
 import { PageShell } from "@/components/PageShell";
 import { BookingLookup, rememberBookingRef } from "@/components/BookingLookup";
+import { WhatsAppLink } from "@/components/WhatsAppLink";
 import { useI18n } from "@/lib/i18n";
 import { usePageMeta } from "@/hooks/use-page-meta";
 import {
@@ -259,12 +260,16 @@ function Intro({
         <ChaletPicker chaletId={chaletId} setChaletId={setChaletId} />
       </div>
 
-      <button
-        onClick={onNext}
-        className="bg-black px-8 py-4 text-sm uppercase tracking-widest text-white hover:opacity-90"
-      >
-        {tr("checkAvailability")}
-      </button>
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          onClick={onNext}
+          className="bg-black px-8 py-4 text-sm uppercase tracking-widest text-white hover:opacity-90"
+        >
+          {tr("checkAvailability")}
+        </button>
+        <WhatsAppLink className="inline-flex items-center gap-2 border border-border px-8 py-4 text-sm uppercase tracking-widest transition-colors hover:bg-secondary" />
+      </div>
+      <p className="mt-3 text-sm text-muted-foreground">{tr("whatsappAlt")}</p>
 
       <div className="mt-16 border-t border-border pt-10">
         <BookingLookup />
@@ -1043,6 +1048,15 @@ function BookingForm({
           {tr("noPaymentNow")} {tr("weReplyIn")}
         </span>
       </div>
+
+      <p className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+        {tr("whatsappHelp")}
+        <WhatsAppLink
+          context={{ chaletId, start, end }}
+          className="inline-flex items-center gap-2 underline underline-offset-4 hover:text-foreground"
+          label="WhatsApp"
+        />
+      </p>
 
       {/* Server-side rejections (dates taken since you picked them, rate limit) */}
       {request.isError && (

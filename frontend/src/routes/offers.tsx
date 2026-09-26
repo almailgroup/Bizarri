@@ -18,7 +18,7 @@ function Offers() {
       : "باقات إقامة بسعر ثابت لشاليه بيزاري، وأسعار يومية للتواريخ المخصصة.",
   );
   // Rates are admin-editable, so read them rather than hard-coding the figures.
-  const { data: stored } = useRates();
+  const { data: stored, isError: ratesFailed } = useRates();
   const rates = stored ?? DEFAULT_RATES;
   const { data: occasions } = useSpecialOccasions();
   // Past windows are noise on a price list; only what is still bookable.
@@ -60,6 +60,12 @@ function Offers() {
         </p>
         <h1 className="animate-fade-up font-display text-5xl md:text-6xl">{tr("ourPackages")}</h1>
         <p className="animate-fade-up mt-5 max-w-lg text-muted-foreground">{tr("offersIntro")}</p>
+
+        {ratesFailed && (
+          <p className="mt-10 border border-border bg-secondary p-4 text-sm text-muted-foreground">
+            {tr("ratesIndicative")}
+          </p>
+        )}
 
         <div className="mt-16 grid gap-4 md:grid-cols-3">
           {packages.map((p, i) => (

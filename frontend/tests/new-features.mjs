@@ -1016,6 +1016,106 @@ async function adminPage(state, tab) {
   await ctx.close();
 }
 
+// ===================================== a way through that is not the form
+{
+  const state = makeState();
+  const { p, ctx } = await guestPage(state, "booking");
+  const wa = p.getByRole("link", { name: /whatsapp/i }).first();
+  ck("The booking page offers WhatsApp as well as the form", await wa.isVisible());
+
+  const href = await wa.getAttribute("href");
+  ck("It points at wa.me", /^https:\/\/wa\.me\//.test(href ?? ""), href?.split("?")[0]);
+  // The only number allowed to appear anywhere on this site.
+  ck(
+    "It uses the chalet's own number",
+    /wa\.me\/96594040955/.test(href ?? ""),
+    href?.split("?")[0],
+  );
+  ck(
+    "The message is prefilled so the guest does not start from a blank chat",
+    decodeURIComponent(new URL(href).searchParams.get("text") ?? "").length > 20,
+    decodeURIComponent(new URL(href).searchParams.get("text") ?? ""),
+  );
+  ck("It opens in a new tab", (await wa.getAttribute("target")) === "_blank");
+  ck(
+    "…without handing the new tab a window reference",
+    /noopener/.test((await wa.getAttribute("rel")) ?? ""),
+    await wa.getAttribute("rel"),
+  );
+
+  // The Civil ID request is the likeliest place to lose someone, so the
+  // escape hatch has to be there too — carrying what they already chose.
+  await toCalendarNextMonth(p);
+  await p.getByRole("button", { name: /Weekend/i }).click();
+  await p.waitForTimeout(200);
+  await dayCell(p, thuA).click();
+  await p.waitForTimeout(200);
+  await p.getByRole("button", { name: /^Continue$/i }).click();
+  await p.waitForTimeout(400);
+
+  const waForm = p.getByRole("link", { name: /whatsapp/i }).first();
+  ck("The checkout form offers WhatsApp too", await waForm.isVisible());
+  const text = decodeURIComponent(
+    new URL(await waForm.getAttribute("href")).searchParams.get("text") ?? "",
+  );
+  ck("…and the message carries the dates already chosen", text.includes(iso(thuA)), text);
+  await ctx.close();
+}
+
+// ============================== an outage must not read as "nothing here"
+{
+  const ctx = await b.newContext({ viewport: { width: 1280, height: 900 } });
+  await ctx.route(/^https?:\/\/(?!localhost)/, (r) => {
+    const u = r.request().url();
+    if (/fonts\.(googleapis|gstatic)\.com/.test(u)) return r.continue();
+    if (SUPA.test(u))
+      return r.fulfill({
+        status: 500,
+        contentType: "application/json",
+        body: '{"message":"simulated outage"}',
+      });
+    return r.abort();
+  });
+  await ctx.addInitScript(() => sessionStorage.setItem("bizarri_intro_seen", "1"));
+  const p = await ctx.newPage();
+
+  await p.goto(B + "news", { waitUntil: "load" });
+  await p.waitForTimeout(1500);
+  const newsText = await p.locator("body").innerText();
+  ck(
+    "A failed news request is reported as a connection problem",
+    /connection problem/i.test(newsText),
+  );
+  ck(
+    "…and is NOT reported as the chalet having no news",
+    !/No news yet/i.test(newsText),
+    newsText.includes("No news yet") ? "still says 'No news yet'" : "",
+  );
+  ck("…with a way to retry", await p.getByRole("button", { name: /try again/i }).isVisible());
+
+  // Offers falls back to the built-in rates, which keeps the page useful —
+  // but a guest must not quote a stale price believing it is live.
+  await p.goto(B + "offers", { waitUntil: "load" });
+  await p.waitForTimeout(1500);
+  const offersText = await p.locator("body").innerText();
+  ck("Offers still shows prices during an outage", /600/.test(offersText));
+  ck(
+    "…but says they are standard rather than live",
+    /standard prices/i.test(offersText),
+    offersText.includes("standard prices") ? "" : "no caveat shown",
+  );
+  await ctx.close();
+}
+
+// The same pages, with a healthy backend, must not cry wolf.
+{
+  const state = makeState();
+  const { p, ctx } = await guestPage(state, "offers");
+  const text = await p.locator("body").innerText();
+  ck("No outage caveat when rates load fine", !/standard prices/i.test(text));
+  await ctx.close();
+}
+
 // ======================================= no untranslated keys leak to screen
 /**
  * The dictionary is Record<string, …>, so tr("typo") compiles and silently

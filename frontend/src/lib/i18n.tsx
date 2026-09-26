@@ -187,6 +187,24 @@ export const t: Dict = {
 
   // Booking flow guidance
   checkAvailability: { en: "Check availability", ar: "عرض التواريخ المتاحة" },
+  bookOnWhatsapp: { en: "Book on WhatsApp", ar: "احجز عبر واتساب" },
+  whatsappAlt: {
+    en: "Prefer to arrange it by message? Talk to us on WhatsApp.",
+    ar: "تفضل الترتيب عبر الرسائل؟ تحدث إلينا على واتساب.",
+  },
+  whatsappHelp: {
+    en: "Questions before you send this? Message us on WhatsApp.",
+    ar: "لديك أسئلة قبل الإرسال؟ راسلنا على واتساب.",
+  },
+  newsUnavailable: {
+    en: "We could not load the news just now — this is a connection problem, not an empty page.",
+    ar: "تعذر تحميل الأخبار الآن — هذه مشكلة في الاتصال وليست صفحة فارغة.",
+  },
+  ratesIndicative: {
+    en: "Live rates could not be loaded, so these are our standard prices. We confirm the exact total when you request your dates.",
+    ar: "تعذر تحميل الأسعار المحدثة، لذا هذه أسعارنا المعتادة. نؤكد الإجمالي الدقيق عند طلب التواريخ.",
+  },
+  tryAgain: { en: "Try again", ar: "إعادة المحاولة" },
   stepDates: { en: "Dates", ar: "التواريخ" },
   stepDetails: { en: "Your details", ar: "بياناتك" },
   stepDone: { en: "Confirmed", ar: "التأكيد" },
