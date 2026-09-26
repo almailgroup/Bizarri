@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "test:integration": "node tests/be-test.mjs && node tests/fixes.mjs && node tests/authtest.mjs && node tests/admin-features.mjs && node tests/new-features.mjs && node tests/notify-whatsapp-logic.mjs"
+    "test:integration": "node tests/be-test.mjs && node tests/fixes.mjs && node tests/authtest.mjs && node tests/admin-features.mjs && node tests/new-features.mjs && node tests/logo.mjs && node tests/notify-whatsapp-logic.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -78,10 +78,11 @@
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
     "globals": "^15.15.0",
+    "playwright": "^1.49.1",
+    "pngjs": "^7.0.0",
     "prettier": "^3.7.3",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.56.1",
-    "vite": "^7.3.1",
-    "playwright": "^1.49.1"
+    "vite": "^7.3.1"
   }
 }

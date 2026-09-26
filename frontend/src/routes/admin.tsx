@@ -32,7 +32,7 @@ function Admin() {
 function Splash() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-black text-white">
-      <img src={logoWhite} alt="Bizarri" className="h-10 w-auto animate-pulse" />
+      <img src={logoWhite} alt="Bizarri" className="h-12 w-auto animate-pulse" />
     </div>
   );
 }
@@ -69,7 +69,7 @@ function SignIn() {
       </Link>
 
       <form onSubmit={submit} className="animate-fade-up w-full max-w-sm">
-        <img src={logoWhite} alt="Bizarri" className="mx-auto mb-10 h-12 w-auto" />
+        <img src={logoWhite} alt="Bizarri" className="mx-auto mb-10 h-14 w-auto" />
         <p className="mb-2 text-center text-xs uppercase tracking-[0.4em] text-white/40">
           {tr("admin")}
         </p>
@@ -122,7 +122,7 @@ function NotAuthorised() {
   const { signOut } = useAuth();
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-black px-6 text-center text-white">
-      <img src={logoWhite} alt="Bizarri" className="h-10 w-auto" />
+      <img src={logoWhite} alt="Bizarri" className="h-12 w-auto" />
       <p className="max-w-sm text-white/70">
         {lang === "en"
           ? "This account does not have chalet management access."
@@ -173,7 +173,7 @@ function Dashboard() {
       <header className="border-b border-border bg-black text-white">
         <div className="mx-auto flex h-20 max-w-7xl items-center justify-between gap-4 px-6">
           <div className="flex items-center gap-4">
-            <img src={logoWhite} alt="Bizarri" className="h-8 w-auto" />
+            <img src={logoWhite} alt="Bizarri" className="h-10 w-auto" />
             <span className="hidden text-xs uppercase tracking-[0.4em] text-white/60 sm:inline">
               {tr("dashboard")}
             </span>

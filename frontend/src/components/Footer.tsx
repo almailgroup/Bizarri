@@ -11,7 +11,7 @@ export function Footer() {
     <footer className="bg-black text-white">
       <div className="max-w-7xl mx-auto px-6 py-20 grid md:grid-cols-4 gap-12">
         <div className="md:col-span-2">
-          <img src={logoWhite} alt="Bizarri Chalet" className="h-12 mb-6" />
+          <img src={logoWhite} alt="Bizarri Chalet" className="h-14 mb-6" />
           <p className="text-white/60 max-w-sm leading-relaxed">{tr("tagline")}</p>
         </div>
 

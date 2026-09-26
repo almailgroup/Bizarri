@@ -56,9 +56,9 @@ function Home() {
             <img
               src={logoWhite}
               alt={tr("brand")}
-              width={609}
-              height={183}
-              className="mx-auto h-20 w-auto md:h-28"
+              width={1400}
+              height={510}
+              className="mx-auto h-24 w-auto md:h-36"
             />
           </h1>
           <p

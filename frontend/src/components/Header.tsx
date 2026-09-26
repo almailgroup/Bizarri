@@ -76,16 +76,16 @@ export function Header() {
             <img
               src={overHero ? logoWhite : logo}
               alt="Bizarri"
-              className="h-9 w-auto dark:hidden"
-              width={609}
-              height={183}
+              className="h-11 w-auto dark:hidden"
+              width={1400}
+              height={510}
             />
             <img
               src={logoWhite}
               alt="Bizarri"
-              className="hidden h-9 w-auto dark:block"
-              width={609}
-              height={183}
+              className="hidden h-11 w-auto dark:block"
+              width={1400}
+              height={510}
             />
           </Link>
 
@@ -155,7 +155,7 @@ export function Header() {
           aria-label={tr("menu")}
         >
           <div className="sticky top-0 z-10 mx-auto flex h-20 max-w-7xl items-center justify-between bg-black px-6">
-            <img src={logoWhite} alt="Bizarri" className="h-9" />
+            <img src={logoWhite} alt="Bizarri" className="h-11" />
             <button
               onClick={() => setOpen(false)}
               className="p-2.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
