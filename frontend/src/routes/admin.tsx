@@ -59,7 +59,7 @@ function SignIn() {
   };
 
   return (
-    <div className="admin-ui relative flex min-h-screen items-center justify-center bg-black px-6 text-white">
+    <div className="relative flex min-h-screen items-center justify-center bg-black px-6 text-white">
       <Link
         to="/"
         aria-label={tr("close")}
@@ -121,7 +121,7 @@ function NotAuthorised() {
   const { lang } = useI18n();
   const { signOut } = useAuth();
   return (
-    <div className="admin-ui flex min-h-screen flex-col items-center justify-center gap-6 bg-black px-6 text-center text-white">
+    <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-black px-6 text-center text-white">
       <img src={logoWhite} alt="Bizarri" className="h-10 w-auto" />
       <p className="max-w-sm text-white/70">
         {lang === "en"
@@ -169,7 +169,7 @@ function Dashboard() {
   ];
 
   return (
-    <div className="admin-ui min-h-screen bg-background">
+    <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-black text-white">
         <div className="mx-auto flex h-20 max-w-7xl items-center justify-between gap-4 px-6">
           <div className="flex items-center gap-4">

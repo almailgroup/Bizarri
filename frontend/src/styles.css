@@ -28,10 +28,7 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --font-display: "Cormorant Garamond", "Playfair Display", serif;
-  --font-display-ar: "El Messiri", "Noto Kufi Arabic", serif;
-  --font-sans: "Inter", system-ui, sans-serif;
-  --font-arabic: "Noto Kufi Arabic", "Cairo", "Tajawal", sans-serif;
+  --font-sans: "IBM Plex Sans Arabic", system-ui, sans-serif;
 }
 
 :root {
@@ -94,39 +91,37 @@
     -webkit-font-smoothing: antialiased;
   }
   [dir="rtl"] body {
-    font-family: var(--font-arabic);
     letter-spacing: 0;
     /* Arabic glyphs sit smaller in the em box than Latin; give them more
-       leading so body copy reads at parity with the English side. */
+       leading so body copy reads at parity with the English side. This is a
+       readability fix, not a second typeface. */
     line-height: 1.9;
   }
-  [dir="rtl"] h1,
-  [dir="rtl"] h2,
-  [dir="rtl"] h3,
-  [dir="rtl"] h4 {
-    font-family: var(--font-display-ar);
-    letter-spacing: 0;
-    font-weight: 600;
-  }
-  [dir="ltr"] h1,
-  [dir="ltr"] h2,
-  [dir="ltr"] h3,
-  [dir="ltr"] h4 {
-    font-family: var(--font-display);
-    letter-spacing: -0.02em;
-  }
+  /* The serif used to carry the weight of a heading on its own. With one sans
+     family the distinction has to come from weight and tracking instead. */
   h1,
   h2,
   h3,
   h4 {
-    font-family: var(--font-display);
+    font-weight: 600;
     letter-spacing: -0.02em;
+  }
+  /* Arabic is cursive: negative tracking severs the joins between letterforms. */
+  [dir="rtl"] h1,
+  [dir="rtl"] h2,
+  [dir="rtl"] h3,
+  [dir="rtl"] h4 {
+    letter-spacing: 0;
   }
 }
 
 @layer utilities {
   .font-display {
-    font-family: var(--font-display);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+  [dir="rtl"] .font-display {
+    letter-spacing: 0;
   }
   .text-balance {
     text-wrap: balance;
@@ -249,36 +244,8 @@
   text-transform: none;
 }
 
-/* The admin dashboard is a tool, not a brochure. The marketing serif next to
-   dashboard tables reads as two different pages, so the whole admin surface
-   uses one family. Unlayered for the same reason as the RTL rules above: the
-   .font-display utility and the base h1-h4 rule both sit in layers, and a
-   layered rule always loses to Tailwind's utilities whatever its specificity. */
-.admin-ui,
-.admin-ui h1,
-.admin-ui h2,
-.admin-ui h3,
-.admin-ui h4,
-.admin-ui .font-display,
-.admin-ui .font-mono {
+/* Tailwind's font-mono utility would pull in a second family; the booking
+   reference is set in the same face as everything else. */
+.font-mono {
   font-family: var(--font-sans);
-  letter-spacing: normal;
-}
-[dir="rtl"] .admin-ui,
-[dir="rtl"] .admin-ui h1,
-[dir="rtl"] .admin-ui h2,
-[dir="rtl"] .admin-ui h3,
-[dir="rtl"] .admin-ui h4,
-[dir="rtl"] .admin-ui .font-display,
-[dir="rtl"] .admin-ui .font-mono {
-  font-family: var(--font-arabic);
-}
-/* The serif carried the visual weight of a heading on its own; the sans needs
-   the weight set explicitly or admin headings read as body copy. */
-.admin-ui h1,
-.admin-ui h2,
-.admin-ui h3,
-.admin-ui h4,
-.admin-ui .font-display {
-  font-weight: 600;
 }

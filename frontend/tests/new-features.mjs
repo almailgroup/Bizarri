@@ -18,9 +18,14 @@ const b = await chromium.launch(
     : {},
 );
 let fails = 0;
+let skips = 0;
 const ck = (n, c, d = "") => {
   if (!c) fails++;
   console.log(`${c ? "PASS" : "FAIL"}  ${n}${d ? " — " + d : ""}`);
+};
+const skip = (n, why) => {
+  skips++;
+  console.log(`SKIP  ${n} — ${why}`);
 };
 
 /* ----------------------------------------------------------------- dates */
@@ -575,35 +580,159 @@ async function adminPage(state, tab) {
   await ctx.close();
 }
 
-// ================================================ admin: one font throughout
+// ============================================ one font across the whole site
+/**
+ * The site used to load five families (a serif for headings, a sans for body,
+ * and three Arabic faces). Everything is now IBM Plex Sans Arabic, which ships
+ * both scripts — a Latin-only font would leave the browser substituting some
+ * other face on every Arabic page, which is two fonts by accident.
+ */
 {
   const state = makeState();
-  const { p, ctx } = await adminPage(state, /Booking Requests/i);
-  const bodyFont = await p.evaluate(() => getComputedStyle(document.body).fontFamily);
-  const headingFont = await p
-    .getByRole("heading", { name: /Booking Requests/i })
-    .evaluate((el) => getComputedStyle(el).fontFamily);
-  const refFont = await p
-    .locator("li", { hasText: "Aisha Al-Sabah" })
-    .locator("p")
-    .first()
-    .evaluate((el) => getComputedStyle(el).fontFamily);
+  const ctx = await b.newContext({ viewport: { width: 1400, height: 1000 } });
+  await ctx.route(/^https?:\/\/(?!localhost)/, (r) => {
+    // Google Fonts must reach the network here, or every element falls back to
+    // system-ui and the assertions below pass without proving anything.
+    const u = r.request().url();
+    if (SUPA.test(u)) return r.fallback();
+    if (/fonts\.(googleapis|gstatic)\.com/.test(u)) return r.continue();
+    return r.abort();
+  });
+  await mock(ctx, state);
+  await ctx.addInitScript(() => sessionStorage.setItem("bizarri_intro_seen", "1"));
 
-  ck("Admin headings use the body font, not the marketing serif", headingFont === bodyFont, headingFont);
-  // (?<!sans-) so the sans stack's own "sans-serif" fallback is not a match.
-  const SERIF = /Cormorant|Playfair|(?<!sans-)serif/i;
-  ck("No serif is left in an admin heading", !SERIF.test(headingFont), headingFont);
-  ck("Admin monospace is unified too", refFont === bodyFont, refFont);
+  // Every family actually resolved on the page, across both languages and the
+  // public site and the dashboard.
+  const familiesOn = async (path, lang) => {
+    const p = await ctx.newPage();
+    await p.goto(B + path, { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(600);
+    if (lang === "ar") {
+      await p.getByRole("button", { name: /العربية/ }).first().click();
+      await p.waitForTimeout(600);
+    }
+    await p.evaluate(() => document.fonts.ready);
+    const fams = await p.evaluate(() =>
+      [
+        ...new Set(
+          [...document.querySelectorAll("h1,h2,h3,h4,p,span,button,a,li,input,dt,dd")]
+            .filter((el) => (el.textContent ?? "").trim().length > 0)
+            .map((el) => getComputedStyle(el).fontFamily),
+        ),
+      ].sort(),
+    );
+    await p.close();
+    return fams;
+  };
 
-  // The public site must keep its display serif — this is an admin-only change.
-  const gp = await ctx.newPage();
-  await gp.goto(B, { waitUntil: "domcontentloaded" });
-  await gp.waitForTimeout(500);
-  const marketing = await gp
-    .getByRole("heading", { level: 1 })
-    .first()
-    .evaluate((el) => getComputedStyle(el).fontFamily);
-  ck("The public site keeps its display serif", SERIF.test(marketing), marketing);
+  const homeEn = await familiesOn("", "en");
+  ck("The homepage renders exactly one font family", homeEn.length === 1, homeEn.join(" | "));
+  ck(
+    "…and it is IBM Plex Sans Arabic",
+    /IBM Plex Sans Arabic/.test(homeEn[0] ?? ""),
+    homeEn[0],
+  );
+
+  const bookingEn = await familiesOn("booking", "en");
+  ck("The booking page renders exactly one font family", bookingEn.length === 1, bookingEn.join(" | "));
+
+  const homeAr = await familiesOn("", "ar");
+  ck("The Arabic site renders exactly one font family", homeAr.length === 1, homeAr.join(" | "));
+  ck("…the same one as English", homeAr[0] === homeEn[0], `${homeAr[0]} vs ${homeEn[0]}`);
+
+  // No serif anywhere. (?<!sans-) so the stack's own "sans-serif" fallback
+  // is not counted as a match.
+  const SERIF = /Cormorant|Playfair|El Messiri|(?<!sans-)serif/i;
+  ck("No serif family survives anywhere", !SERIF.test([...homeEn, ...homeAr, ...bookingEn].join(" ")));
+
+  // The rules above prove the CSS asks for one family. This proves the file
+  // behind it actually arrives and covers both scripts.
+  //
+  // ignoreHTTPSErrors is for this check only: outbound HTTPS in this sandbox
+  // goes through a TLS-intercepting proxy whose CA Chromium does not trust, so
+  // the stylesheet fails with ERR_CERT_AUTHORITY_INVALID here and nowhere else.
+  // Without it the assertion would "pass" against a silent system fallback.
+  const netCtx = await b.newContext({ ignoreHTTPSErrors: true });
+  const seen = [];
+  netCtx.on("response", (r) => {
+    if (/fonts\.(googleapis|gstatic)\.com/.test(r.url())) seen.push([r.status(), r.url()]);
+  });
+  const fp = await netCtx.newPage();
+  await fp.goto(B, { waitUntil: "load" });
+  await fp.waitForTimeout(2500);
+  await fp.evaluate(() => document.fonts.ready);
+
+  const css = seen.find(([, u]) => u.includes("googleapis.com/css2"));
+  // Google Fonts is a third party reached through this sandbox's egress proxy,
+  // so it can simply be unreachable. That says nothing about the site, and
+  // must not read as a failure — or as a pass.
+  if (css?.[0] !== 200) {
+    skip(
+      "Webfont delivery (stylesheet, files, Arabic coverage)",
+      `Google Fonts unreachable from here: ${css ? `HTTP ${css[0]}` : "no response"}`,
+    );
+  } else {
+  ck("The font stylesheet loads", css[0] === 200, JSON.stringify(css));
+  ck(
+    "Only one family is requested",
+    (css[1].match(/family=/g) ?? []).length === 1,
+    css[1].split("?")[1],
+  );
+
+  const faces = await fp.evaluate(() =>
+    [...document.fonts].map((f) => ({ family: f.family, status: f.status, range: f.unicodeRange })),
+  );
+  const plex = faces.filter((f) => /IBM Plex Sans Arabic/.test(f.family));
+  ck("The browser has the family", plex.length > 0, `${faces.length} faces registered`);
+  ck(
+    "Its files are actually downloaded",
+    plex.some((f) => f.status === "loaded"),
+    [...new Set(plex.map((f) => f.status))].join(", "),
+  );
+  // U+0600 is Arabic. A Latin-only font would register no face covering it.
+  ck(
+    "The same family covers Arabic, so nothing is substituted",
+    plex.some((f) => f.status === "loaded" && /0600|0750|FB50|FE70/i.test(f.range ?? "")),
+    plex.filter((f) => f.status === "loaded").map((f) => (f.range ?? "").slice(0, 40)).join(" / "),
+  );
+  const woff = seen.filter(([, u]) => u.includes("gstatic.com") && u.endsWith(".woff2"));
+  ck("Font files came over the wire", woff.length > 0, `${woff.length} woff2 files`);
+  }
+  await netCtx.close();
+
+  // The dashboard is part of "the entire website" too. Fresh context: the
+  // Arabic check above persists the language choice, which would leave the
+  // sign-in button labelled in Arabic.
+  const adminCtx = await b.newContext({ viewport: { width: 1400, height: 1000 } });
+  await adminCtx.route(/^https?:\/\/(?!localhost)/, (r) => {
+    const u = r.request().url();
+    if (SUPA.test(u)) return r.fallback();
+    if (/fonts\.(googleapis|gstatic)\.com/.test(u)) return r.continue();
+    return r.abort();
+  });
+  await mock(adminCtx, state);
+  await adminCtx.addInitScript(() => sessionStorage.setItem("bizarri_intro_seen", "1"));
+  const ap = await adminCtx.newPage();
+  await ap.goto(B + "admin", { waitUntil: "domcontentloaded" });
+  await ap.locator("input[type=email]").fill("admin@example.com");
+  await ap.locator("input[type=password]").fill("pw");
+  await ap.getByRole("button", { name: /^Login$/i }).click();
+  await ap.waitForTimeout(900);
+  await ap.getByRole("button", { name: /Booking Requests/i }).click();
+  await ap.waitForTimeout(600);
+  await ap.evaluate(() => document.fonts.ready);
+  const adminFams = await ap.evaluate(() =>
+    [
+      ...new Set(
+        [...document.querySelectorAll("h1,h2,h3,h4,p,span,button,li")]
+          .filter((el) => (el.textContent ?? "").trim().length > 0)
+          .map((el) => getComputedStyle(el).fontFamily),
+      ),
+    ].sort(),
+  );
+  ck("The dashboard renders exactly one font family", adminFams.length === 1, adminFams.join(" | "));
+  ck("…the same one as the public site", adminFams[0] === homeEn[0], adminFams[0]);
+  await adminCtx.close();
   await ctx.close();
 }
 
@@ -907,5 +1036,5 @@ for (const [label, tab] of [
 }
 
 await b.close();
-console.log(`\n${fails} failing`);
+console.log(`\n${fails} failing${skips ? `, ${skips} skipped` : ""}`);
 process.exit(fails ? 1 : 0);
