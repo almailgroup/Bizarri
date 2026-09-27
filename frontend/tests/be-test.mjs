@@ -195,7 +195,8 @@ await day(7).click();
 await p.waitForTimeout(400);
 ck(
   "Custom server price applied (75+200+blocked… range refused)",
-  await p.getByText("Those dates include a day that isn't available.").isVisible(),
+  // Also present in the sr-only live region, so target the visible alert.
+  await p.getByRole("alert").filter({ hasText: "isn't available" }).isVisible(),
 );
 
 await p.getByRole("button", { name: /^Clear$/i }).click();

@@ -109,7 +109,7 @@ export function NewsPanel() {
               <button
                 onClick={() => setPendingDelete(n)}
                 aria-label={lang === "en" ? "Delete news item" : "حذف الخبر"}
-                className="p-2 text-muted-foreground transition-colors hover:text-destructive"
+                className="flex h-11 w-11 items-center justify-center text-muted-foreground transition-colors hover:text-destructive"
               >
                 <Trash2 className="h-4 w-4" />
               </button>

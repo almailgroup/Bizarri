@@ -78,7 +78,7 @@ export function EditBookingModal({
             type="button"
             onClick={onClose}
             aria-label={tr("close")}
-            className="p-1 text-muted-foreground hover:text-foreground"
+            className="-me-2 flex h-11 w-11 items-center justify-center text-muted-foreground hover:text-foreground"
           >
             <X className="h-5 w-5" />
           </button>

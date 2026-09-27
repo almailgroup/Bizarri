@@ -184,7 +184,7 @@ function Dashboard() {
             </span>
             <button
               onClick={signOut}
-              className="flex items-center gap-2 text-xs uppercase tracking-widest hover:text-white/70"
+              className="-me-2 flex min-h-11 items-center gap-2 px-2 text-xs uppercase tracking-widest hover:text-white/70"
             >
               <LogOut className="h-4 w-4" /> {tr("logout")}
             </button>

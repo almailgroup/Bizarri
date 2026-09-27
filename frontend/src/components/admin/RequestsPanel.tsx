@@ -185,7 +185,7 @@ export function RequestsPanel() {
                 <button
                   onClick={() => setEditing(b)}
                   aria-label={tr("editDetails")}
-                  className="p-1 text-muted-foreground transition-colors hover:text-foreground"
+                  className="flex h-11 w-11 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
                 >
                   <Pencil className="h-4 w-4" />
                 </button>
@@ -234,7 +234,7 @@ export function RequestsPanel() {
               <button
                 onClick={() => setPendingDelete(b)}
                 aria-label={tr("deleteRequest")}
-                className="ms-auto p-2 text-muted-foreground transition-colors hover:text-destructive"
+                className="ms-auto flex h-11 w-11 items-center justify-center text-muted-foreground transition-colors hover:text-destructive"
               >
                 <Trash2 className="h-4 w-4" />
               </button>

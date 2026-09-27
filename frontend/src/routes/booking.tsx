@@ -242,6 +242,11 @@ function Calendar({
   const [filter, setFilter] = useState<DateFilter>("all");
   const [showForm, setShowForm] = useState(false);
   const [jumped, setJumped] = useState(false);
+  // Roving focus for the date grid. Every day used to be its own tab stop,
+  // so a keyboard user pressed Tab about thirty times to get past the
+  // calendar; a date grid should be one stop with arrows inside it.
+  const [focusDay, setFocusDay] = useState<Date | null>(null);
+  const [keyboardNav, setKeyboardNav] = useState(false);
 
   // Held here, not in BookingForm: stepping back to change dates used to
   // unmount the form and silently discard everything the guest had typed.
@@ -391,6 +396,59 @@ function Calendar({
     }
     return out;
   }, [rates, calendar, today, windowEnd, byDay, customPrices, occasions, lang]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** The single day in the grid that Tab reaches; arrows move it from there. */
+  const activeDay = useMemo(() => {
+    const inMonth = (d: Date | null) =>
+      !!d && d.getMonth() === month.getMonth() && d.getFullYear() === month.getFullYear();
+    if (inMonth(focusDay)) return focusDay as Date;
+    if (inMonth(start)) return start as Date;
+    if (inMonth(today)) return today;
+    const firstFree = cells.find((d) => d && !dayBlocked(d) && !isPast(d));
+    return firstFree ?? new Date(month.getFullYear(), month.getMonth(), 1);
+  }, [focusDay, start, month, cells, byDay]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Move focus to the roving day, but only in response to a key — otherwise
+  // the page would steal focus on load and on every re-render.
+  useEffect(() => {
+    if (!keyboardNav) return;
+    document.querySelector<HTMLButtonElement>(`[data-day="${fmtDate(activeDay)}"]`)?.focus();
+  }, [activeDay, keyboardNav]);
+
+  const onGridKeyDown = (e: React.KeyboardEvent) => {
+    const steps: Record<string, number> = {
+      ArrowRight: 1,
+      ArrowLeft: -1,
+      ArrowDown: 7,
+      ArrowUp: -7,
+      PageDown: 30,
+      PageUp: -30,
+    };
+    let target: Date;
+    if (e.key in steps) {
+      target = addDays(activeDay, steps[e.key]);
+    } else if (e.key === "Home") {
+      target = new Date(month.getFullYear(), month.getMonth(), 1);
+    } else if (e.key === "End") {
+      target = new Date(month.getFullYear(), month.getMonth() + 1, 0);
+    } else {
+      return;
+    }
+    e.preventDefault();
+    // Disabled days cannot hold focus, so keep going the same way until a
+    // selectable one turns up rather than dead-ending on a booked week.
+    const dir = target >= activeDay ? 1 : -1;
+    for (let i = 0; i < 400 && (dayBlocked(target) || isPast(target)); i++) {
+      target = addDays(target, dir);
+    }
+    if (target < today || target > windowEnd) return;
+    setKeyboardNav(true);
+    setFocusDay(target);
+    if (target.getMonth() !== month.getMonth() || target.getFullYear() !== month.getFullYear()) {
+      setMonth(startOfMonth(target));
+      setJumped(false);
+    }
+  };
 
   const monthHasWindow = useMemo(() => {
     if (!windows) return true;
@@ -599,7 +657,9 @@ function Calendar({
             >
               <ChevronLeft className="h-5 w-5 rtl:rotate-180" />
             </button>
-            <p className="font-display text-2xl capitalize">{monthName}</p>
+            <p className="font-display text-2xl capitalize" aria-live="polite">
+              {monthName}
+            </p>
             <button
               onClick={() => changeMonth(1)}
               disabled={atLastMonth}
@@ -618,7 +678,12 @@ function Calendar({
             ))}
           </div>
 
-          <div className="grid grid-cols-7 gap-1">
+          <div
+            role="grid"
+            aria-label={monthName}
+            onKeyDown={onGridKeyDown}
+            className="grid grid-cols-7 gap-1"
+          >
             {cells.map((d, i) => {
               if (!d) return <div key={`pad-${i}`} />;
               const iso = fmtDate(d);
@@ -663,7 +728,9 @@ function Calendar({
                     occ ? ` — ${lang === "en" ? occ.nameEn : occ.nameAr || occ.nameEn}` : ""
                   }`}
                   aria-pressed={!!selected}
-                  className={`relative flex aspect-square flex-col items-center justify-center text-sm transition-colors ${tone}`}
+                  data-day={iso}
+                  tabIndex={fmtDate(activeDay) === iso ? 0 : -1}
+                  className={`relative flex aspect-square flex-col items-center justify-center text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-current ${tone}`}
                 >
                   {d.getDate()}
                   {priced && !reserved && !past && (
@@ -755,7 +822,21 @@ function Calendar({
           <p className="mt-3 text-sm text-muted-foreground">{tr("customPricing")}</p>
         )}
 
-        {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
+        {/* Selection, price and refusals were all silent to a screen reader:
+            the calendar changed underneath them with no announcement. */}
+        <p aria-live="polite" className="sr-only">
+          {error
+            ? error
+            : current && !tooShort && start && end
+              ? `${fmtDate(start)} → ${fmtDate(end)}, ${current.days} ${tr("nightsLabel")}, ${formatMoney(current.total, lang)}`
+              : ""}
+        </p>
+
+        {error && (
+          <p className="mt-4 text-sm text-destructive" role="alert">
+            {error}
+          </p>
+        )}
 
         <div className="mt-8 flex flex-wrap gap-3">
           <button

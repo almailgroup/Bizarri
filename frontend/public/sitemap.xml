@@ -26,6 +26,11 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://almailgroup.github.io/Bizarri/reservation</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
     <loc>https://almailgroup.github.io/Bizarri/news</loc>
     <changefreq>weekly</changefreq>
     <priority>0.5</priority>
