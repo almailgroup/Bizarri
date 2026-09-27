@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronLeft, ChevronRight, Paperclip, ShieldCheck } from "lucide-react";
 import { PageShell } from "@/components/PageShell";
-import { BookingLookup, rememberBookingRef } from "@/components/BookingLookup";
+import { rememberBookingRef } from "@/components/BookingLookup";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
 import { useI18n } from "@/lib/i18n";
 import { usePageMeta } from "@/hooks/use-page-meta";
@@ -26,6 +26,7 @@ import {
   useSpecialOccasions,
 } from "@/lib/api";
 import type { BookingRow } from "@/integrations/supabase/types";
+import { readGuest, rememberGuest } from "@/lib/guest";
 
 export const Route = createFileRoute("/booking")({ component: Booking });
 
@@ -49,7 +50,7 @@ interface GuestDetails {
   notes: string;
 }
 
-const BLANK_DETAILS: GuestDetails = { name: "", phone: "", email: "", guests: "2", notes: "" };
+const BLANK_DETAILS: GuestDetails = { name: "", phone: "+965 ", email: "", guests: "2", notes: "" };
 
 function Booking() {
   const { tr, lang } = useI18n();
@@ -60,7 +61,7 @@ function Booking() {
       : "تحقق من التوفر واطلب إقامتك في شاليه بيزاري.",
   );
 
-  const [stage, setStage] = useState<"intro" | "calendar" | "done">("intro");
+  const [stage, setStage] = useState<"calendar" | "done">("calendar");
   const [chaletId, setChaletId] = useState(1);
   const [confirmed, setConfirmed] = useState<BookingRow | null>(null);
 
@@ -70,14 +71,6 @@ function Booking() {
         <p className="mb-6 text-xs uppercase tracking-[0.4em] text-muted-foreground">
           {tr("booking")}
         </p>
-
-        {stage === "intro" && (
-          <Intro
-            chaletId={chaletId}
-            setChaletId={setChaletId}
-            onNext={() => setStage("calendar")}
-          />
-        )}
 
         {stage === "calendar" && (
           <Calendar
@@ -229,55 +222,6 @@ function ChaletPicker({
   );
 }
 
-function Intro({
-  chaletId,
-  setChaletId,
-  onNext,
-}: {
-  chaletId: number;
-  setChaletId: (id: number) => void;
-  onNext: () => void;
-}) {
-  const { tr, lang } = useI18n();
-
-  return (
-    <div className="animate-fade-up">
-      <Steps current={1} />
-      <h1 className="mb-4 font-display text-5xl md:text-6xl">{tr("startBooking")}</h1>
-      <p className="mb-6 max-w-xl text-lg text-muted-foreground">
-        {lang === "en"
-          ? "Choose your chalet, then pick your dates."
-          : "اختر الشاليه، ثم حدد التواريخ."}{" "}
-        {tr("noPaymentNow")}
-      </p>
-
-      <RatesStrip />
-
-      <div className="my-8">
-        <p className="mb-3 text-xs uppercase tracking-widest text-muted-foreground">
-          {tr("pickChalet")}
-        </p>
-        <ChaletPicker chaletId={chaletId} setChaletId={setChaletId} />
-      </div>
-
-      <div className="flex flex-wrap items-center gap-3">
-        <button
-          onClick={onNext}
-          className="bg-black px-8 py-4 text-sm uppercase tracking-widest text-white hover:opacity-90"
-        >
-          {tr("checkAvailability")}
-        </button>
-        <WhatsAppLink className="inline-flex items-center gap-2 border border-border px-8 py-4 text-sm uppercase tracking-widest transition-colors hover:bg-secondary" />
-      </div>
-      <p className="mt-3 text-sm text-muted-foreground">{tr("whatsappAlt")}</p>
-
-      <div className="mt-16 border-t border-border pt-10">
-        <BookingLookup />
-      </div>
-    </div>
-  );
-}
-
 function Calendar({
   chaletId,
   setChaletId,
@@ -302,6 +246,15 @@ function Calendar({
   // Held here, not in BookingForm: stepping back to change dates used to
   // unmount the form and silently discard everything the guest had typed.
   const [details, setDetails] = useState<GuestDetails>(BLANK_DETAILS);
+  const [recognised, setRecognised] = useState(false);
+
+  // localStorage is not readable during SSR, so fill in after mount.
+  useEffect(() => {
+    const saved = readGuest();
+    if (!saved) return;
+    setDetails((d) => ({ ...d, ...saved }));
+    setRecognised(true);
+  }, []);
   const [civilId, setCivilId] = useState<File | null>(null);
   const [terms, setTerms] = useState(false);
 
@@ -409,6 +362,36 @@ function Calendar({
     return map;
   }, [filter, month, byDay]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  /**
+   * The next two free Thu-Sat stays, priced. Only offered when the whole
+   * window is actually free, so a quick pick can never lead to a refusal.
+   */
+  const quickPicks = useMemo(() => {
+    if (!rates || !calendar) return [];
+    const firstThu = (() => {
+      const d = new Date(today);
+      while (d.getDay() !== 4) d.setDate(d.getDate() + 1);
+      return d;
+    })();
+    const out: { label: string; start: Date; end: Date; total: number }[] = [];
+    for (const [offset, label] of [
+      [0, lang === "en" ? "This weekend" : "نهاية هذا الأسبوع"],
+      [7, lang === "en" ? "Next weekend" : "نهاية الأسبوع القادم"],
+    ] as const) {
+      const from = addDays(firstThu, offset);
+      const to = addDays(from, 2);
+      if (to > windowEnd) continue;
+      if (eachDay(from, to).some(dayBlocked)) continue;
+      out.push({
+        label,
+        start: from,
+        end: to,
+        total: quote(from, to, customPrices, rates, occasions ?? []).total,
+      });
+    }
+    return out;
+  }, [rates, calendar, today, windowEnd, byDay, customPrices, occasions, lang]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const monthHasWindow = useMemo(() => {
     if (!windows) return true;
     return cells.some((d) => d && windows.has(fmtDate(d)));
@@ -477,6 +460,7 @@ function Calendar({
         total={current.total}
         details={details}
         setDetails={setDetails}
+        recognised={recognised}
         civilId={civilId}
         setCivilId={setCivilId}
         terms={terms}
@@ -506,14 +490,16 @@ function Calendar({
       <div className="animate-fade-up pb-28 lg:pb-0">
         <Steps current={1} />
         <h1 className="mb-2 font-display text-4xl md:text-5xl">{tr("selectDates")}</h1>
-        <p className="mb-4 text-sm text-muted-foreground">
+        <p className="mb-6 text-sm text-muted-foreground">
+          {tr("noPaymentNow")}{" "}
           {filter !== "all" ? tr("filterHint") : !start || end ? tr("pickStart") : tr("pickEnd")}
         </p>
 
-        {/* Switch chalet without losing your place in the flow. */}
+        <RatesStrip />
+
         <div className="mb-6 flex flex-wrap items-center gap-3">
           <span className="text-xs uppercase tracking-widest text-muted-foreground">
-            {tr("changeChalet")}
+            {tr("pickChalet")}
           </span>
           <ChaletPicker
             chaletId={chaletId}
@@ -531,6 +517,36 @@ function Calendar({
           <p className="mb-4 border border-destructive p-4 text-sm text-destructive">
             {(loadError as Error).message}
           </p>
+        )}
+
+        {/* Most requests are simply "the next free weekend". Offering those
+            outright saves paging a calendar to work out which Thursday it is. */}
+        {quickPicks.length > 0 && (
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <span className="text-xs uppercase tracking-widest text-muted-foreground">
+              {tr("quickPick")}
+            </span>
+            {quickPicks.map((q) => (
+              <button
+                key={q.label}
+                type="button"
+                onClick={() => {
+                  setFilter("all");
+                  setMonth(startOfMonth(q.start));
+                  setStart(q.start);
+                  setEnd(q.end);
+                  setError("");
+                  setJumped(false);
+                }}
+                className="border border-border px-4 py-2 text-xs uppercase tracking-widest transition-colors hover:border-foreground/50"
+              >
+                {q.label}
+                <span className="ms-2 normal-case tracking-normal text-muted-foreground">
+                  {formatMoney(q.total, lang)}
+                </span>
+              </button>
+            ))}
+          </div>
         )}
 
         {/* Package filter, above the calendar. */}
@@ -761,7 +777,20 @@ function Calendar({
           </button>
         </div>
 
-        <p className="mt-6 text-sm text-muted-foreground">{tr("noPaymentNow")}</p>
+        <p className="mt-8 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+          {tr("whatsappAlt")}
+          <WhatsAppLink
+            context={{ chaletId, start, end }}
+            className="inline-flex items-center gap-2 underline underline-offset-4 hover:text-foreground"
+            label="WhatsApp"
+          />
+        </p>
+
+        <p className="mt-4 text-sm text-muted-foreground">
+          <Link to="/reservation" className="underline underline-offset-4 hover:text-foreground">
+            {tr("checkBooking")}
+          </Link>
+        </p>
       </div>
 
       {/* Mobile keeps the running total and the way forward in view; on a
@@ -801,6 +830,7 @@ function BookingForm({
   total,
   details,
   setDetails,
+  recognised,
   civilId,
   setCivilId,
   terms,
@@ -814,6 +844,8 @@ function BookingForm({
   total: number;
   details: GuestDetails;
   setDetails: (d: GuestDetails) => void;
+  /** Their details came back from a previous booking on this device. */
+  recognised: boolean;
   civilId: File | null;
   setCivilId: (f: File | null) => void;
   terms: boolean;
@@ -897,6 +929,7 @@ function BookingForm({
       civilIdPath,
       termsAccepted: terms,
     });
+    rememberGuest({ name: details.name, phone: details.phone, email: details.email });
     onDone(booking);
   };
 
@@ -910,8 +943,13 @@ function BookingForm({
       { key: "name", label: tr("fullName"), autoComplete: "name" },
       { key: "phone", label: tr("phone"), type: "tel", autoComplete: "tel" },
       { key: "email", label: tr("email"), type: "email", autoComplete: "email" },
-      { key: "guests", label: tr("guests"), type: "number" },
     ];
+
+  const guests = Number(details.guests) || 0;
+  const stepGuests = (by: number) => {
+    const next = Math.min(20, Math.max(1, guests + by));
+    set("guests", String(next));
+  };
 
   const busy = uploading || request.isPending;
 
@@ -936,6 +974,8 @@ function BookingForm({
         </p>
         <p className="pt-1 text-base font-semibold">{formatMoney(total, lang)}</p>
       </div>
+
+      {recognised && <p className="text-sm text-muted-foreground">{tr("welcomeBack")}</p>}
 
       <div className="grid gap-4 sm:grid-cols-2">
         {fields.map((f) => (
@@ -965,6 +1005,48 @@ function BookingForm({
             )}
           </label>
         ))}
+      </div>
+
+      <div>
+        <span className="text-xs uppercase tracking-widest text-muted-foreground">
+          {tr("guests")}
+        </span>
+        <div className="mt-2 flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => stepGuests(-1)}
+            disabled={guests <= 1}
+            aria-label={lang === "en" ? "Fewer guests" : "عدد أقل من الضيوف"}
+            className="h-12 w-12 border border-border text-lg transition-colors hover:bg-secondary disabled:opacity-30"
+          >
+            −
+          </button>
+          <input
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={20}
+            value={details.guests}
+            aria-label={tr("guests")}
+            aria-invalid={!!errors.guests}
+            onChange={(e) => set("guests", e.target.value)}
+            className={`h-12 w-20 border bg-secondary text-center outline-none focus:border-foreground ${
+              errors.guests ? "border-destructive" : "border-border"
+            }`}
+          />
+          <button
+            type="button"
+            onClick={() => stepGuests(1)}
+            disabled={guests >= 20}
+            aria-label={lang === "en" ? "More guests" : "عدد أكبر من الضيوف"}
+            className="h-12 w-12 border border-border text-lg transition-colors hover:bg-secondary disabled:opacity-30"
+          >
+            +
+          </button>
+        </div>
+        {errors.guests && (
+          <span className="mt-1 block text-sm text-destructive">{errors.guests}</span>
+        )}
       </div>
 
       <label className="block">

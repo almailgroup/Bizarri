@@ -298,8 +298,6 @@ async function guestPage(state, route = "booking") {
 
 /** Advance the guest calendar from this month to next month. */
 async function toCalendarNextMonth(p) {
-  await p.getByRole("button", { name: /check availability/i }).click();
-  await p.waitForTimeout(700);
   await p.getByRole("button", { name: /Next month/i }).click();
   await p.waitForTimeout(250);
 }
@@ -350,8 +348,7 @@ const bg = (loc) => loc.evaluate((el) => getComputedStyle(el).backgroundColor);
 {
   const state = makeState();
   const { p, ctx } = await guestPage(state);
-  await p.getByRole("button", { name: /check availability/i }).click();
-  await p.waitForTimeout(700);
+  await p.waitForTimeout(400);
   if (today.getDate() > 1) {
     const yesterday = addDays(today, -1);
     const cell = dayCell(p, yesterday);
@@ -372,11 +369,17 @@ const bg = (loc) => loc.evaluate((el) => getComputedStyle(el).backgroundColor);
   const { p, ctx } = await guestPage(state);
   await toCalendarNextMonth(p);
 
-  ck("Weekday filter chip is shown", await p.getByRole("button", { name: /Weekday/i }).isVisible());
-  ck("Weekend filter chip is shown", await p.getByRole("button", { name: /Weekend/i }).isVisible());
+  ck(
+    "Weekday filter chip is shown",
+    await p.getByRole("button", { name: /^Weekday ·/i }).isVisible(),
+  );
+  ck(
+    "Weekend filter chip is shown",
+    await p.getByRole("button", { name: /^Weekend ·/i }).isVisible(),
+  );
 
   // Weekend: one tap on any Thursday should take the whole Thu-Sat stay.
-  await p.getByRole("button", { name: /Weekend/i }).click();
+  await p.getByRole("button", { name: /^Weekend ·/i }).click();
   await p.waitForTimeout(250);
   const monday = firstDow(nextMonth, 1);
   ck("Weekend filter disables days outside a Thu-Sat stay", await dayCell(p, monday).isDisabled());
@@ -392,7 +395,7 @@ const bg = (loc) => loc.evaluate((el) => getComputedStyle(el).backgroundColor);
   );
 
   // Weekday: Sun-Wed, 4 days, 300.
-  await p.getByRole("button", { name: /Weekday/i }).click();
+  await p.getByRole("button", { name: /^Weekday ·/i }).click();
   await p.waitForTimeout(250);
   await dayCell(p, sunA).click();
   await p.waitForTimeout(250);
@@ -410,7 +413,7 @@ const bg = (loc) => loc.evaluate((el) => getComputedStyle(el).backgroundColor);
   const state = makeState();
   const { p, ctx } = await guestPage(state);
   await toCalendarNextMonth(p);
-  await p.getByRole("button", { name: /Weekend/i }).click();
+  await p.getByRole("button", { name: /^Weekend ·/i }).click();
   await p.waitForTimeout(250);
   await dayCell(p, occFrom).click();
   await p.waitForTimeout(300);
@@ -429,7 +432,7 @@ const bg = (loc) => loc.evaluate((el) => getComputedStyle(el).backgroundColor);
   const state = makeState();
   const { p, ctx } = await guestPage(state);
   await toCalendarNextMonth(p);
-  await p.getByRole("button", { name: /Weekend/i }).click();
+  await p.getByRole("button", { name: /^Weekend ·/i }).click();
   await p.waitForTimeout(250);
   await dayCell(p, thuA).click();
   await p.waitForTimeout(250);
@@ -825,8 +828,8 @@ async function adminPage(state, tab) {
       .isVisible(),
   );
   ck(
-    "The CTA describes what it does, rather than 'Book Now'",
-    await p.getByRole("button", { name: /check availability/i }).isVisible(),
+    "Dates are pickable immediately, with no intro screen in the way",
+    await p.getByRole("button", { name: /Next month/i }).isVisible(),
   );
   await ctx.close();
 }
@@ -836,7 +839,7 @@ async function adminPage(state, tab) {
   const state = makeState();
   const { p, ctx } = await guestPage(state);
   await toCalendarNextMonth(p);
-  await p.getByRole("button", { name: /Weekend/i }).click();
+  await p.getByRole("button", { name: /^Weekend ·/i }).click();
   await p.waitForTimeout(200);
   await dayCell(p, thuA).click();
   await p.waitForTimeout(200);
@@ -878,8 +881,8 @@ async function adminPage(state, tab) {
   const { p, ctx } = await guestPage(state);
   await toCalendarNextMonth(p);
   ck(
-    "The chalet can be switched from the calendar",
-    await p.getByText("Change chalet").first().isVisible(),
+    "The chalet is chosen on the calendar itself",
+    await p.getByText("Choose Chalet").first().isVisible(),
   );
   await dayCell(p, thuA).click();
   await p.waitForTimeout(200);
@@ -915,7 +918,7 @@ async function adminPage(state, tab) {
   const bar = p.locator("div.fixed.bottom-0", { hasText: "Your stay" });
   ck("No summary bar before any dates are picked", (await bar.count()) === 0);
 
-  await p.getByRole("button", { name: /Weekend/i }).click();
+  await p.getByRole("button", { name: /^Weekend ·/i }).click();
   await p.waitForTimeout(200);
   await dayCell(p, thuA).click();
   await p.waitForTimeout(300);
@@ -966,8 +969,7 @@ async function adminPage(state, tab) {
     status: "accepted",
   });
   const { p, ctx } = await guestPage(state);
-  await p.getByRole("button", { name: /check availability/i }).click();
-  await p.waitForTimeout(900);
+  await p.waitForTimeout(1200);
   ck(
     "A fully-booked month is skipped rather than shown empty",
     await p.getByText(/next month with availability/i).isVisible(),
@@ -980,7 +982,7 @@ async function adminPage(state, tab) {
   const state = makeState();
   const { p, ctx } = await guestPage(state);
   await toCalendarNextMonth(p);
-  await p.getByRole("button", { name: /Weekend/i }).click();
+  await p.getByRole("button", { name: /^Weekend ·/i }).click();
   await p.waitForTimeout(200);
   await dayCell(p, thuA).click();
   await p.waitForTimeout(200);
@@ -1046,7 +1048,7 @@ async function adminPage(state, tab) {
   // The Civil ID request is the likeliest place to lose someone, so the
   // escape hatch has to be there too — carrying what they already chose.
   await toCalendarNextMonth(p);
-  await p.getByRole("button", { name: /Weekend/i }).click();
+  await p.getByRole("button", { name: /^Weekend ·/i }).click();
   await p.waitForTimeout(200);
   await dayCell(p, thuA).click();
   await p.waitForTimeout(200);
@@ -1116,6 +1118,138 @@ async function adminPage(state, tab) {
   await ctx.close();
 }
 
+// =========================================== fewer steps, fewer keystrokes
+{
+  const state = makeState();
+  const { p, ctx } = await guestPage(state, "booking");
+  await p.waitForTimeout(600);
+
+  // The whole booking used to open on an intro screen whose only job was a
+  // button to the calendar.
+  ck(
+    "The calendar is on screen straight away",
+    await p.locator(".grid.grid-cols-7").first().isVisible(),
+  );
+  ck(
+    "Rates are visible without leaving the page",
+    (await p.locator("body").innerText()).toLowerCase().includes("rates at a glance"),
+  );
+
+  // One tap for the stay most people actually want.
+  const quick = p.getByRole("button", { name: /this weekend/i }).first();
+  ck("A one-tap 'this weekend' is offered", await quick.isVisible());
+  ck(
+    "…and it shows what that costs before you commit",
+    /\d/.test(await quick.innerText()),
+    (await quick.innerText()).replace(/\n/g, " "),
+  );
+
+  await quick.click();
+  await p.waitForTimeout(400);
+  const checkIn = await p.locator("text=Check-in").locator("..").innerText();
+  const checkOut = await p.locator("text=Check-out").locator("..").innerText();
+  ck(
+    "One tap fills both dates",
+    !checkIn.includes("—") && !checkOut.includes("—"),
+    `${checkIn.trim()} / ${checkOut.trim()}`,
+  );
+  ck(
+    "…as a Thursday to Saturday stay",
+    new Date(checkIn.split("\n").pop().trim()).getDay() === 4,
+    checkIn.split("\n").pop().trim(),
+  );
+  ck(
+    "…and it is immediately bookable",
+    await p
+      .getByRole("button", { name: /^Continue$/i })
+      .first()
+      .isEnabled(),
+  );
+  await ctx.close();
+}
+
+// ================================== the form remembers a returning guest
+{
+  const state = makeState();
+  const { p, ctx } = await guestPage(state);
+  await toCalendarNextMonth(p);
+  await p.getByRole("button", { name: /^Weekend ·/i }).click();
+  await p.waitForTimeout(200);
+  await dayCell(p, thuA).click();
+  await p.waitForTimeout(200);
+  await p.getByRole("button", { name: /^Continue$/i }).click();
+  await p.waitForTimeout(400);
+
+  ck(
+    "The phone field starts with the country code",
+    (await p.getByLabel("Phone Number", { exact: true }).inputValue()).startsWith("+965"),
+    await p.getByLabel("Phone Number", { exact: true }).inputValue(),
+  );
+
+  // Guests is a count: tapping beats a native number spinner on a phone.
+  const more = p.getByRole("button", { name: /more guests/i });
+  const fewer = p.getByRole("button", { name: /fewer guests/i });
+  const count = p.locator("input[type=number]");
+  ck(
+    "Guest count has plus and minus controls",
+    (await more.isVisible()) && (await fewer.isVisible()),
+  );
+  await more.click();
+  await p.waitForTimeout(150);
+  ck("Plus raises the count", (await count.inputValue()) === "3", await count.inputValue());
+  await fewer.click();
+  await fewer.click();
+  await p.waitForTimeout(150);
+  ck("Minus lowers it", (await count.inputValue()) === "1", await count.inputValue());
+  // At the floor the control is disabled rather than silently doing nothing.
+  ck("…and it cannot go below one guest", await fewer.isDisabled());
+
+  // Complete a booking, then come back and check the details were kept.
+  await more.click();
+  await p.getByLabel("Full Name").fill("Repeat Guest");
+  await p.getByLabel("Phone Number", { exact: true }).fill("+96599991111");
+  await p.getByLabel("Email", { exact: true }).fill("repeat@example.com");
+  await p.locator("input[type=file]").setInputFiles({
+    name: "id.png",
+    mimeType: "image/png",
+    buffer: Buffer.from("89504e470d0a1a0a", "hex"),
+  });
+  await p.locator("input[type=checkbox]").check();
+  await p.getByRole("button", { name: /^Submit/i }).click();
+  await p.waitForTimeout(900);
+  ck("The booking went through", await p.getByText("BZR-NEW999").isVisible());
+
+  // Same device, a second booking.
+  await p.goto(B + "booking", { waitUntil: "domcontentloaded" });
+  await p.waitForTimeout(800);
+  await toCalendarNextMonth(p);
+  await p.getByRole("button", { name: /^Weekend ·/i }).click();
+  await p.waitForTimeout(200);
+  await dayCell(p, addDays(thuA, 21)).click();
+  await p.waitForTimeout(200);
+  await p.getByRole("button", { name: /^Continue$/i }).click();
+  await p.waitForTimeout(500);
+
+  ck(
+    "A returning guest does not retype their name",
+    (await p.getByLabel("Full Name").inputValue()) === "Repeat Guest",
+    await p.getByLabel("Full Name").inputValue(),
+  );
+  ck(
+    "…or their phone",
+    (await p.getByLabel("Phone Number", { exact: true }).inputValue()) === "+96599991111",
+  );
+  ck(
+    "…or their email",
+    (await p.getByLabel("Email", { exact: true }).inputValue()) === "repeat@example.com",
+  );
+  ck(
+    "…and is told why the form is already filled",
+    await p.getByText(/last booking on this device/i).isVisible(),
+  );
+  await ctx.close();
+}
+
 // ======================================= no untranslated keys leak to screen
 /**
  * The dictionary is Record<string, …>, so tr("typo") compiles and silently
@@ -1170,7 +1304,7 @@ const leaks = (text) => {
   const cal = leaks(await p.locator("body").innerText());
   ck("No raw i18n keys on the calendar", cal.length === 0, cal.join(", "));
 
-  await p.getByRole("button", { name: /Weekend/i }).click();
+  await p.getByRole("button", { name: /^Weekend ·/i }).click();
   await p.waitForTimeout(200);
   await dayCell(p, thuA).click();
   await p.waitForTimeout(200);

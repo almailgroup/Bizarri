@@ -107,7 +107,6 @@ async function mk(tz) {
 
 // ── fix 1: confirmation dates in a timezone behind UTC ──
 let { p, ctx } = await mk("America/New_York");
-await p.getByRole("button", { name: /check availability/i }).click();
 await p.waitForTimeout(900);
 await p.getByRole("button", { name: "Next month" }).click();
 await p.waitForTimeout(400);
@@ -140,7 +139,6 @@ await ctx.close();
 
 // ── fix 2: month horizon ──
 ({ p, ctx } = await mk("Asia/Kuwait"));
-await p.getByRole("button", { name: /check availability/i }).click();
 await p.waitForTimeout(900);
 let clicks = 0;
 for (let i = 0; i < 20; i++) {
@@ -172,7 +170,11 @@ ck(
 await ctx.close();
 
 // ── fix 4: guest lookup ──
+// The panel used to sit at the foot of the booking page, duplicating both the
+// header shortcut and /reservation. It now lives only on /reservation.
 ({ p, ctx } = await mk("Asia/Kuwait"));
+await p.goto(B + "reservation", { waitUntil: "domcontentloaded" });
+await p.waitForTimeout(600);
 await p.locator('input[placeholder="BZR-XXXXXX"]').fill("BZR-TZ0001");
 await p.locator("input[type=email]").fill("t@e.com");
 await p.getByRole("button", { name: /check status/i }).click();

@@ -188,6 +188,11 @@ export const t: Dict = {
   // Booking flow guidance
   checkAvailability: { en: "Check availability", ar: "عرض التواريخ المتاحة" },
   bookOnWhatsapp: { en: "Book on WhatsApp", ar: "احجز عبر واتساب" },
+  quickPick: { en: "Quick pick", ar: "اختيار سريع" },
+  welcomeBack: {
+    en: "We filled in your details from your last booking on this device.",
+    ar: "تمت تعبئة بياناتك من حجزك السابق على هذا الجهاز.",
+  },
   whatsappAlt: {
     en: "Prefer to arrange it by message? Talk to us on WhatsApp.",
     ar: "تفضل الترتيب عبر الرسائل؟ تحدث إلينا على واتساب.",
