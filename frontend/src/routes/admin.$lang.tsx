@@ -1,7 +1,7 @@
 import { requireLang } from "@/lib/lang-route";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { Lock, LogOut, X } from "lucide-react";
+import { ArrowLeft, Globe, Lock, LogOut, X } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
 import { useIsAdmin } from "@/lib/api";
@@ -61,14 +61,17 @@ function SignIn() {
 
   return (
     <div className="relative flex min-h-screen items-center justify-center bg-black px-6 text-white">
-      <Link
-        to="/$lang"
-        params={{ lang }}
-        aria-label={tr("close")}
-        className="absolute end-5 top-5 border border-white/20 p-2.5 text-white/70 transition-colors hover:border-white/60 hover:text-white"
-      >
-        <X className="h-5 w-5" />
-      </Link>
+      <div className="absolute end-5 top-5 flex items-center gap-2">
+        <LangToggle />
+        <Link
+          to="/$lang"
+          params={{ lang }}
+          aria-label={tr("close")}
+          className="flex min-h-11 items-center border border-white/20 p-2.5 text-white/70 transition-colors hover:border-white/60 hover:text-white"
+        >
+          <X className="h-5 w-5" />
+        </Link>
+      </div>
 
       <form onSubmit={submit} className="animate-fade-up w-full max-w-sm">
         <img src={logoWhite} alt="Bizarri" className="mx-auto mb-10 h-14 w-auto" />
@@ -119,8 +122,27 @@ function SignIn() {
   );
 }
 
+/**
+ * The site header's toggle is not on these screens, so without this the admin
+ * panel is a one-way door into whichever language you arrived in. It navigates
+ * like every other language switch: same page, other language.
+ */
+function LangToggle({ className = "" }: { className?: string }) {
+  const { tr, lang, setLang } = useI18n();
+  return (
+    <button
+      onClick={() => setLang(lang === "en" ? "ar" : "en")}
+      lang={lang === "en" ? "ar" : "en"}
+      className={`flex min-h-11 items-center gap-2 border border-white/25 px-3 text-xs uppercase tracking-widest transition-colors hover:bg-white hover:text-black ${className}`}
+    >
+      <Globe className="h-3.5 w-3.5" />
+      {tr("language")}
+    </button>
+  );
+}
+
 function NotAuthorised() {
-  const { lang } = useI18n();
+  const { tr, lang } = useI18n();
   const { signOut, session } = useAuth();
   const email = session?.user?.email ?? "";
   return (
@@ -140,12 +162,22 @@ function NotAuthorised() {
           {email}
         </p>
       )}
-      <button
-        onClick={signOut}
-        className="border border-white/30 px-6 py-3 text-sm uppercase tracking-widest hover:bg-white hover:text-black"
-      >
-        {lang === "en" ? "Sign out" : "تسجيل الخروج"}
-      </button>
+      <div className="flex flex-wrap items-center justify-center gap-3">
+        <LangToggle className="px-6" />
+        <Link
+          to="/$lang"
+          params={{ lang }}
+          className="border border-white/30 px-6 py-3 text-sm uppercase tracking-widest hover:bg-white hover:text-black"
+        >
+          {tr("backToSite")}
+        </Link>
+        <button
+          onClick={signOut}
+          className="border border-white/30 px-6 py-3 text-sm uppercase tracking-widest hover:bg-white hover:text-black"
+        >
+          {lang === "en" ? "Sign out" : "تسجيل الخروج"}
+        </button>
+      </div>
     </div>
   );
 }
@@ -185,7 +217,12 @@ function Dashboard() {
       <header className="border-b border-border bg-black text-white">
         <div className="mx-auto flex h-20 max-w-7xl items-center justify-between gap-4 px-6">
           <div className="flex items-center gap-4">
-            <img src={logoWhite} alt="Bizarri" className="h-10 w-auto" />
+            {/* The logo goes back to the site, as it does everywhere else on
+                it. The labelled link next to it is for anyone who would not
+                think to try the logo. */}
+            <Link to="/$lang" params={{ lang }} aria-label={tr("backToSite")}>
+              <img src={logoWhite} alt="Bizarri" className="h-10 w-auto" />
+            </Link>
             <span className="hidden text-xs uppercase tracking-[0.4em] text-white/60 sm:inline">
               {tr("dashboard")}
             </span>
@@ -194,6 +231,14 @@ function Dashboard() {
             <span className="hidden text-xs text-white/50 md:inline" dir="ltr">
               {session?.user.email}
             </span>
+            <LangToggle />
+            <Link
+              to="/$lang"
+              params={{ lang }}
+              className="flex min-h-11 items-center gap-2 px-2 text-xs uppercase tracking-widest hover:text-white/70"
+            >
+              <ArrowLeft className="h-4 w-4 rtl:rotate-180" /> {tr("viewSite")}
+            </Link>
             <button
               onClick={signOut}
               className="-me-2 flex min-h-11 items-center gap-2 px-2 text-xs uppercase tracking-widest hover:text-white/70"

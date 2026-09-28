@@ -455,6 +455,91 @@ async function adminPage(state) {
   await ctx.close();
 }
 
+// ================================= crossing between the site and the panel
+{
+  const state = makeState();
+  const { p, ctx } = await adminPage(state);
+
+  // The logo goes back to the site, as it does on every other page.
+  await p.locator("header img").first().click();
+  await p.waitForTimeout(900);
+  ck(
+    "The admin logo goes back to the website",
+    !new URL(p.url()).pathname.includes("admin"),
+    p.url(),
+  );
+
+  await p.goBack();
+  await p.waitForTimeout(900);
+  // …and a labelled link too, for anyone who would not think to click a logo.
+  await p.getByRole("link", { name: /View site/i }).click();
+  await p.waitForTimeout(900);
+  ck("…and so does the View site link", !new URL(p.url()).pathname.includes("admin"), p.url());
+  await ctx.close();
+}
+
+// ======================================= the panel can change language too
+{
+  const state = makeState();
+  const { p, ctx } = await adminPage(state);
+  ck(
+    "The dashboard offers a language toggle",
+    await p.getByRole("button", { name: /العربية/ }).isVisible(),
+  );
+  await p.getByRole("button", { name: /العربية/ }).click();
+  await p.waitForTimeout(1000);
+
+  const st = await p.evaluate(() => ({
+    path: location.pathname,
+    lang: document.documentElement.lang,
+    dir: document.documentElement.dir,
+  }));
+  ck("…that stays in the dashboard", st.path.includes("admin"), st.path);
+  ck("…and actually switches it", st.lang === "ar" && st.dir === "rtl", `${st.lang}/${st.dir}`);
+  ck(
+    "…with the dashboard's own chrome translated",
+    await p.getByText("لوحة التحكم").first().isVisible(),
+  );
+  ck(
+    "…and the tabs with it",
+    await p
+      .getByRole("button", { name: /نظرة عامة/ })
+      .first()
+      .isVisible(),
+  );
+
+  // Back again, so it is a toggle and not a one-way trip.
+  await p.getByRole("button", { name: /English/i }).click();
+  await p.waitForTimeout(1000);
+  const back = await p.evaluate(() => document.documentElement.lang);
+  ck("…and back to English", back === "en", back);
+  await ctx.close();
+}
+
+// The signed-out screens need it too, or you cannot reach an Arabic login.
+{
+  const state = makeState();
+  const ctx = await b.newContext({ viewport: { width: 1200, height: 900 } });
+  await ctx.route(/^https?:\/\/(?!localhost)/, (r) =>
+    SUPA.test(r.request().url()) ? r.fallback() : r.abort(),
+  );
+  await mock(ctx, state);
+  const p = await ctx.newPage();
+  await p.goto(pageUrl("admin"), { waitUntil: "domcontentloaded" });
+  await p.waitForTimeout(900);
+  ck(
+    "The login screen offers it as well",
+    await p.getByRole("button", { name: /العربية/ }).isVisible(),
+  );
+  await p.getByRole("button", { name: /العربية/ }).click();
+  await p.waitForTimeout(900);
+  ck(
+    "…and the login form follows",
+    (await p.evaluate(() => document.documentElement.dir)) === "rtl",
+  );
+  await ctx.close();
+}
+
 console.log("\n" + fails + " failing");
 await b.close();
 process.exit(fails ? 1 : 0);
