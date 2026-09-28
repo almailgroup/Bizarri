@@ -120,6 +120,34 @@ async function readSetting(key: string): Promise<unknown> {
   }
 }
 
+/**
+ * The public WhatsApp number, digits only, for the link in a guest's email.
+ *
+ * Guests are not sent WhatsApp messages — that needs a WhatsApp Business API
+ * and Meta-approved templates, and the site deliberately does not use one —
+ * but a guest starting the conversation needs no approval at all. So the
+ * emails carry a tappable link rather than a number to copy out by hand.
+ */
+async function guestWhatsAppNumber(): Promise<string> {
+  const contact = await readSetting("contact");
+  const raw =
+    contact && typeof contact === "object"
+      ? ((contact as Record<string, unknown>).whatsapp ?? "")
+      : "";
+  const digits = String(raw).replace(/\D/g, "");
+  return digits || (Deno.env.get("CONTACT_WHATSAPP") ?? "96594040955");
+}
+
+/** A WhatsApp button, or nothing when there is no number to point it at. */
+function whatsAppButton(number: string, label: string): string {
+  if (!number) return "";
+  return `<p style="margin:24px 0 0">
+      <a href="https://wa.me/${esc(number)}"
+         style="display:inline-block;border:1px solid #ddd;padding:10px 18px;
+                font-size:13px;color:#111;text-decoration:none">${esc(label)}</a>
+    </p>`;
+}
+
 /** Editable from Site Settings, so an admin can change recipients without a
  *  redeploy. */
 async function notifyEmailsFromSettings(): Promise<string[] | null> {
@@ -185,7 +213,7 @@ function render(b: BookingRecord): string {
  * and it says the request is not yet confirmed so nobody turns up on the
  * strength of this email alone.
  */
-function renderGuest(b: BookingRecord, lang: "en" | "ar"): string {
+function renderGuest(b: BookingRecord, lang: "en" | "ar", whatsapp = ""): string {
   const ar = lang === "ar";
   const t = ar
     ? {
@@ -197,6 +225,7 @@ function renderGuest(b: BookingRecord, lang: "en" | "ar"): string {
         guests: "عدد الضيوف",
         pending: "طلبك قيد المراجعة. سنتواصل معك قريباً لتأكيد الحجز.",
         keep: "احتفظ برقم الحجز للاستعلام عن حالته في أي وقت.",
+        chat: "تواصل معنا عبر واتساب",
       }
     : {
         title: "We have your booking request",
@@ -207,6 +236,7 @@ function renderGuest(b: BookingRecord, lang: "en" | "ar"): string {
         guests: "Guests",
         pending: "Your request is being reviewed. We will contact you shortly to confirm.",
         keep: "Keep this reference to check the status of your booking at any time.",
+        chat: "Message us on WhatsApp",
       };
   const row = (label: string, value: string) =>
     `<tr><td style="padding:6px 16px 6px 0;color:#666">${esc(label)}</td>` +
@@ -227,6 +257,7 @@ function renderGuest(b: BookingRecord, lang: "en" | "ar"): string {
         ${row(t.guests, String(b.guests))}
       </table>
       <p style="margin-top:24px;font-size:13px;color:#888">${esc(t.keep)}</p>
+      ${whatsAppButton(whatsapp, t.chat)}
     </div>`;
 }
 
@@ -238,7 +269,7 @@ function renderGuest(b: BookingRecord, lang: "en" | "ar"): string {
  * deliberately not included: the admin panel labels it internal and an admin
  * writing "haggled, gave discount" there does not expect the guest to read it.
  */
-export function renderDecision(b: BookingRecord, lang: "en" | "ar"): string {
+export function renderDecision(b: BookingRecord, lang: "en" | "ar", whatsapp = ""): string {
   const ar = lang === "ar";
   const status = b.status ?? "";
   const copy = ar
@@ -261,7 +292,8 @@ export function renderDecision(b: BookingRecord, lang: "en" | "ar"): string {
         dates: "التواريخ",
         total: "الإجمالي",
         guests: "عدد الضيوف",
-        contact: "لأي استفسار، تواصل معنا على +965 94040955.",
+        contact: "لأي استفسار، تواصل معنا.",
+        chat: "تواصل معنا عبر واتساب",
       }
     : {
         accepted: {
@@ -285,7 +317,8 @@ export function renderDecision(b: BookingRecord, lang: "en" | "ar"): string {
         dates: "Dates",
         total: "Total",
         guests: "Guests",
-        contact: "Any questions, reach us on +965 94040955.",
+        contact: "Any questions, just get in touch.",
+        chat: "Message us on WhatsApp",
       };
   const t = (copy as Record<string, { title: string; body: string }>)[status] ?? copy.accepted;
 
@@ -317,6 +350,7 @@ export function renderDecision(b: BookingRecord, lang: "en" | "ar"): string {
       ${details}
       <p style="margin-top:24px;font-size:13px;color:#888" dir="${ar ? "rtl" : "ltr"}">
         ${esc(copy.contact)}</p>
+      ${whatsAppButton(whatsapp, copy.chat)}
     </div>`;
 }
 
@@ -415,6 +449,7 @@ async function sendGuestEmail(booking: BookingRecord): Promise<DeliveryResult> {
   const lang: "en" | "ar" = booking.lang === "ar" ? "ar" : "en";
   const from = Deno.env.get("NOTIFY_FROM") ?? "Bizarri Chalet <onboarding@resend.dev>";
   const replyTo = (await notifyEmailsFromSettings())?.[0] ?? Deno.env.get("NOTIFY_EMAILS");
+  const whatsapp = await guestWhatsAppNumber();
 
   try {
     const res = await fetch("https://api.resend.com/emails", {
@@ -427,7 +462,7 @@ async function sendGuestEmail(booking: BookingRecord): Promise<DeliveryResult> {
           lang === "ar"
             ? `\u0637\u0644\u0628 \u0627\u0644\u062d\u062c\u0632 ${booking.ref} \u2014 \u0634\u0627\u0644\u064a\u0647 \u0628\u064a\u0632\u0627\u0631\u064a`
             : `Your booking request ${booking.ref} \u2014 Bizarri Chalet`,
-        html: renderGuest(booking, lang),
+        html: renderGuest(booking, lang, whatsapp),
         ...(replyTo ? { reply_to: replyTo } : {}),
       }),
     });
@@ -452,6 +487,7 @@ async function sendDecisionEmail(booking: BookingRecord): Promise<DeliveryResult
   const from = Deno.env.get("NOTIFY_FROM") ?? "Bizarri Chalet <onboarding@resend.dev>";
   const replyTo = (await notifyEmailsFromSettings())?.[0] ?? Deno.env.get("NOTIFY_EMAILS");
   const confirmed = booking.status === "accepted";
+  const whatsapp = await guestWhatsAppNumber();
 
   try {
     const res = await fetch("https://api.resend.com/emails", {
@@ -464,7 +500,7 @@ async function sendDecisionEmail(booking: BookingRecord): Promise<DeliveryResult
           lang === "ar"
             ? `${confirmed ? "\u062a\u0645 \u062a\u0623\u0643\u064a\u062f \u062d\u062c\u0632\u0643" : "\u062a\u062d\u062f\u064a\u062b \u0639\u0644\u0649 \u062d\u062c\u0632\u0643"} ${booking.ref}`
             : `${confirmed ? "Confirmed" : "Update"}: booking ${booking.ref} \u2014 Bizarri Chalet`,
-        html: renderDecision(booking, lang),
+        html: renderDecision(booking, lang, whatsapp),
         ...(replyTo ? { reply_to: replyTo } : {}),
       }),
     });

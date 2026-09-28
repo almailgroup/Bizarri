@@ -187,6 +187,19 @@ ck(
   ck("A refusal does not", !withNote("rejected").includes("350"));
   ck("Nor does a cancellation", !withNote("cancelled").includes("350"));
 
+  // Guests are never sent WhatsApp messages, so the way back to a
+  // conversation is a link they tap. A number they have to retype is not one.
+  const linked = renderDecision(booking({ status: "accepted" }), "en", "96594040955");
+  ck("The email offers a tappable way into WhatsApp", linked.includes("https://wa.me/96594040955"));
+  ck(
+    "…and only the one published number",
+    (linked.match(/wa\.me\/(\d+)/g) ?? []).every((m) => m.endsWith("96594040955")),
+  );
+  ck(
+    "No number configured means no dead button",
+    !renderDecision(booking({ status: "accepted" }), "en", "").includes("wa.me"),
+  );
+
   const ar = renderDecision(booking({ status: "accepted", lang: "ar" }), "ar");
   ck("The Arabic email is laid out right to left", ar.includes('dir="rtl"'));
   ck("…and is actually in Arabic", /[\u0600-\u06FF]/.test(ar));
