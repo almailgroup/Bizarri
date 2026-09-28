@@ -333,6 +333,7 @@ export const t: Dict = {
     en: "Booking opens 12 months ahead. For later dates, please contact us.",
     ar: "الحجز متاح حتى ١٢ شهراً مقدماً. للتواريخ الأبعد، يرجى التواصل معنا.",
   },
+  quickLinks: { en: "Links", ar: "روابط" },
   checkBooking: { en: "Check an existing request", ar: "تتبع طلب حجز" },
   checkBookingHint: {
     en: "Enter the reference from your confirmation and the email you used.",

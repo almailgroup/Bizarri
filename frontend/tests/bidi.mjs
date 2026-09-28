@@ -77,7 +77,15 @@ ck("The homepage number reads the same way", home === "+965 94040955", `reads "$
 const foot = await p.evaluate(() => {
   const a = document.querySelector('footer a[href^="tel:"]');
   if (!a) return null;
-  const t = [...a.childNodes].find((n) => n.nodeType === 3 && n.textContent.includes("+"));
+  // Walk descendants, not direct children: the digits sit in their own span
+  // so the row's direction can stay with the page.
+  const walker = document.createTreeWalker(a, NodeFilter.SHOW_TEXT);
+  let t = null;
+  while (!t) {
+    const n = walker.nextNode();
+    if (!n) break;
+    if (n.textContent.includes("+")) t = n;
+  }
   if (!t) return null;
   const out = [];
   for (let k = 0; k < t.textContent.length; k++) {
@@ -93,6 +101,34 @@ const foot = await p.evaluate(() => {
     .join("");
 });
 ck("The footer number does too", foot === "+96594040955", `reads "${foot}"`);
+
+// ================================= the contact rows have to share an edge
+{
+  // Character order is not enough. dir="ltr" on the phone row put the digits
+  // in the right order and moved the whole row — icon and all — to the left,
+  // while the three rows under it stayed right. Every assertion above passed.
+  await p.goto(pageUrl("contact"), { waitUntil: "load" });
+  await p.waitForTimeout(1200);
+  const icons = await p.evaluate(() =>
+    [...document.querySelectorAll("footer li a svg")].map((i) =>
+      Math.round(i.getBoundingClientRect().x),
+    ),
+  );
+  const spread = icons.length ? Math.max(...icons) - Math.min(...icons) : -1;
+  ck(
+    "Every footer contact row starts at the same edge",
+    icons.length >= 4 && spread <= 1,
+    `icons at ${icons.join(", ")}`,
+  );
+
+  // And on the right of it, this being an Arabic page.
+  const half = await p.evaluate(() => window.innerWidth / 2);
+  ck(
+    "\u2026on the right, as the rest of the page reads",
+    icons.length > 0 && icons.every((x) => x > half - 200),
+    `first icon at ${icons[0]}, viewport ${half * 2}`,
+  );
+}
 
 await b.close();
 console.log(`\n${fails} failing`);

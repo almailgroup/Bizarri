@@ -24,10 +24,13 @@ export function Footer() {
             <li>
               <a
                 href={`tel:${contact.phone}`}
-                dir="ltr"
                 className="-my-1 flex items-center gap-3 py-2 text-white/70 hover:text-white"
               >
-                <Phone className="w-4 h-4" /> {contact.phone}
+                {/* dir on the number, not on the row. On the row it flips the
+                    whole flex line to LTR, so the icon and the number sit on
+                    the left while the three rows below them stay on the
+                    right. Only the digits need their own direction. */}
+                <Phone className="w-4 h-4" /> <span dir="ltr">{contact.phone}</span>
               </a>
             </li>
             <li>
@@ -62,7 +65,9 @@ export function Footer() {
         </div>
 
         <div>
-          <h4 className="text-xs tracking-[0.3em] uppercase text-white/40 mb-5">Links</h4>
+          <h4 className="text-xs tracking-[0.3em] uppercase text-white/40 mb-5">
+            {tr("quickLinks")}
+          </h4>
           <ul className="space-y-1 text-sm">
             <li>
               <Link

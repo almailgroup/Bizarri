@@ -121,7 +121,8 @@ function SignIn() {
 
 function NotAuthorised() {
   const { lang } = useI18n();
-  const { signOut } = useAuth();
+  const { signOut, session } = useAuth();
+  const email = session?.user?.email ?? "";
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-black px-6 text-center text-white">
       <img src={logoWhite} alt="Bizarri" className="h-12 w-auto" />
@@ -130,6 +131,15 @@ function NotAuthorised() {
           ? "This account does not have chalet management access."
           : "هذا الحساب لا يملك صلاحية إدارة الشاليه."}
       </p>
+      {/* Which account was refused. Signing in with the wrong one of two
+          addresses looks identical to not being an admin at all, and the
+          owner cannot tell them apart without this. It is the reader's own
+          address, so it discloses nothing they do not already know. */}
+      {email && (
+        <p className="font-mono text-sm text-white/40" dir="ltr">
+          {email}
+        </p>
+      )}
       <button
         onClick={signOut}
         className="border border-white/30 px-6 py-3 text-sm uppercase tracking-widest hover:bg-white hover:text-black"
