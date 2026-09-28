@@ -67,7 +67,7 @@ function Booking() {
 
   return (
     <PageShell>
-      <section className="mx-auto max-w-4xl px-6 py-24 md:py-32">
+      <section className="mx-auto max-w-4xl px-6 py-16 md:py-32">
         <p className="mb-6 text-xs uppercase tracking-[0.4em] text-muted-foreground">
           {tr("booking")}
         </p>
@@ -109,7 +109,7 @@ function Steps({ current }: { current: 1 | 2 | 3 }) {
               }`}
             >
               <span
-                className={`flex h-6 w-6 items-center justify-center border text-[11px] ${
+                className={`flex h-7 w-7 items-center justify-center border text-xs ${
                   active
                     ? "border-foreground bg-foreground text-background"
                     : done
@@ -150,19 +150,21 @@ function RatesStrip() {
   ];
 
   return (
-    <div className="mb-6 border border-border p-5">
-      <p className="mb-3 text-xs uppercase tracking-widest text-muted-foreground">
+    <div className="mb-5 border border-border p-3 md:mb-6 md:p-5">
+      <p className="mb-2 hidden text-xs uppercase tracking-widest text-muted-foreground md:mb-3 md:block">
         {tr("ratesAtAGlance")}
       </p>
-      <dl className="flex flex-wrap gap-x-8 gap-y-3">
+      <dl className="flex flex-wrap items-baseline gap-x-4 gap-y-1 md:gap-x-8 md:gap-y-3">
         {items.map((it) => (
-          <div key={it.label}>
+          <div key={it.label} className="flex items-baseline gap-1.5 md:block">
             <dt className="text-xs text-muted-foreground">{it.label}</dt>
-            <dd className="mt-0.5 text-lg font-medium">{formatMoney(it.price, lang)}</dd>
+            <dd className="text-sm font-medium md:mt-0.5 md:text-lg">
+              {formatMoney(it.price, lang)}
+            </dd>
           </div>
         ))}
       </dl>
-      <p className="mt-3 text-xs text-muted-foreground">{tr("minStayNote")}</p>
+      <p className="mt-2 text-xs text-muted-foreground md:mt-3">{tr("minStayNote")}</p>
     </div>
   );
 }
@@ -547,7 +549,7 @@ function Calendar({
           staying pinned. */}
       <div className="animate-fade-up pb-28 lg:pb-0">
         <Steps current={1} />
-        <h1 className="mb-2 font-display text-4xl md:text-5xl">{tr("selectDates")}</h1>
+        <h1 className="mb-2 font-display text-3xl md:text-5xl">{tr("selectDates")}</h1>
         <p className="mb-6 text-sm text-muted-foreground">
           {tr("noPaymentNow")}{" "}
           {filter !== "all" ? tr("filterHint") : !start || end ? tr("pickStart") : tr("pickEnd")}
@@ -862,13 +864,16 @@ function Calendar({
           {tr("whatsappAlt")}
           <WhatsAppLink
             context={{ chaletId, start, end }}
-            className="inline-flex items-center gap-2 underline underline-offset-4 hover:text-foreground"
+            className="-my-2 inline-flex items-center gap-2 py-2 underline underline-offset-4 hover:text-foreground"
             label="WhatsApp"
           />
         </p>
 
         <p className="mt-4 text-sm text-muted-foreground">
-          <Link to="/reservation" className="underline underline-offset-4 hover:text-foreground">
+          <Link
+            to="/reservation"
+            className="-my-2 inline-block py-2 underline underline-offset-4 hover:text-foreground"
+          >
             {tr("checkBooking")}
           </Link>
         </p>
@@ -1216,7 +1221,7 @@ function BookingForm({
         {tr("whatsappHelp")}
         <WhatsAppLink
           context={{ chaletId, start, end }}
-          className="inline-flex items-center gap-2 underline underline-offset-4 hover:text-foreground"
+          className="-my-2 inline-flex items-center gap-2 py-2 underline underline-offset-4 hover:text-foreground"
           label="WhatsApp"
         />
       </p>

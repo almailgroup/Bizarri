@@ -20,12 +20,12 @@ export function Footer() {
 
         <div>
           <h4 className="text-xs tracking-[0.3em] uppercase text-white/40 mb-5">{tr("contact")}</h4>
-          <ul className="space-y-3 text-sm">
+          <ul className="space-y-1 text-sm">
             <li>
               <a
                 href={`tel:${contact.phone}`}
                 dir="ltr"
-                className="flex items-center gap-3 hover:text-white text-white/70"
+                className="-my-1 flex items-center gap-3 py-2 text-white/70 hover:text-white"
               >
                 <Phone className="w-4 h-4" /> {contact.phone}
               </a>
@@ -33,7 +33,7 @@ export function Footer() {
             <li>
               <a
                 href={`mailto:${contact.email}`}
-                className="flex items-center gap-3 hover:text-white text-white/70"
+                className="-my-1 flex items-center gap-3 py-2 text-white/70 hover:text-white"
               >
                 <Mail className="w-4 h-4" /> {contact.email}
               </a>
@@ -43,7 +43,7 @@ export function Footer() {
                 href={contact.maps}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-3 hover:text-white text-white/70"
+                className="-my-1 flex items-center gap-3 py-2 text-white/70 hover:text-white"
               >
                 <MapPin className="w-4 h-4" /> {tr("location")}
               </a>
@@ -53,7 +53,7 @@ export function Footer() {
                 href={contact.instagram}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-3 hover:text-white text-white/70"
+                className="-my-1 flex items-center gap-3 py-2 text-white/70 hover:text-white"
               >
                 <Instagram className="w-4 h-4" /> Instagram
               </a>
@@ -63,34 +63,43 @@ export function Footer() {
 
         <div>
           <h4 className="text-xs tracking-[0.3em] uppercase text-white/40 mb-5">Links</h4>
-          <ul className="space-y-3 text-sm">
+          <ul className="space-y-1 text-sm">
             <li>
-              <Link to="/booking" className="text-white/70 hover:text-white">
+              <Link
+                to="/booking"
+                className="-my-1 inline-block py-2 text-white/70 hover:text-white"
+              >
                 {tr("bookNow")}
               </Link>
             </li>
             <li>
-              <Link to="/facilities" className="text-white/70 hover:text-white">
+              <Link
+                to="/facilities"
+                className="-my-1 inline-block py-2 text-white/70 hover:text-white"
+              >
                 {tr("facilities")}
               </Link>
             </li>
             <li>
-              <Link to="/photos" className="text-white/70 hover:text-white">
+              <Link to="/photos" className="-my-1 inline-block py-2 text-white/70 hover:text-white">
                 {tr("photos")}
               </Link>
             </li>
             <li>
-              <Link to="/news" className="text-white/70 hover:text-white">
+              <Link to="/news" className="-my-1 inline-block py-2 text-white/70 hover:text-white">
                 {tr("news")}
               </Link>
             </li>
             <li>
-              <Link to="/privacy" className="text-white/70 hover:text-white">
+              <Link
+                to="/privacy"
+                className="-my-1 inline-block py-2 text-white/70 hover:text-white"
+              >
                 {tr("privacy")}
               </Link>
             </li>
             <li>
-              <Link to="/rules" className="text-white/70 hover:text-white">
+              <Link to="/rules" className="-my-1 inline-block py-2 text-white/70 hover:text-white">
                 {tr("rules")}
               </Link>
             </li>
@@ -106,7 +115,7 @@ export function Footer() {
               href="https://almailgroup.com"
               target="_blank"
               rel="noopener noreferrer"
-              className="hover:text-white transition-colors"
+              className="-my-2 inline-block py-2 transition-colors hover:text-white"
             >
               {tr("visitAlmail")} →
             </a>

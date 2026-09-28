@@ -3,6 +3,15 @@
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
+/* Without this every hover: utility also fires on touch, where there is
+   no pointer to leave — the style sticks after the tap. */
+@custom-variant hover {
+  @media (hover: hover) {
+    &:hover {
+      @slot;
+    }
+  }
+}
 
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);
@@ -120,9 +129,13 @@
       transform 0.5s cubic-bezier(0.16, 1, 0.3, 1),
       box-shadow 0.5s;
   }
-  .hover-lift:hover {
-    transform: translateY(-6px);
-    box-shadow: var(--shadow-luxe);
+  /* Hand-written, so the hover variant override does not reach it: a touch
+     screen has no pointer to leave, and the card would stay lifted. */
+  @media (hover: hover) {
+    .hover-lift:hover {
+      transform: translateY(-6px);
+      box-shadow: var(--shadow-luxe);
+    }
   }
 
   @keyframes fade-up {

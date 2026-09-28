@@ -17,7 +17,7 @@ function Reservation() {
 
   return (
     <PageShell>
-      <section className="mx-auto max-w-2xl px-6 py-24 md:py-32">
+      <section className="mx-auto max-w-2xl px-6 py-16 md:py-32">
         <p className="mb-6 text-xs uppercase tracking-[0.4em] text-muted-foreground">
           {tr("booking")}
         </p>
@@ -27,7 +27,10 @@ function Reservation() {
         <BookingLookup heading={false} />
 
         <p className="mt-12 border-t border-border pt-8 text-sm text-muted-foreground">
-          <Link to="/booking" className="underline underline-offset-4 hover:text-foreground">
+          <Link
+            to="/booking"
+            className="-my-2 inline-block py-2 underline underline-offset-4 hover:text-foreground"
+          >
             {tr("startBooking")}
           </Link>
         </p>

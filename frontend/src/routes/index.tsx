@@ -99,7 +99,7 @@ function Home() {
 
         <a
           href="#chalet"
-          className="absolute bottom-8 left-1/2 z-10 -translate-x-1/2 text-[10px] uppercase tracking-[0.3em] text-white/50 transition-colors hover:text-white"
+          className="absolute bottom-8 left-1/2 z-10 -translate-x-1/2 text-xs uppercase tracking-[0.3em] text-white/50 transition-colors hover:text-white"
         >
           <span className="mb-3 block">{tr("scroll")}</span>
           <span className="mx-auto block h-10 w-px overflow-hidden bg-white/20">

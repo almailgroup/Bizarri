@@ -53,7 +53,7 @@ function Facilities() {
 
   return (
     <PageShell>
-      <section className="max-w-6xl mx-auto px-6 py-24 md:py-32">
+      <section className="max-w-6xl mx-auto px-6 py-16 md:py-32">
         <p className="text-xs tracking-[0.4em] uppercase text-muted-foreground mb-6">
           {tr("facilities")}
         </p>

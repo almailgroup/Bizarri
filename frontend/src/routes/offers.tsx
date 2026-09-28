@@ -54,7 +54,7 @@ function Offers() {
 
   return (
     <PageShell>
-      <section className="mx-auto max-w-5xl px-6 py-24 md:py-32">
+      <section className="mx-auto max-w-5xl px-6 py-16 md:py-32">
         <p className="mb-6 text-xs uppercase tracking-[0.4em] text-muted-foreground">
           {tr("offers")}
         </p>
