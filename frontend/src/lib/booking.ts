@@ -10,8 +10,16 @@
  * All persistence lives in src/lib/api.ts.
  */
 
-/** Guests may not request a stay shorter than this. */
-export const MIN_STAY_DAYS = 3;
+/**
+ * Fallback minimum stay, for the moment before the rates have loaded.
+ *
+ * The real value is rates.min_stay_days, which the admin panel edits and
+ * request_booking() enforces. This is only what the UI assumes until the
+ * server has answered, so it is the permissive value: briefly allowing a
+ * selection the server then refuses is better than briefly refusing one it
+ * would have taken.
+ */
+export const MIN_STAY_DAYS = 1;
 
 import type { PackageKey } from "@/integrations/supabase/types";
 

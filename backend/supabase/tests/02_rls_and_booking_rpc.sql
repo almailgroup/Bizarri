@@ -81,14 +81,14 @@ begin
   perform pg_temp.ok('Notes trimmed', b.notes = 'late check-in', b.notes);
   perform pg_temp.ok('days is derived', b.days = 7, b.days::text);
 
-  -- min stay
-  begin
-    b := public.request_booking(1::smallint, date '2026-11-02', date '2026-11-03',
-          'Too Short', '+96599999999', 'short@example.com', 2::smallint, null, 'ids/short.jpg', true);
-    perform pg_temp.ok('Two-day request rejected', false, 'accepted');
-  exception when others then
-    perform pg_temp.ok('Two-day request rejected', sqlerrm like '%Minimum stay%', sqlerrm);
-  end;
+  -- min stay. The default is one day now, so a single night books; the guard
+  -- is tested against a minimum the test sets itself rather than against
+  -- whatever the default happens to be, which is what made this break when
+  -- the default moved.
+  b := public.request_booking(1::smallint, date '2026-11-02', date '2026-11-02',
+        'One Night', '+96599999999', 'onenight@example.com', 2::smallint, null, 'ids/one.jpg', true);
+  perform pg_temp.ok('A single day is a booking', b.days = 1, b.days::text);
+  perform pg_temp.ok('…priced per day, matching no package', b.package_key is null, coalesce(b.package_key, 'null'));
 
   -- unknown chalet
   begin

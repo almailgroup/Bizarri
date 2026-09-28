@@ -126,3 +126,41 @@ begin
     perform pg_temp.ok('availability_calendar survives', false, left(sqlerrm, 60));
   end;
 end $$;
+
+-- ---------------------------------------------------------- minimum stay
+
+-- The minimum is a setting, not a constant. Set it here so the guard is
+-- tested against a known value instead of whatever the default happens to be.
+do $$
+declare b public.bookings;
+begin
+  reset role;
+  update public.rates set min_stay_days = 3 where id;
+  set local role anon;
+
+  begin
+    b := public.request_booking(1::smallint, date '2027-09-05', date '2027-09-06',
+          'Below Minimum', '+96599999999', 'below@example.com', 2::smallint, null, 'ids/below.jpg', true);
+    perform pg_temp.ok('A stay under the configured minimum is refused', false, 'accepted ' || b.ref);
+  exception when others then
+    perform pg_temp.ok('A stay under the configured minimum is refused',
+      sqlerrm like '%Minimum stay is 3 days%', left(sqlerrm, 40));
+  end;
+
+  b := public.request_booking(1::smallint, date '2027-09-05', date '2027-09-07',
+        'At Minimum', '+96599999998', 'atmin@example.com', 2::smallint, null, 'ids/atmin.jpg', true);
+  perform pg_temp.ok('…and exactly the minimum is allowed', b.days = 3, b.days::text);
+end $$;
+
+do $$
+declare b public.bookings;
+begin
+  reset role;
+  update public.rates set min_stay_days = 1 where id;
+  set local role anon;
+  b := public.request_booking(2::smallint, date '2027-10-03', date '2027-10-03',
+        'Single Night', '+96599999997', 'single@example.com', 2::smallint, null, 'ids/single.jpg', true);
+  perform pg_temp.ok('Lowering it to one lets a single day through', b.days = 1, b.days::text);
+end $$;
+
+reset role;

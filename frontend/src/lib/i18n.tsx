@@ -143,8 +143,8 @@ export const t: Dict = {
   pickStart: { en: "Tap a day to start", ar: "اضغط على يوم للبدء" },
   pickEnd: { en: "Now tap your check-out day", ar: "الآن اضغط على يوم المغادرة" },
   minStay: {
-    en: "Minimum stay is 3 days.",
-    ar: "الحد الأدنى للإقامة ٣ أيام.",
+    en: "Minimum stay is {n} days.",
+    ar: "الحد الأدنى للإقامة {n} أيام.",
   },
   rangeBlocked: {
     en: "Those dates include a day that isn't available.",
@@ -285,9 +285,12 @@ export const t: Dict = {
     ar: "لا يوجد متاح هذا الشهر — نعرض الشهر التالي المتاح.",
   },
   minStayNote: {
-    en: "Minimum stay 3 days.",
-    ar: "الحد الأدنى للإقامة ٣ أيام.",
+    en: "Minimum stay {n} days.",
+    ar: "الحد الأدنى للإقامة {n} أيام.",
   },
+  daysSelected: { en: "{n} days selected", ar: "{n} أيام محددة" },
+  oneDaySelected: { en: "1 day selected", ar: "يوم واحد محدد" },
+  pickEndHint: { en: "Tap another day to extend your stay", ar: "اضغط على يوم آخر لتمديد إقامتك" },
   yourStay: { en: "Your stay", ar: "إقامتك" },
   optionalLabel: { en: "Optional", ar: "اختياري" },
   requiredLabel: { en: "Required", ar: "مطلوب" },

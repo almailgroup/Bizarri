@@ -169,7 +169,12 @@ function RatesStrip() {
           </div>
         ))}
       </dl>
-      <p className="mt-2 text-xs text-muted-foreground md:mt-3">{tr("minStayNote")}</p>
+      {/* A minimum of one is no minimum at all; saying so is noise. */}
+      {rates.minStayDays > 1 && (
+        <p className="mt-2 text-xs text-muted-foreground md:mt-3">
+          {tr("minStayNote").replace("{n}", String(rates.minStayDays))}
+        </p>
+      )}
     </div>
   );
 }
@@ -466,8 +471,22 @@ function Calendar({
   // its answer is what is stored.
   const current =
     start && end && rates ? quote(start, end, customPrices, rates, occasions ?? []) : null;
-  const tooShort = current !== null && current.days < MIN_STAY_DAYS;
+  // rates is the source of truth; the constant only covers the moment before
+  // it has loaded. request_booking() enforces the same number server-side.
+  const minStay = rates?.minStayDays ?? MIN_STAY_DAYS;
+  const tooShort = current !== null && current.days < minStay;
   const ready = !!start && !!end && !tooShort;
+
+  // While a check-out day is still being chosen, the day under the pointer
+  // stands in for it, so the range and its length can be seen before the tap
+  // that commits them. Only on a pointer: a touch screen has nothing to hover.
+  const [hoverDay, setHoverDay] = useState<Date | null>(null);
+  const previewEnd =
+    end ??
+    (start && hoverDay && hoverDay >= start && !eachDay(start, hoverDay).some(dayBlocked)
+      ? hoverDay
+      : null);
+  const selectedDays = start && previewEnd ? daysBetween(start, previewEnd) : 0;
 
   const selectDay = (d: Date) => {
     setError("");
@@ -488,12 +507,12 @@ function Calendar({
       return;
     }
     setEnd(d);
-    if (daysBetween(start, d) < MIN_STAY_DAYS) setError(tr("minStay"));
+    if (daysBetween(start, d) < minStay) setError(tr("minStay").replace("{n}", String(minStay)));
   };
 
-  const inRange = (d: Date) => start && end && d >= start && d <= end;
+  const inRange = (d: Date) => start && previewEnd && d >= start && d <= previewEnd;
   const isEdge = (d: Date) =>
-    (start && fmtDate(d) === fmtDate(start)) || (end && fmtDate(d) === fmtDate(end));
+    (start && fmtDate(d) === fmtDate(start)) || (previewEnd && fmtDate(d) === fmtDate(previewEnd));
 
   const monthName = month.toLocaleDateString(lang === "ar" ? "ar-EG" : "en-US", {
     month: "long",
@@ -509,8 +528,8 @@ function Calendar({
       setError(tr("pickStart"));
       return;
     }
-    if (daysBetween(start, end) < MIN_STAY_DAYS) {
-      setError(tr("minStay"));
+    if (daysBetween(start, end) < minStay) {
+      setError(tr("minStay").replace("{n}", String(minStay)));
       return;
     }
     setShowForm(true);
@@ -703,6 +722,8 @@ function Calendar({
               const disabled = past || reserved || offPackage;
               const selected = isEdge(d);
               const within = inRange(d);
+              const firstOfRange = !!start && fmtDate(d) === fmtDate(start);
+              const lastOfRange = !!previewEnd && fmtDate(d) === fmtDate(previewEnd);
               const priced = byDay.get(iso)?.custom === true;
               const occ = occasionFor(d);
               const dayLabel = d.toLocaleDateString(lang === "ar" ? "ar-EG" : "en-US", {
@@ -716,9 +737,9 @@ function Calendar({
                 : past
                   ? "cursor-not-allowed text-muted-foreground/30"
                   : selected
-                    ? "bg-background font-semibold ring-2 ring-inset ring-foreground"
+                    ? "bg-foreground font-semibold text-background"
                     : within
-                      ? "bg-secondary"
+                      ? "bg-secondary text-foreground"
                       : offPackage
                         ? "cursor-not-allowed text-muted-foreground/30"
                         : occ
@@ -737,7 +758,13 @@ function Calendar({
                   aria-pressed={!!selected}
                   data-day={iso}
                   tabIndex={fmtDate(activeDay) === iso ? 0 : -1}
-                  className={`relative flex aspect-square flex-col items-center justify-center text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-current ${tone}`}
+                  onMouseEnter={() => !disabled && setHoverDay(d)}
+                  onMouseLeave={() => setHoverDay(null)}
+                  className={`relative flex aspect-square flex-col items-center justify-center text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-current ${tone} ${
+                    // Rounding only the outer ends makes the run read as one
+                    // stay rather than a row of separately shaded squares.
+                    firstOfRange ? "rounded-s-full" : ""
+                  } ${lastOfRange ? "rounded-e-full" : ""}`}
                 >
                   {d.getDate()}
                   {priced && !reserved && !past && (
@@ -750,6 +777,29 @@ function Calendar({
               );
             })}
           </div>
+
+          {/* The count, where the counting happens. Reading it off a summary
+              below the fold means tapping, scrolling, checking, scrolling
+              back — so it sits against the grid and follows the pointer while
+              a check-out day is still being chosen. */}
+          {start && (
+            <div className="mt-5 border-t border-border pt-4">
+              <div>
+                <p className="font-display text-xl" aria-live="polite">
+                  {previewEnd
+                    ? selectedDays === 1
+                      ? tr("oneDaySelected")
+                      : tr("daysSelected").replace("{n}", String(selectedDays))
+                    : tr("pickEndHint")}
+                </p>
+                {previewEnd && (
+                  <p className="mt-1 text-sm text-muted-foreground" dir="ltr">
+                    {fmtDate(start)} → {fmtDate(previewEnd)}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
 
           {!monthHasWindow && (
             <p className="mt-4 text-xs text-muted-foreground">{tr("filterNoneLeft")}</p>
