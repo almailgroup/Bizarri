@@ -105,8 +105,15 @@ interface WebhookPayload {
   old_record?: BookingRecord | null;
 }
 
-/** The decisions worth telling a guest about. */
-const DECISIONS = ["accepted", "rejected", "cancelled"];
+/**
+ * The statuses worth telling a guest about.
+ *
+ * "pending" is in here for the move *back* — an admin who accepted and then
+ * reconsidered leaves the guest holding a confirmation that is no longer
+ * true, which is worse than never having been told. A new request is also
+ * pending, but that arrives as an INSERT and is handled before this is read.
+ */
+const NOTIFIED_STATUSES = ["accepted", "rejected", "cancelled", "pending"];
 
 /**
  * What one webhook delivery should cause.
@@ -133,8 +140,8 @@ export function classify(payload: WebhookPayload | null): {
     const before = payload.old_record.status ?? null;
     const after = record.status ?? null;
     if (before === after) return { action: "ignore", reason: "status unchanged" };
-    if (!after || !DECISIONS.includes(after)) {
-      return { action: "ignore", reason: `status ${after} is not a decision` };
+    if (!after || !NOTIFIED_STATUSES.includes(after)) {
+      return { action: "ignore", reason: `status ${after} is not worth an email` };
     }
     return { action: "decision" };
   }
@@ -279,7 +286,7 @@ function renderGuest(b: BookingRecord, lang: "en" | "ar"): string {
  * deliberately not included: the admin panel labels it internal and an admin
  * writing "haggled, gave discount" there does not expect the guest to read it.
  */
-function renderDecision(b: BookingRecord, lang: "en" | "ar"): string {
+export function renderDecision(b: BookingRecord, lang: "en" | "ar"): string {
   const ar = lang === "ar";
   const status = b.status ?? "";
   const copy = ar
@@ -293,6 +300,10 @@ function renderDecision(b: BookingRecord, lang: "en" | "ar"): string {
           body: "نأسف، هذه التواريخ غير متاحة. تواصل معنا عبر واتساب وسنساعدك في إيجاد موعد آخر.",
         },
         cancelled: { title: "تم إلغاء حجزك", body: "تم إلغاء هذا الحجز. إذا لم تطلب ذلك، يرجى التواصل معنا." },
+        pending: {
+          title: "حجزك قيد المراجعة",
+          body: "أعدنا طلبك إلى قائمة الانتظار بينما نراجع التفاصيل. سنتواصل معك قريباً بالتأكيد النهائي.",
+        },
         ref: "رقم الحجز",
         chalet: "الشاليه",
         dates: "التواريخ",
@@ -313,6 +324,10 @@ function renderDecision(b: BookingRecord, lang: "en" | "ar"): string {
           title: "Your booking has been cancelled",
           body: "This booking has been cancelled. If you did not ask for this, please get in touch.",
         },
+        pending: {
+          title: "Your booking is back under review",
+          body: "We have put your request back on the waiting list while we check the details. We will be in touch shortly to confirm.",
+        },
         ref: "Booking reference",
         chalet: "Chalet",
         dates: "Dates",
@@ -326,10 +341,10 @@ function renderDecision(b: BookingRecord, lang: "en" | "ar"): string {
     `<tr><td style="padding:6px 16px 6px 0;color:#666">${esc(label)}</td>` +
     `<td style="padding:6px 0;font-weight:500">${esc(value)}</td></tr>`;
 
-  // Confirmed gets the full stay again; a refusal does not need the price of
-  // something that is not happening.
+  // The stay is shown while it might still happen. A refusal or a
+  // cancellation does not need the price of something that is not.
   const details =
-    status === "accepted"
+    status === "accepted" || status === "pending"
       ? `<table style="border-collapse:collapse;font-size:14px">
         ${row(copy.chalet, `Bizarri Chalet ${b.chalet_id}`)}
         ${row(copy.dates, `${b.start_date} \u2192 ${b.end_date} (${b.days})`)}

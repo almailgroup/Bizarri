@@ -239,11 +239,16 @@ Dashboard → Database → Webhooks → *Create*:
 - Type **Supabase Edge Function**, function `notify-booking`
 
 Add a **second** hook on the same table for **Update**, pointing at the same
-function. That one sends the guest the decision when an admin accepts,
-rejects or cancels. An Update hook fires on every column, so `classify()` in
-the function decides what is worth an email: only a change of `status`, and
-only to one of those three. Editing a phone number or writing an internal note
-sends nothing, and the note itself is never shown to the guest.
+function — or simply tick **Update** on the existing hook, which is the same
+thing with less to maintain. That is what tells the guest the outcome.
+
+An Update hook fires on every column, so `classify()` decides what is worth an
+email: only a change of `status`, and only to accepted, rejected, cancelled or
+back to pending. That last one is for the admin who accepts and then
+reconsiders — leaving a guest holding a confirmation that is no longer true is
+worse than never having told them. Editing a phone number or saving an
+internal note sends nothing, and `admin_note` is never shown to the guest in
+any of the four.
 
 ### Checking what a database already has
 

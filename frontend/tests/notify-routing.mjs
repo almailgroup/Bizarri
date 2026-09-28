@@ -38,7 +38,7 @@ const built = await build({
 // server unless Deno is stubbed. Nothing here needs a real one.
 globalThis.Deno = { serve: () => {}, env: { get: () => undefined } };
 
-const { classify } = await import(
+const { classify, renderDecision } = await import(
   "data:text/javascript;base64," + Buffer.from(built.outputFiles[0].text).toString("base64")
 );
 
@@ -109,13 +109,30 @@ for (const status of ["accepted", "rejected", "cancelled"]) {
   ck("…even on an already-accepted booking", r.action === "ignore", r.reason);
 }
 {
-  // Re-deciding the same way is not a new decision, so no second email.
+  // An admin who accepted and then reconsidered leaves the guest holding a
+  // confirmation that is no longer true. That is worth an email.
   const r = classify({
     type: "UPDATE",
     old_record: booking({ status: "accepted" }),
     record: booking({ status: "pending" }),
   });
-  ck("Moving back to pending is not a decision", r.action === "ignore", r.reason);
+  ck(
+    "Putting an accepted booking back on the waiting list tells the guest",
+    r.action === "decision",
+  );
+}
+{
+  const r = classify({
+    type: "UPDATE",
+    old_record: booking({ status: "rejected" }),
+    record: booking({ status: "pending" }),
+  });
+  ck("…and so does reopening a rejected one", r.action === "decision");
+}
+{
+  // A brand-new booking is pending too, but it arrives as an INSERT.
+  const r = classify({ type: "INSERT", record: booking({ status: "pending" }) });
+  ck("A new pending booking is still a new request, not a status change", r.action === "new");
 }
 {
   const r = classify({ type: "DELETE", old_record: booking(), record: booking() });
@@ -137,6 +154,43 @@ ck(
     record: booking({ status: "accepted" }),
   }).action !== "new",
 );
+
+// ================================================== what the guest is sent
+{
+  const withNote = (status) =>
+    renderDecision(
+      { ...booking({ status }), admin_note: "haggled, gave 50 off", notes: "late arrival" },
+      "en",
+    );
+
+  ck("An acceptance says so", /confirmed/i.test(withNote("accepted")));
+  ck("A refusal reads as an apology, not a status code", /sorry/i.test(withNote("rejected")));
+  ck("A cancellation says so", /cancelled/i.test(withNote("cancelled")));
+  ck(
+    "Going back to pending explains the wait",
+    /under review|waiting list/i.test(withNote("pending")),
+  );
+
+  for (const status of ["accepted", "rejected", "cancelled", "pending"]) {
+    // The admin panel calls that field internal. An admin writing
+    // "haggled, gave 50 off" does not expect the guest to read it back.
+    ck(
+      `The internal note never reaches the guest (${status})`,
+      !withNote(status).includes("haggled"),
+    );
+    ck(`…and the reference always does (${status})`, withNote(status).includes("BZR-TEST01"));
+  }
+
+  // The price of a stay that is not happening is noise at best.
+  ck("A confirmed stay shows the total", withNote("accepted").includes("350"));
+  ck("…as does one back under review", withNote("pending").includes("350"));
+  ck("A refusal does not", !withNote("rejected").includes("350"));
+  ck("Nor does a cancellation", !withNote("cancelled").includes("350"));
+
+  const ar = renderDecision(booking({ status: "accepted", lang: "ar" }), "ar");
+  ck("The Arabic email is laid out right to left", ar.includes('dir="rtl"'));
+  ck("…and is actually in Arabic", /[\u0600-\u06FF]/.test(ar));
+}
 
 console.log(`\n${fails} failing`);
 process.exit(fails ? 1 : 0);
