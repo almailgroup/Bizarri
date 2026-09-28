@@ -9,7 +9,10 @@
  */
 import { chromium } from "playwright";
 
-const B = "http://localhost:4173/ar/";
+// The language is the last segment, so a page URL is pageUrl(route).
+const LANG = "ar";
+const B = "http://localhost:4173/";
+const pageUrl = (r) => (r ? `${B}${r}/${LANG}` : `${B}${LANG}`);
 const b = await chromium.launch(
   process.env.PLAYWRIGHT_CHROMIUM_PATH
     ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_PATH }
@@ -52,7 +55,7 @@ const visualOrder = async (text) =>
     return null;
   }, text);
 
-await p.goto(B + "contact", { waitUntil: "load" });
+await p.goto(pageUrl("contact"), { waitUntil: "load" });
 await p.waitForTimeout(1200);
 const dir = await p.evaluate(() => document.documentElement.dir);
 ck("/contact really is the Arabic page", dir === "rtl", `dir=${dir}`);
@@ -67,7 +70,7 @@ ck("The email is not reordered either", mail === "sales@bizarri.com", `reads "${
 
 // The footer is on every page, and the homepage prints the number a second
 // time with a space in it, so both are worth their own measurement.
-await p.goto(B, { waitUntil: "load" });
+await p.goto(pageUrl(""), { waitUntil: "load" });
 await p.waitForTimeout(1200);
 const home = await visualOrder("+965 94040955");
 ck("The homepage number reads the same way", home === "+965 94040955", `reads "${home}"`);

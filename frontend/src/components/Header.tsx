@@ -11,22 +11,22 @@ import logoWhite from "@/assets/bizarri-logo-white.png";
 // Typed as the router's own paths rather than plain strings, so a nav entry
 // that has not been moved under /$lang is a compile error. It was not, and
 // these five silently kept sending Arabic readers to the English page.
-type NavPath = Extract<LinkProps["to"], `/$lang/${string}`>;
+type NavPath = Extract<LinkProps["to"], `/${string}/$lang`>;
 
 const primaryNav: { to: NavPath; key: TrKey }[] = [
-  { to: "/$lang/facilities", key: "facilities" },
-  { to: "/$lang/photos", key: "photos" },
-  { to: "/$lang/offers", key: "offers" },
-  { to: "/$lang/booking", key: "booking" },
-  { to: "/$lang/contact", key: "contact" },
+  { to: "/facilities/$lang", key: "facilities" },
+  { to: "/photos/$lang", key: "photos" },
+  { to: "/offers/$lang", key: "offers" },
+  { to: "/booking/$lang", key: "booking" },
+  { to: "/contact/$lang", key: "contact" },
 ];
 
 const menuNav: { to: NavPath; key: TrKey }[] = [
   ...primaryNav.slice(0, 4),
-  { to: "/$lang/reservation", key: "yourReservation" },
-  { to: "/$lang/news", key: "news" },
-  { to: "/$lang/rules", key: "rules" },
-  { to: "/$lang/contact", key: "contact" },
+  { to: "/reservation/$lang", key: "yourReservation" },
+  { to: "/news/$lang", key: "news" },
+  { to: "/rules/$lang", key: "rules" },
+  { to: "/contact/$lang", key: "contact" },
 ];
 
 export function Header() {
@@ -106,7 +106,7 @@ export function Header() {
             {/* A shortcut rather than another nav item: returning guests come
                 back to check a status, not to browse. */}
             <Link
-              to="/$lang/reservation"
+              to="/reservation/$lang"
               params={{ lang }}
               className={`hidden items-center gap-1.5 border px-3 py-2 text-xs uppercase tracking-widest transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current sm:flex ${
                 overHero

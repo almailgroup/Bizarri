@@ -1,10 +1,14 @@
+import { requireLang } from "@/lib/lang-route";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { PageShell } from "@/components/PageShell";
 import { BookingLookup } from "@/components/BookingLookup";
 import { useI18n } from "@/lib/i18n";
 import { usePageMeta } from "@/hooks/use-page-meta";
 
-export const Route = createFileRoute("/$lang/reservation")({ component: Reservation });
+export const Route = createFileRoute("/reservation/$lang")({
+  component: Reservation,
+  beforeLoad: requireLang,
+});
 
 function Reservation() {
   const { tr, lang } = useI18n();
@@ -28,7 +32,7 @@ function Reservation() {
 
         <p className="mt-12 border-t border-border pt-8 text-sm text-muted-foreground">
           <Link
-            to="/$lang/booking"
+            to="/booking/$lang"
             params={{ lang }}
             className="-my-2 inline-block py-2 underline underline-offset-4 hover:text-foreground"
           >

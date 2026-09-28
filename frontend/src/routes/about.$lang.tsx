@@ -1,9 +1,10 @@
+import { requireLang } from "@/lib/lang-route";
 import { createFileRoute } from "@tanstack/react-router";
 import { PageShell } from "@/components/PageShell";
 import { useI18n } from "@/lib/i18n";
 import { usePageMeta } from "@/hooks/use-page-meta";
 
-export const Route = createFileRoute("/$lang/about")({ component: About });
+export const Route = createFileRoute("/about/$lang")({ component: About, beforeLoad: requireLang });
 
 function About() {
   const { tr, lang } = useI18n();

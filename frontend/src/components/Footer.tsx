@@ -66,7 +66,7 @@ export function Footer() {
           <ul className="space-y-1 text-sm">
             <li>
               <Link
-                to="/$lang/booking"
+                to="/booking/$lang"
                 params={{ lang }}
                 className="-my-1 inline-block py-2 text-white/70 hover:text-white"
               >
@@ -75,7 +75,7 @@ export function Footer() {
             </li>
             <li>
               <Link
-                to="/$lang/facilities"
+                to="/facilities/$lang"
                 params={{ lang }}
                 className="-my-1 inline-block py-2 text-white/70 hover:text-white"
               >
@@ -84,7 +84,7 @@ export function Footer() {
             </li>
             <li>
               <Link
-                to="/$lang/photos"
+                to="/photos/$lang"
                 params={{ lang }}
                 className="-my-1 inline-block py-2 text-white/70 hover:text-white"
               >
@@ -93,7 +93,7 @@ export function Footer() {
             </li>
             <li>
               <Link
-                to="/$lang/news"
+                to="/news/$lang"
                 params={{ lang }}
                 className="-my-1 inline-block py-2 text-white/70 hover:text-white"
               >
@@ -102,7 +102,7 @@ export function Footer() {
             </li>
             <li>
               <Link
-                to="/$lang/privacy"
+                to="/privacy/$lang"
                 params={{ lang }}
                 className="-my-1 inline-block py-2 text-white/70 hover:text-white"
               >
@@ -111,7 +111,7 @@ export function Footer() {
             </li>
             <li>
               <Link
-                to="/$lang/rules"
+                to="/rules/$lang"
                 params={{ lang }}
                 className="-my-1 inline-block py-2 text-white/70 hover:text-white"
               >

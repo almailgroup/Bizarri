@@ -1,6 +1,9 @@
 import { chromium } from "playwright";
 
-const B = "http://localhost:4173/en/";
+// The language is the last segment, so a page URL is pageUrl(route).
+const LANG = "en";
+const B = "http://localhost:4173/";
+const pageUrl = (r) => (r ? `${B}${r}/${LANG}` : `${B}${LANG}`);
 const SUPA = /ycfvqzcnatwacwlcmiej\.supabase\.co/;
 const b = await chromium.launch(
   process.env.PLAYWRIGHT_CHROMIUM_PATH
@@ -224,7 +227,7 @@ async function adminPage(state) {
   await mock(ctx, state);
   await ctx.addInitScript(() => sessionStorage.setItem("bizarri_intro_seen", "1"));
   const p = await ctx.newPage();
-  await p.goto(B + "admin", { waitUntil: "domcontentloaded" });
+  await p.goto(pageUrl("admin"), { waitUntil: "domcontentloaded" });
   await p.locator("input[type=email]").fill("admin@example.com");
   await p.locator("input[type=password]").fill("pw");
   await p.getByRole("button", { name: /^Login$/i }).click();

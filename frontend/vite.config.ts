@@ -16,16 +16,15 @@ const base = process.env.BASE_PATH ?? "/";
 const SITE = "https://bizarri.com";
 const LANGS = ["en", "ar"] as const;
 
-/** The pages, taken from the route files so this cannot drift from them. */
+/**
+ * The pages, taken from the route files so this cannot drift from them.
+ * A page is <slug>.$lang.tsx; the homepage is $lang.tsx and has no slug.
+ */
 function pageSlugs(): string[] {
-  return (
-    readdirSync(resolve(__dirname, "src/routes/$lang"))
-      .filter((f) => f.endsWith(".tsx"))
-      .map((f) => f.replace(/\.tsx$/, ""))
-      // route.tsx is the layout and $.tsx is the catch-all; neither is a page.
-      .filter((n) => n !== "route" && n !== "$")
-      .map((n) => (n === "index" ? "" : n))
-  );
+  const slugs = readdirSync(resolve(__dirname, "src/routes"))
+    .filter((f) => f.endsWith(".$lang.tsx"))
+    .map((f) => f.replace(/\.\$lang\.tsx$/, ""));
+  return ["", ...slugs];
 }
 
 /**
@@ -53,7 +52,9 @@ function staticRoutes(): Plugin {
       for (const lang of LANGS) {
         const dir = lang === "ar" ? "rtl" : "ltr";
         for (const slug of pageSlugs()) {
-          const url = `${SITE}/${lang}${slug ? `/${slug}` : ""}`;
+          // The language goes last: /facilities/en, and /en for the home page.
+          const path = slug ? `${slug}/${lang}` : lang;
+          const url = `${SITE}/${path}`;
           const html = shell
             .replace(/<html lang="[^"]*" dir="[^"]*">/, `<html lang="${lang}" dir="${dir}">`)
             .replace(
@@ -64,7 +65,7 @@ function staticRoutes(): Plugin {
               /<meta property="og:url" content="[^"]*" \/>/,
               `<meta property="og:url" content="${url}" />`,
             );
-          const target = resolve(out, lang, slug);
+          const target = resolve(out, path);
           mkdirSync(target, { recursive: true });
           writeFileSync(resolve(target, "index.html"), html);
         }

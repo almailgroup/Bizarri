@@ -1,9 +1,10 @@
+import { requireLang } from "@/lib/lang-route";
 import { createFileRoute } from "@tanstack/react-router";
 import { PageShell } from "@/components/PageShell";
 import { useI18n } from "@/lib/i18n";
 import { usePageMeta } from "@/hooks/use-page-meta";
 
-export const Route = createFileRoute("/$lang/rules")({ component: Rules });
+export const Route = createFileRoute("/rules/$lang")({ component: Rules, beforeLoad: requireLang });
 
 const RULES_EN = `Bizarri Chalet Rentals is committed to protecting the privacy and personal information of all guests. We collect only the data necessary to confirm bookings, process payments, and deliver a safe and reliable rental experience. All personal information—such as identification details, contact information, and payment data—is stored securely and used strictly for operational and legal purposes in accordance with Kuwaiti regulations.
 

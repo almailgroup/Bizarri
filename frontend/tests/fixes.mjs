@@ -1,5 +1,8 @@
 import { chromium } from "playwright";
-const B = "http://localhost:4173/en/";
+// The language is the last segment, so a page URL is pageUrl(route).
+const LANG = "en";
+const B = "http://localhost:4173/";
+const pageUrl = (r) => (r ? `${B}${r}/${LANG}` : `${B}${LANG}`);
 const SUPA = /ycfvqzcnatwacwlcmiej\.supabase\.co/;
 const b = await chromium.launch(
   process.env.PLAYWRIGHT_CHROMIUM_PATH
@@ -100,7 +103,7 @@ async function mk(tz) {
   });
   await ctx.addInitScript(() => sessionStorage.setItem("bizarri_intro_seen", "1"));
   const p = await ctx.newPage();
-  await p.goto(B + "booking", { waitUntil: "domcontentloaded" });
+  await p.goto(pageUrl("booking"), { waitUntil: "domcontentloaded" });
   await p.waitForTimeout(700);
   return { p, ctx };
 }
@@ -173,7 +176,7 @@ await ctx.close();
 // The panel used to sit at the foot of the booking page, duplicating both the
 // header shortcut and /reservation. It now lives only on /reservation.
 ({ p, ctx } = await mk("Asia/Kuwait"));
-await p.goto(B + "reservation", { waitUntil: "domcontentloaded" });
+await p.goto(pageUrl("reservation"), { waitUntil: "domcontentloaded" });
 await p.waitForTimeout(600);
 await p.locator('input[placeholder="BZR-XXXXXX"]').fill("BZR-TZ0001");
 await p.locator("input[type=email]").fill("t@e.com");

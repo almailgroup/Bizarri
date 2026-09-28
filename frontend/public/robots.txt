@@ -1,6 +1,6 @@
 User-agent: *
 Allow: /
-Disallow: /en/admin
-Disallow: /ar/admin
+Disallow: /admin/en
+Disallow: /admin/ar
 
 Sitemap: https://bizarri.com/sitemap.xml

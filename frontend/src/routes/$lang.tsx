@@ -1,7 +1,7 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, redirect, Link } from "@tanstack/react-router";
 import { PageShell } from "@/components/PageShell";
 import { Reveal } from "@/components/Reveal";
-import { useI18n } from "@/lib/i18n";
+import { LANGS, preferredLang, useI18n, type Lang } from "@/lib/i18n";
 import { usePageMeta } from "@/hooks/use-page-meta";
 import logoWhite from "@/assets/bizarri-logo-white.png";
 import heroImg from "@/assets/banner.jpg";
@@ -11,7 +11,23 @@ import room4 from "@/assets/room-4.jpg";
 import room5 from "@/assets/room-5.jpg";
 import { ArrowRight, Cpu, Tv, Waves, ChefHat, Bed, Wifi, MapPin, Phone } from "lucide-react";
 
-export const Route = createFileRoute("/$lang/")({ component: Home });
+/**
+ * The homepage, /en or /ar.
+ *
+ * This route matches any single segment, so it also catches /facilities —
+ * a page URL from before the language suffix existed, and still out there in
+ * anything already shared. Those move to /facilities/<lang> rather than 404.
+ */
+export const Route = createFileRoute("/$lang")({
+  component: Home,
+  beforeLoad: ({ params }) => {
+    if (LANGS.includes(params.lang as Lang)) return;
+    throw redirect({
+      href: `${import.meta.env.BASE_URL}${params.lang}/${preferredLang()}`,
+      replace: true,
+    });
+  },
+});
 
 const highlights = [
   { icon: Cpu, en: "Fully automated smart home", ar: "منزل ذكي مؤتمت بالكامل" },
@@ -82,7 +98,7 @@ function Home() {
             style={{ animationDelay: "400ms" }}
           >
             <Link
-              to="/$lang/booking"
+              to="/booking/$lang"
               params={{ lang }}
               className="group inline-flex w-full items-center justify-center gap-2 bg-white px-10 py-4 text-sm uppercase tracking-widest text-black transition-colors hover:bg-white/90 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white sm:w-auto"
             >
@@ -90,7 +106,7 @@ function Home() {
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1 rtl:rotate-180 rtl:group-hover:-translate-x-1" />
             </Link>
             <Link
-              to="/$lang/facilities"
+              to="/facilities/$lang"
               params={{ lang }}
               className="inline-flex w-full items-center justify-center gap-2 px-6 py-4 text-sm uppercase tracking-widest text-white/80 underline-offset-8 transition-colors hover:text-white hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white sm:w-auto"
             >
@@ -144,7 +160,7 @@ function Home() {
 
         <Reveal delay={120}>
           <Link
-            to="/$lang/facilities"
+            to="/facilities/$lang"
             params={{ lang }}
             className="group mt-16 inline-flex items-center gap-2 border-b border-foreground/30 pb-1 text-sm uppercase tracking-widest transition-colors hover:border-foreground"
           >
@@ -167,7 +183,7 @@ function Home() {
               </h2>
             </div>
             <Link
-              to="/$lang/photos"
+              to="/photos/$lang"
               params={{ lang }}
               className="group inline-flex items-center gap-2 border-b border-foreground/30 pb-1 text-sm uppercase tracking-widest transition-colors hover:border-foreground"
             >
@@ -180,7 +196,7 @@ function Home() {
           <div className="grid gap-4 md:grid-cols-3 md:grid-rows-2">
             <Reveal className="md:col-span-2 md:row-span-2">
               <Link
-                to="/$lang/photos"
+                to="/photos/$lang"
                 params={{ lang }}
                 className="group block h-full overflow-hidden bg-black"
               >
@@ -197,7 +213,7 @@ function Home() {
             {[room4, room5].map((src, i) => (
               <Reveal key={i} delay={(i + 1) * 90}>
                 <Link
-                  to="/$lang/photos"
+                  to="/photos/$lang"
                   params={{ lang }}
                   className="group block h-full overflow-hidden bg-black"
                 >
@@ -243,7 +259,7 @@ function Home() {
           ].map((p, i) => (
             <Reveal key={p.label} delay={i * 90}>
               <Link
-                to="/$lang/booking"
+                to="/booking/$lang"
                 params={{ lang }}
                 className="group flex h-full flex-col justify-between border border-border p-9 transition-colors hover:border-foreground"
               >
@@ -262,7 +278,7 @@ function Home() {
 
         <Reveal delay={140} className="mt-12 text-center">
           <Link
-            to="/$lang/booking"
+            to="/booking/$lang"
             params={{ lang }}
             className="group inline-flex items-center gap-2 bg-black px-10 py-4 text-sm uppercase tracking-widest text-white transition-opacity hover:opacity-90"
           >

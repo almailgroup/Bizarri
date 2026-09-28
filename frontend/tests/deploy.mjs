@@ -11,7 +11,10 @@
 import { readFileSync, existsSync } from "node:fs";
 import { chromium } from "playwright";
 
-const B = "http://localhost:4173/en/";
+// The language is the last segment, so a page URL is pageUrl(route).
+const LANG = "en";
+const B = "http://localhost:4173/";
+const pageUrl = (r) => (r ? `${B}${r}/${LANG}` : `${B}${LANG}`);
 const dist = new URL("../dist/", import.meta.url).pathname;
 let fails = 0;
 const ck = (n, c, d = "") => {
@@ -67,7 +70,7 @@ ck(
 );
 ck(
   "…and still hides the admin route, in both languages",
-  /^Disallow: \/en\/admin\s*$/m.test(robots) && /^Disallow: \/ar\/admin\s*$/m.test(robots),
+  /^Disallow: \/admin\/en\s*$/m.test(robots) && /^Disallow: \/admin\/ar\s*$/m.test(robots),
   robots.trim().replace(/\n/g, " | "),
 );
 const sitemap = readFileSync(dist + "sitemap.xml", "utf8");
@@ -93,7 +96,7 @@ ck(
     if (r.url().startsWith(B) && r.status() >= 400) broken.push(`${r.status()} ${r.url()}`);
   });
 
-  await p.goto(B, { waitUntil: "load" });
+  await p.goto(pageUrl(""), { waitUntil: "load" });
   await p.waitForTimeout(1500);
 
   ck("Nothing the page asks for 404s", broken.length === 0, broken.slice(0, 3).join(" | "));
@@ -112,7 +115,7 @@ ck(
   p.on("response", (r) => {
     if (r.url().startsWith(B) && r.status() >= 400) deep.push(r.url());
   });
-  await p.goto(B + "booking", { waitUntil: "load" });
+  await p.goto(pageUrl("booking"), { waitUntil: "load" });
   await p.waitForTimeout(1500);
   const deepMounted = await p.evaluate(() => document.getElementById("root")?.children.length ?? 0);
   ck("A deep link boots the app too", deepMounted > 0, `${deepMounted} children`);

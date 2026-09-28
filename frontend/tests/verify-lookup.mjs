@@ -7,7 +7,10 @@
  */
 import { chromium } from "playwright";
 
-const B = "http://localhost:4173/en/";
+// The language is the last segment, so a page URL is pageUrl(route).
+const LANG = "en";
+const B = "http://localhost:4173/";
+const pageUrl = (r) => (r ? `${B}${r}/${LANG}` : `${B}${LANG}`);
 const SUPA = /ycfvqzcnatwacwlcmiej\.supabase\.co/;
 const b = await chromium.launch(
   process.env.PLAYWRIGHT_CHROMIUM_PATH
@@ -150,7 +153,7 @@ async function page(state) {
 {
   const state = makeState();
   const { p, ctx } = await page(state);
-  await p.goto(B + "reservation", { waitUntil: "load" });
+  await p.goto(pageUrl("reservation"), { waitUntil: "load" });
   await p.waitForTimeout(900);
 
   const refTab = p.getByRole("tab", { name: /Reference & email/i });
@@ -200,7 +203,7 @@ async function page(state) {
 {
   const state = makeState({ bookingsForPhone: [SECOND, BOOKING] });
   const { p, ctx } = await page(state);
-  await p.goto(B + "reservation", { waitUntil: "load" });
+  await p.goto(pageUrl("reservation"), { waitUntil: "load" });
   await p.waitForTimeout(900);
   await p.getByRole("tab", { name: /Phone number/i }).click();
   await p.locator('input[type="tel"]').fill("96551110002");
@@ -216,7 +219,7 @@ async function page(state) {
 {
   const state = makeState({ bookingsForPhone: [] });
   const { p, ctx } = await page(state);
-  await p.goto(B + "reservation", { waitUntil: "load" });
+  await p.goto(pageUrl("reservation"), { waitUntil: "load" });
   await p.waitForTimeout(900);
   await p.getByRole("tab", { name: /Phone number/i }).click();
   await p.locator('input[type="tel"]').fill("96500000000");
@@ -232,7 +235,7 @@ async function page(state) {
 {
   const state = makeState({ phoneError: "Too many lookups. Please try again later." });
   const { p, ctx } = await page(state);
-  await p.goto(B + "reservation", { waitUntil: "load" });
+  await p.goto(pageUrl("reservation"), { waitUntil: "load" });
   await p.waitForTimeout(900);
   await p.getByRole("tab", { name: /Phone number/i }).click();
   await p.locator('input[type="tel"]').fill("96551110002");
@@ -265,7 +268,7 @@ const dayCell = (p, d) =>
   });
 
 async function toCheckout(p) {
-  await p.goto(B + "booking", { waitUntil: "load" });
+  await p.goto(pageUrl("booking"), { waitUntil: "load" });
   await p.waitForTimeout(1200);
   await p.getByRole("button", { name: /Next month/i }).click();
   await p.waitForTimeout(300);

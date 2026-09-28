@@ -29,14 +29,14 @@ function NotFoundComponent() {
             {tr("home")}
           </Link>
           <Link
-            to="/$lang/booking"
+            to="/booking/$lang"
             params={{ lang }}
             className="border border-border px-8 py-4 text-sm uppercase tracking-widest hover:bg-secondary"
           >
             {tr("bookNow")}
           </Link>
           <Link
-            to="/$lang/contact"
+            to="/contact/$lang"
             params={{ lang }}
             className="border border-border px-8 py-4 text-sm uppercase tracking-widest hover:bg-secondary"
           >

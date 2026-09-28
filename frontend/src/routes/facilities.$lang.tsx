@@ -1,3 +1,4 @@
+import { requireLang } from "@/lib/lang-route";
 import { createFileRoute } from "@tanstack/react-router";
 import { PageShell } from "@/components/PageShell";
 import { useI18n } from "@/lib/i18n";
@@ -19,7 +20,10 @@ import {
   Waves,
 } from "lucide-react";
 
-export const Route = createFileRoute("/$lang/facilities")({ component: Facilities });
+export const Route = createFileRoute("/facilities/$lang")({
+  component: Facilities,
+  beforeLoad: requireLang,
+});
 
 function Facilities() {
   const { tr, lang } = useI18n();

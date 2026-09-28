@@ -26,13 +26,19 @@ export function preferredLang(): Lang {
   return navigator.languages?.some((l) => l.toLowerCase().startsWith("ar")) ? "ar" : "en";
 }
 
-/** The language segment of a path, or null if it has none. */
+/**
+ * The language segment of a path, or null if it has none.
+ *
+ * It is the LAST segment: pages are /facilities/en and the homepage is /en,
+ * so the end of the path is the one place both of them have it.
+ */
 export function langFromPath(pathname: string, base = "/"): Lang | null {
   const rest = pathname.startsWith(base)
     ? pathname.slice(base.length)
     : pathname.replace(/^\//, "");
-  const first = rest.split("/")[0];
-  return first === "en" || first === "ar" ? first : null;
+  const parts = rest.split("/").filter(Boolean);
+  const last = parts[parts.length - 1];
+  return last === "en" || last === "ar" ? last : null;
 }
 
 type Dict = Record<string, { en: string; ar: string }>;

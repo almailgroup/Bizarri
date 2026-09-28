@@ -10,11 +10,14 @@
 import { chromium } from "playwright";
 import { PNG } from "pngjs";
 
-const B = "http://localhost:4173/en/";
+// The language is the last segment, so a page URL is pageUrl(route).
+const LANG = "en";
+const B = "http://localhost:4173/";
+const pageUrl = (r) => (r ? `${B}${r}/${LANG}` : `${B}${LANG}`);
 // Derived, not written out: the site moved from a /Bizarri/ project page to a
 // custom domain at the root, and a hardcoded home path would have to be found
 // and changed by hand every time that moves again.
-const HOME = new URL(B).pathname.replace(/\/$/, "");
+const HOME = new URL(pageUrl("")).pathname.replace(/\/$/, "");
 const SUPA = /ycfvqzcnatwacwlcmiej\.supabase\.co/;
 const b = await chromium.launch(
   process.env.PLAYWRIGHT_CHROMIUM_PATH
@@ -127,7 +130,7 @@ async function check(label, page, locator) {
   const ctx = await newCtx();
   const p = await ctx.newPage();
   // An inner page: plain white background, so the dark-ink variant must win.
-  await p.goto(B + "contact", { waitUntil: "load" });
+  await p.goto(pageUrl("contact"), { waitUntil: "load" });
   await p.waitForTimeout(900);
   const header = p.locator("header img").first();
   const c = await check("Header logo on a light page", p, header);
@@ -144,7 +147,7 @@ async function check(label, page, locator) {
 {
   const ctx = await newCtx();
   const p = await ctx.newPage();
-  await p.goto(B, { waitUntil: "load" });
+  await p.goto(pageUrl(""), { waitUntil: "load" });
   await p.waitForTimeout(1200);
 
   // The header sits transparently over the dark hero photo before scrolling.
@@ -171,7 +174,7 @@ async function check(label, page, locator) {
 {
   const ctx = await newCtx({ width: 390, height: 844 });
   const p = await ctx.newPage();
-  await p.goto(B + "contact", { waitUntil: "load" });
+  await p.goto(pageUrl("contact"), { waitUntil: "load" });
   await p.waitForTimeout(900);
   await p.getByRole("button", { name: /menu/i }).first().click();
   await p.waitForTimeout(500);
@@ -183,7 +186,7 @@ async function check(label, page, locator) {
 {
   const ctx = await newCtx();
   const p = await ctx.newPage();
-  await p.goto(B + "admin", { waitUntil: "load" });
+  await p.goto(pageUrl("admin"), { waitUntil: "load" });
   await p.waitForTimeout(900);
   await check("Logo on the admin sign-in", p, p.locator("form img").first());
 
@@ -199,7 +202,7 @@ async function check(label, page, locator) {
 {
   const ctx = await newCtx();
   const p = await ctx.newPage();
-  await p.goto(B, { waitUntil: "load" });
+  await p.goto(pageUrl(""), { waitUntil: "load" });
   await p.waitForTimeout(1500);
 
   const hero = p.locator("section img").first();
@@ -250,7 +253,7 @@ async function check(label, page, locator) {
   const p = await ctx.newPage();
 
   // From an inner page.
-  await p.goto(B + "contact", { waitUntil: "load" });
+  await p.goto(pageUrl("contact"), { waitUntil: "load" });
   await p.waitForTimeout(800);
   await p.locator("header img").first().click();
   await p.waitForTimeout(900);
@@ -292,7 +295,7 @@ async function check(label, page, locator) {
     `scrollY ${Math.round(await p.evaluate(() => window.scrollY))}`,
   );
 
-  await p.goto(B + "offers", { waitUntil: "load" });
+  await p.goto(pageUrl("offers"), { waitUntil: "load" });
   await p.waitForTimeout(800);
   await p.locator("footer a").first().click();
   await p.waitForTimeout(900);
@@ -308,7 +311,7 @@ async function check(label, page, locator) {
 {
   const ctx = await newCtx({ width: 390, height: 844 });
   const p = await ctx.newPage();
-  await p.goto(B + "contact", { waitUntil: "load" });
+  await p.goto(pageUrl("contact"), { waitUntil: "load" });
   await p.waitForTimeout(800);
   await p.getByRole("button", { name: /menu/i }).first().click();
   await p.waitForTimeout(500);

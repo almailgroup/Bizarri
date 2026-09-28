@@ -1,3 +1,4 @@
+import { requireLang } from "@/lib/lang-route";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { Lock, LogOut, X } from "lucide-react";
@@ -16,7 +17,7 @@ import { OccasionsPanel } from "@/components/admin/OccasionsPanel";
 import { ActivityPanel } from "@/components/admin/ActivityPanel";
 import { useChalets } from "@/lib/api";
 
-export const Route = createFileRoute("/$lang/admin")({ component: Admin });
+export const Route = createFileRoute("/admin/$lang")({ component: Admin, beforeLoad: requireLang });
 
 function Admin() {
   const { session, loading } = useAuth();

@@ -1,3 +1,4 @@
+import { requireLang } from "@/lib/lang-route";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight } from "lucide-react";
 import { PageShell } from "@/components/PageShell";
@@ -7,7 +8,10 @@ import { usePageMeta } from "@/hooks/use-page-meta";
 import { DEFAULT_RATES, fmtDate, formatMoney } from "@/lib/booking";
 import { useRates, useSpecialOccasions } from "@/lib/api";
 
-export const Route = createFileRoute("/$lang/offers")({ component: Offers });
+export const Route = createFileRoute("/offers/$lang")({
+  component: Offers,
+  beforeLoad: requireLang,
+});
 
 function Offers() {
   const { tr, lang } = useI18n();
@@ -149,7 +153,7 @@ function Offers() {
 
         <Reveal delay={160}>
           <Link
-            to="/$lang/booking"
+            to="/booking/$lang"
             params={{ lang }}
             className="group mt-12 inline-flex items-center gap-2 bg-black px-10 py-4 text-sm uppercase tracking-widest text-white transition-opacity hover:opacity-90"
           >

@@ -1,3 +1,4 @@
+import { requireLang } from "@/lib/lang-route";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronLeft, ChevronRight, Paperclip, ShieldCheck } from "lucide-react";
@@ -29,7 +30,10 @@ import {
 import type { BookingRow } from "@/integrations/supabase/types";
 import { readGuest, rememberGuest } from "@/lib/guest";
 
-export const Route = createFileRoute("/$lang/booking")({ component: Booking });
+export const Route = createFileRoute("/booking/$lang")({
+  component: Booking,
+  beforeLoad: requireLang,
+});
 
 /** Which package shape the calendar is filtered to. */
 type DateFilter = "all" | "weekday" | "weekend";
@@ -872,7 +876,7 @@ function Calendar({
 
         <p className="mt-4 text-sm text-muted-foreground">
           <Link
-            to="/$lang/reservation"
+            to="/reservation/$lang"
             params={{ lang }}
             className="-my-2 inline-block py-2 underline underline-offset-4 hover:text-foreground"
           >
@@ -1217,7 +1221,7 @@ function BookingForm({
           <span className="text-sm">
             {tr("acceptTerms")}{" "}
             <Link
-              to="/$lang/rules"
+              to="/rules/$lang"
               params={{ lang }}
               target="_blank"
               className="underline underline-offset-4 hover:opacity-70"
@@ -1322,7 +1326,7 @@ function Confirmation({ booking }: { booking: BookingRow }) {
 
       <p className="mt-8 text-sm">
         <Link
-          to="/$lang/reservation"
+          to="/reservation/$lang"
           params={{ lang }}
           className="underline underline-offset-4 text-muted-foreground hover:text-foreground"
         >

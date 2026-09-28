@@ -1,3 +1,4 @@
+import { requireLang } from "@/lib/lang-route";
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
@@ -10,7 +11,10 @@ import room3 from "@/assets/room-3.jpg";
 import room4 from "@/assets/room-4.jpg";
 import room5 from "@/assets/room-5.jpg";
 
-export const Route = createFileRoute("/$lang/photos")({ component: Photos });
+export const Route = createFileRoute("/photos/$lang")({
+  component: Photos,
+  beforeLoad: requireLang,
+});
 
 interface Category {
   en: string;

@@ -53,11 +53,11 @@ const visit = async (url) => {
   ck("/ar is Arabic, right to left", ar.lang === "ar" && ar.dir === "rtl", `${ar.lang}/${ar.dir}`);
   ck("…and it renders", ar.mounted);
 
-  const arPage = await visit("/ar/photos");
+  const arPage = await visit("/photos/ar");
   ck("An inner page keeps its language", arPage.lang === "ar", arPage.path);
   ck(
     "…and says so in its canonical URL",
-    arPage.canonical.endsWith("/ar/photos"),
+    arPage.canonical.endsWith("/photos/ar"),
     arPage.canonical,
   );
 }
@@ -69,7 +69,7 @@ const visit = async (url) => {
   await p.goto(B + "/en", { waitUntil: "load" });
   await p.waitForTimeout(800);
   await p.evaluate(() => localStorage.setItem("bizarri_lang", "en"));
-  const ar = await visit("/ar/contact");
+  const ar = await visit("/contact/ar");
   ck("A shared /ar link opens in Arabic despite an English preference", ar.lang === "ar", ar.lang);
 }
 
@@ -87,14 +87,29 @@ const visit = async (url) => {
 // ================================================ links published before this
 {
   const old = await visit("/booking");
-  ck("An old unprefixed link still lands on the page", old.path.endsWith("/booking"), old.path);
-  ck("…under a language", /^\/(en|ar)\//.test(old.path), old.path);
+  ck("An old unprefixed link still lands on the page", old.path.startsWith("/booking"), old.path);
+  ck("…under a language", /\/(en|ar)$/.test(old.path), old.path);
   ck("…and renders rather than 404ing", old.mounted);
+}
+
+// The prefix shape shipped for one deploy and went into a sitemap, so those
+// URLs are turned around rather than dropped.
+{
+  const flipped = await visit("/en/facilities");
+  ck(
+    "A URL from the brief prefix era is turned around",
+    flipped.path === "/facilities/en",
+    flipped.path,
+  );
+  ck("…and renders", flipped.mounted);
+
+  const flippedAr = await visit("/ar/photos");
+  ck("…in either language", flippedAr.path === "/photos/ar", flippedAr.path);
 }
 
 // ===================================================== switching, in place
 {
-  await p.goto(B + "/en/photos", { waitUntil: "load" });
+  await p.goto(B + "/photos/en", { waitUntil: "load" });
   await p.waitForTimeout(1200);
   await p
     .getByRole("button", { name: /العربية/ })
@@ -102,7 +117,7 @@ const visit = async (url) => {
     .click();
   await p.waitForTimeout(900);
   const ar = await state();
-  ck("Switching language stays on the same page", ar.path === "/ar/photos", ar.path);
+  ck("Switching language stays on the same page", ar.path === "/photos/ar", ar.path);
   ck("…and actually switches it", ar.lang === "ar" && ar.dir === "rtl", `${ar.lang}/${ar.dir}`);
 
   await p
@@ -111,7 +126,7 @@ const visit = async (url) => {
     .click();
   await p.waitForTimeout(900);
   const en = await state();
-  ck("…and back again", en.path === "/en/photos" && en.lang === "en", en.path);
+  ck("…and back again", en.path === "/photos/en" && en.lang === "en", en.path);
 
   // Navigating on from there must not drop the language.
   await p
@@ -120,7 +135,7 @@ const visit = async (url) => {
     .click();
   await p.waitForTimeout(900);
   const next = await state();
-  ck("Following a link keeps the language in the URL", next.path === "/en/booking", next.path);
+  ck("Following a link keeps the language in the URL", next.path === "/booking/en", next.path);
 }
 
 {
@@ -129,7 +144,7 @@ const visit = async (url) => {
   await p.getByRole("link", { name: /الحجز/ }).first().click();
   await p.waitForTimeout(900);
   const next = await state();
-  ck("…in Arabic too", next.path === "/ar/booking" && next.lang === "ar", next.path);
+  ck("…in Arabic too", next.path === "/booking/ar" && next.lang === "ar", next.path);
 }
 
 // ============================== no internal link may drop the language
@@ -141,17 +156,17 @@ const visit = async (url) => {
   const stray = [];
   for (const lang of ["en", "ar"]) {
     for (const page of ["", "/photos", "/booking", "/offers", "/contact", "/reservation"]) {
-      await p.goto(`${B}/${lang}${page}`, { waitUntil: "load" });
+      await p.goto(`${B}/${page ? `${page}/` : ""}${lang}`, { waitUntil: "load" });
       await p.waitForTimeout(900);
       const bad = await p.evaluate(
         (l) =>
           [...document.querySelectorAll("a[href]")]
             .map((a) => a.getAttribute("href"))
             .filter((h) => h.startsWith("/") && !h.startsWith("//"))
-            .filter((h) => h !== `/${l}` && !h.startsWith(`/${l}/`)),
+            .filter((h) => h !== `/${l}` && !h.endsWith(`/${l}`)),
         lang,
       );
-      for (const h of new Set(bad)) stray.push(`/${lang}${page} -> ${h}`);
+      for (const h of new Set(bad)) stray.push(`/${page || ""}/${lang} -> ${h}`);
     }
   }
   ck(
@@ -163,9 +178,19 @@ const visit = async (url) => {
 
 // ================================================== a path that is not a page
 {
-  const missing = await visit("/en/not-a-page");
-  ck("An unknown page is a 404", await p.getByText("404").first().isVisible(), missing.path);
+  // exact, and checked against a real page too: the contact number is
+  // 94040955, which contains "404", so a loose match calls every page a 404.
+  const is404 = () => p.getByText("404", { exact: true }).first().isVisible();
+
+  const missing = await visit("/not-a-page/en");
+  ck("An unknown page is a 404", await is404(), missing.path);
   ck("…written in the language it was asked for", missing.lang === "en", missing.lang);
+
+  await visit("/facilities/en");
+  ck("…and a page that exists is not", !(await is404()));
+
+  const badLang = await visit("/facilities/fr");
+  ck("A language we do not speak is a 404, not a fallback", await is404(), badLang.path);
 }
 
 await b.close();
@@ -176,7 +201,7 @@ await b.close();
   const missing = [];
   for (const lang of ["en", "ar"]) {
     for (const slug of pages) {
-      const f = `${dist}${lang}${slug ? `/${slug}` : ""}/index.html`;
+      const f = `${dist}${slug ? `${slug}/` : ""}${lang}/index.html`;
       if (!existsSync(f)) missing.push(f.replace(dist, ""));
     }
   }
@@ -188,13 +213,13 @@ await b.close();
     missing.join(", "),
   );
 
-  const ar = readFileSync(`${dist}ar/booking/index.html`, "utf8");
+  const ar = readFileSync(`${dist}booking/ar/index.html`, "utf8");
   ck(
     "…and that file declares its own language before any JavaScript runs",
     /<html lang="ar" dir="rtl">/.test(ar),
     (ar.match(/<html[^>]*>/) ?? [])[0],
   );
-  ck("…and its own canonical URL", ar.includes('href="https://bizarri.com/ar/booking"'));
+  ck("…and its own canonical URL", ar.includes('href="https://bizarri.com/booking/ar"'));
 
   const shell = readFileSync(`${dist}index.html`, "utf8");
   for (const tag of ['hreflang="en"', 'hreflang="ar"', 'hreflang="x-default"']) {
@@ -205,13 +230,13 @@ await b.close();
   const locs = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
   ck(
     "The sitemap lists both languages",
-    locs.some((l) => l.includes("/en")) && locs.some((l) => l.includes("/ar")),
+    locs.some((l) => l.endsWith("/en")) && locs.some((l) => l.endsWith("/ar")),
     `${locs.length} urls`,
   );
   ck(
     "…and every URL carries a language",
-    locs.every((l) => /bizarri\.com\/(en|ar)(\/|$)/.test(l)),
-    locs.filter((l) => !/bizarri\.com\/(en|ar)(\/|$)/.test(l)).join(", "),
+    locs.every((l) => /bizarri\.com\/(.*\/)?(en|ar)$/.test(l)),
+    locs.filter((l) => !/bizarri\.com\/(.*\/)?(en|ar)$/.test(l)).join(", "),
   );
 }
 

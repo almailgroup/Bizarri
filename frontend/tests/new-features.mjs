@@ -10,7 +10,10 @@
 import { chromium } from "playwright";
 import { readFile, readdir } from "node:fs/promises";
 
-const B = "http://localhost:4173/en/";
+// The language is the last segment, so a page URL is pageUrl(route).
+const LANG = "en";
+const B = "http://localhost:4173/";
+const pageUrl = (r) => (r ? `${B}${r}/${LANG}` : `${B}${LANG}`);
 const SUPA = /ycfvqzcnatwacwlcmiej\.supabase\.co/;
 const b = await chromium.launch(
   process.env.PLAYWRIGHT_CHROMIUM_PATH
@@ -319,7 +322,7 @@ async function guestPage(state, route = "booking") {
   await mock(ctx, state);
   await ctx.addInitScript(() => sessionStorage.setItem("bizarri_intro_seen", "1"));
   const p = await ctx.newPage();
-  await p.goto(B + route, { waitUntil: "domcontentloaded" });
+  await p.goto(pageUrl(route), { waitUntil: "domcontentloaded" });
   await p.waitForTimeout(500);
   return { p, ctx };
 }
@@ -582,7 +585,7 @@ const bg = (loc) => loc.evaluate((el) => getComputedStyle(el).backgroundColor);
     localStorage.setItem("bizarri:lastRef", "BZR-AAA111");
   });
   const p = await ctx.newPage();
-  await p.goto(B + "reservation", { waitUntil: "domcontentloaded" });
+  await p.goto(pageUrl("reservation"), { waitUntil: "domcontentloaded" });
   await p.waitForTimeout(500);
   ck(
     "A returning guest's reference is prefilled",
@@ -602,7 +605,7 @@ async function adminPage(state, tab) {
   await mock(ctx, state);
   await ctx.addInitScript(() => sessionStorage.setItem("bizarri_intro_seen", "1"));
   const p = await ctx.newPage();
-  await p.goto(B + "admin", { waitUntil: "domcontentloaded" });
+  await p.goto(pageUrl("admin"), { waitUntil: "domcontentloaded" });
   await p.locator("input[type=email]").fill("admin@example.com");
   await p.locator("input[type=password]").fill("pw");
   await p.getByRole("button", { name: /^Login$/i }).click();
@@ -821,7 +824,7 @@ async function adminPage(state, tab) {
   await mock(adminCtx, state);
   await adminCtx.addInitScript(() => sessionStorage.setItem("bizarri_intro_seen", "1"));
   const ap = await adminCtx.newPage();
-  await ap.goto(B + "admin", { waitUntil: "domcontentloaded" });
+  await ap.goto(pageUrl("admin"), { waitUntil: "domcontentloaded" });
   await ap.locator("input[type=email]").fill("admin@example.com");
   await ap.locator("input[type=password]").fill("pw");
   await ap.getByRole("button", { name: /^Login$/i }).click();
@@ -954,7 +957,7 @@ async function adminPage(state, tab) {
   await mock(ctx, state);
   await ctx.addInitScript(() => sessionStorage.setItem("bizarri_intro_seen", "1"));
   const p = await ctx.newPage();
-  await p.goto(B + "booking", { waitUntil: "domcontentloaded" });
+  await p.goto(pageUrl("booking"), { waitUntil: "domcontentloaded" });
   await p.waitForTimeout(500);
   await toCalendarNextMonth(p);
 
@@ -1125,7 +1128,7 @@ async function adminPage(state, tab) {
   await ctx.addInitScript(() => sessionStorage.setItem("bizarri_intro_seen", "1"));
   const p = await ctx.newPage();
 
-  await p.goto(B + "news", { waitUntil: "load" });
+  await p.goto(pageUrl("news"), { waitUntil: "load" });
   await p.waitForTimeout(1500);
   const newsText = await p.locator("body").innerText();
   ck(
@@ -1141,7 +1144,7 @@ async function adminPage(state, tab) {
 
   // Offers falls back to the built-in rates, which keeps the page useful —
   // but a guest must not quote a stale price believing it is live.
-  await p.goto(B + "offers", { waitUntil: "load" });
+  await p.goto(pageUrl("offers"), { waitUntil: "load" });
   await p.waitForTimeout(1500);
   const offersText = await p.locator("body").innerText();
   ck("Offers still shows prices during an outage", /600/.test(offersText));
@@ -1265,7 +1268,7 @@ async function adminPage(state, tab) {
   ck("The booking went through", await p.getByText("BZR-NEW999").isVisible());
 
   // Same device, a second booking.
-  await p.goto(B + "booking", { waitUntil: "domcontentloaded" });
+  await p.goto(pageUrl("booking"), { waitUntil: "domcontentloaded" });
   await p.waitForTimeout(800);
   await toCalendarNextMonth(p);
   await p.getByRole("button", { name: /^Weekend ·/i }).click();

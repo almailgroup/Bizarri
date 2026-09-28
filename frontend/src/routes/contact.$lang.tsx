@@ -1,3 +1,4 @@
+import { requireLang } from "@/lib/lang-route";
 import { createFileRoute } from "@tanstack/react-router";
 import { PageShell } from "@/components/PageShell";
 import { useI18n } from "@/lib/i18n";
@@ -5,7 +6,10 @@ import { usePageMeta } from "@/hooks/use-page-meta";
 import { useContactInfo } from "@/lib/api";
 import { Phone, Mail, MapPin, Instagram, MessageCircle, ArrowUpRight } from "lucide-react";
 
-export const Route = createFileRoute("/$lang/contact")({ component: Contact });
+export const Route = createFileRoute("/contact/$lang")({
+  component: Contact,
+  beforeLoad: requireLang,
+});
 
 function Contact() {
   const { tr, lang } = useI18n();

@@ -7,7 +7,10 @@
  */
 import { chromium } from "playwright";
 
-const B = "http://localhost:4173/en/";
+// The language is the last segment, so a page URL is pageUrl(route).
+const LANG = "en";
+const B = "http://localhost:4173/";
+const pageUrl = (r) => (r ? `${B}${r}/${LANG}` : `${B}${LANG}`);
 const SUPA = /ycfvqzcnatwacwlcmiej\.supabase\.co/;
 const b = await chromium.launch(
   process.env.PLAYWRIGHT_CHROMIUM_PATH
@@ -134,7 +137,7 @@ for (const [name, vp] of [
   const smallText = [];
 
   for (const route of ROUTES) {
-    await p.goto(B + route, { waitUntil: "load" });
+    await p.goto(pageUrl(route), { waitUntil: "load" });
     await p.waitForTimeout(1000);
     const r = await p.evaluate(() => {
       const winW = window.innerWidth;
@@ -185,7 +188,7 @@ for (const [name, vp] of [
 {
   const ctx = await phone({ width: 390, height: 844 });
   const p = await ctx.newPage();
-  await p.goto(B + "contact", { waitUntil: "load" });
+  await p.goto(pageUrl("contact"), { waitUntil: "load" });
   await p.waitForTimeout(900);
   // Tailwind emits .hover:x:hover unguarded by default, and a touch device
   // has no pointer to move away — so the style sticks after the tap.
@@ -238,7 +241,7 @@ for (const [name, vp] of [
 {
   const ctx = await phone({ width: 390, height: 844 });
   const p = await ctx.newPage();
-  await p.goto(B + "booking", { waitUntil: "load" });
+  await p.goto(pageUrl("booking"), { waitUntil: "load" });
   await p.waitForTimeout(1400);
   const top = await p.evaluate(() => {
     const quick = [...document.querySelectorAll("button")].find((x) =>
