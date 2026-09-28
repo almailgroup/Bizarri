@@ -289,6 +289,49 @@ for (const [name, vp] of [
   await ctx.close();
 }
 
+// ============================ what a phone actually has to download
+{
+  // A budget, not a measurement. Page weight creeps back one asset at a
+  // time, and nothing else here would notice: the layout of a 2 MB page is
+  // identical to the layout of a 400 KB one.
+  //
+  // Sizes are over the wire, so text is counted gzipped the way the host
+  // serves it. A decoded byte count reads roughly three times too high for
+  // JavaScript and would send you optimising the wrong thing.
+  const BUDGET = { en: 450, "booking/en": 330, "photos/en": 600 };
+  const ctx = await phone({ width: 390, height: 844 });
+
+  for (const [route, kb] of Object.entries(BUDGET)) {
+    const p = await ctx.newPage();
+    const pending = [];
+    p.on("response", (r) => {
+      if (!r.url().startsWith(B)) return;
+      pending.push(
+        r
+          .request()
+          .sizes()
+          .then((z) => ({ wire: z.responseBodySize, type: r.request().resourceType() }))
+          .catch(() => null),
+      );
+    });
+    await p.goto(B + route, { waitUntil: "load" });
+    await p.waitForTimeout(2200);
+    const rows = (await Promise.all(pending)).filter(Boolean);
+    const total = rows.reduce((a, x) => a + x.wire, 0) / 1024;
+    ck(
+      `/${route} stays inside its weight budget`,
+      total <= kb,
+      `${total.toFixed(0)} KB of ${kb} KB`,
+    );
+
+    // One oversized image undoes the whole budget on its own.
+    const worst = Math.max(0, ...rows.filter((x) => x.type === "image").map((x) => x.wire)) / 1024;
+    ck(`…with no single image over 260 KB on /${route}`, worst <= 260, `${worst.toFixed(0)} KB`);
+    await p.close();
+  }
+  await ctx.close();
+}
+
 // ================== the fastest way to book is reachable without scrolling
 {
   const ctx = await phone({ width: 390, height: 844 });

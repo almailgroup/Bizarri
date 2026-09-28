@@ -4,11 +4,11 @@ import { Reveal } from "@/components/Reveal";
 import { LANGS, preferredLang, useI18n, type Lang } from "@/lib/i18n";
 import { usePageMeta } from "@/hooks/use-page-meta";
 import logoWhite from "@/assets/bizarri-logo-white.png";
-import heroImg from "@/assets/banner.jpg";
-import heroImgPortrait from "@/assets/banner-portrait.jpg";
-import room1 from "@/assets/room-1.jpg";
-import room4 from "@/assets/room-4.jpg";
-import room5 from "@/assets/room-5.jpg";
+import heroImg from "@/assets/banner.webp";
+import heroImgPortrait from "@/assets/banner-portrait.webp";
+import room1 from "@/assets/room-1.webp";
+import room4 from "@/assets/room-4.webp";
+import room5 from "@/assets/room-5.webp";
 import { ArrowRight, Cpu, Tv, Waves, ChefHat, Bed, Wifi, MapPin, Phone } from "lucide-react";
 
 /**
