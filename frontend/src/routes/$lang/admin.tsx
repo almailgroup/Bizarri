@@ -16,7 +16,7 @@ import { OccasionsPanel } from "@/components/admin/OccasionsPanel";
 import { ActivityPanel } from "@/components/admin/ActivityPanel";
 import { useChalets } from "@/lib/api";
 
-export const Route = createFileRoute("/admin")({ component: Admin });
+export const Route = createFileRoute("/$lang/admin")({ component: Admin });
 
 function Admin() {
   const { session, loading } = useAuth();
@@ -61,7 +61,8 @@ function SignIn() {
   return (
     <div className="relative flex min-h-screen items-center justify-center bg-black px-6 text-white">
       <Link
-        to="/"
+        to="/$lang"
+        params={{ lang }}
         aria-label={tr("close")}
         className="absolute end-5 top-5 border border-white/20 p-2.5 text-white/70 transition-colors hover:border-white/60 hover:text-white"
       >

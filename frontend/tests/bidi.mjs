@@ -9,7 +9,7 @@
  */
 import { chromium } from "playwright";
 
-const B = "http://localhost:4173/";
+const B = "http://localhost:4173/ar/";
 const b = await chromium.launch(
   process.env.PLAYWRIGHT_CHROMIUM_PATH
     ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_PATH }
@@ -23,10 +23,8 @@ const ck = (n, c, d = "") => {
 
 const ctx = await b.newContext({ viewport: { width: 1200, height: 900 } });
 await ctx.route(/^https?:\/\/(?!localhost)/, (r) => r.abort());
-await ctx.addInitScript(() => {
-  localStorage.setItem("bizarri_lang", "ar");
-  sessionStorage.setItem("bizarri_intro_seen", "1");
-});
+// The language is the URL now, not a stored preference: B points at /ar/.
+await ctx.addInitScript(() => sessionStorage.setItem("bizarri_intro_seen", "1"));
 const p = await ctx.newPage();
 
 /** Where each character of a node's text actually sits, left to right. */

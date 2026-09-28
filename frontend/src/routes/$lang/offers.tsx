@@ -7,7 +7,7 @@ import { usePageMeta } from "@/hooks/use-page-meta";
 import { DEFAULT_RATES, fmtDate, formatMoney } from "@/lib/booking";
 import { useRates, useSpecialOccasions } from "@/lib/api";
 
-export const Route = createFileRoute("/offers")({ component: Offers });
+export const Route = createFileRoute("/$lang/offers")({ component: Offers });
 
 function Offers() {
   const { tr, lang } = useI18n();
@@ -149,7 +149,8 @@ function Offers() {
 
         <Reveal delay={160}>
           <Link
-            to="/booking"
+            to="/$lang/booking"
+            params={{ lang }}
             className="group mt-12 inline-flex items-center gap-2 bg-black px-10 py-4 text-sm uppercase tracking-widest text-white transition-opacity hover:opacity-90"
           >
             {tr("startBooking")}

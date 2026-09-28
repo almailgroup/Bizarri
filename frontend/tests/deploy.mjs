@@ -11,7 +11,7 @@
 import { readFileSync, existsSync } from "node:fs";
 import { chromium } from "playwright";
 
-const B = "http://localhost:4173/";
+const B = "http://localhost:4173/en/";
 const dist = new URL("../dist/", import.meta.url).pathname;
 let fails = 0;
 const ck = (n, c, d = "") => {
@@ -65,7 +65,11 @@ ck(
   "robots.txt points at a sitemap on this domain",
   robots.includes(`https://${domain}/sitemap.xml`),
 );
-ck("…and still hides the admin route", /^Disallow: \/admin\s*$/m.test(robots), robots.trim());
+ck(
+  "…and still hides the admin route, in both languages",
+  /^Disallow: \/en\/admin\s*$/m.test(robots) && /^Disallow: \/ar\/admin\s*$/m.test(robots),
+  robots.trim().replace(/\n/g, " | "),
+);
 const sitemap = readFileSync(dist + "sitemap.xml", "utf8");
 const locs = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
 ck(

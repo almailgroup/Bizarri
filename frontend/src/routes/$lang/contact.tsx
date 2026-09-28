@@ -5,7 +5,7 @@ import { usePageMeta } from "@/hooks/use-page-meta";
 import { useContactInfo } from "@/lib/api";
 import { Phone, Mail, MapPin, Instagram, MessageCircle, ArrowUpRight } from "lucide-react";
 
-export const Route = createFileRoute("/contact")({ component: Contact });
+export const Route = createFileRoute("/$lang/contact")({ component: Contact });
 
 function Contact() {
   const { tr, lang } = useI18n();

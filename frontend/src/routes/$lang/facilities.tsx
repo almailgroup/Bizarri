@@ -19,7 +19,7 @@ import {
   Waves,
 } from "lucide-react";
 
-export const Route = createFileRoute("/facilities")({ component: Facilities });
+export const Route = createFileRoute("/$lang/facilities")({ component: Facilities });
 
 function Facilities() {
   const { tr, lang } = useI18n();

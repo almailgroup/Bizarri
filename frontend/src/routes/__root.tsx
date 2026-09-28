@@ -22,19 +22,22 @@ function NotFoundComponent() {
         </p>
         <div className="mt-10 flex flex-wrap justify-center gap-3">
           <Link
-            to="/"
+            to="/$lang"
+            params={{ lang }}
             className="bg-black px-8 py-4 text-sm uppercase tracking-widest text-white hover:opacity-90"
           >
             {tr("home")}
           </Link>
           <Link
-            to="/booking"
+            to="/$lang/booking"
+            params={{ lang }}
             className="border border-border px-8 py-4 text-sm uppercase tracking-widest hover:bg-secondary"
           >
             {tr("bookNow")}
           </Link>
           <Link
-            to="/contact"
+            to="/$lang/contact"
+            params={{ lang }}
             className="border border-border px-8 py-4 text-sm uppercase tracking-widest hover:bg-secondary"
           >
             {tr("contact")}

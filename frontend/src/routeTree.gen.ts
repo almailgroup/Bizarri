@@ -9,72 +9,25 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as RulesRouteImport } from './routes/rules'
-import { Route as ReservationRouteImport } from './routes/reservation'
-import { Route as PrivacyRouteImport } from './routes/privacy'
-import { Route as PhotosRouteImport } from './routes/photos'
-import { Route as OffersRouteImport } from './routes/offers'
-import { Route as NewsRouteImport } from './routes/news'
-import { Route as FacilitiesRouteImport } from './routes/facilities'
-import { Route as ContactRouteImport } from './routes/contact'
-import { Route as BookingRouteImport } from './routes/booking'
-import { Route as AdminRouteImport } from './routes/admin'
-import { Route as AboutRouteImport } from './routes/about'
+import { Route as LangRouteRouteImport } from './routes/$lang/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as LangIndexRouteImport } from './routes/$lang/index'
+import { Route as LangRulesRouteImport } from './routes/$lang/rules'
+import { Route as LangReservationRouteImport } from './routes/$lang/reservation'
+import { Route as LangPrivacyRouteImport } from './routes/$lang/privacy'
+import { Route as LangPhotosRouteImport } from './routes/$lang/photos'
+import { Route as LangOffersRouteImport } from './routes/$lang/offers'
+import { Route as LangNewsRouteImport } from './routes/$lang/news'
+import { Route as LangFacilitiesRouteImport } from './routes/$lang/facilities'
+import { Route as LangContactRouteImport } from './routes/$lang/contact'
+import { Route as LangBookingRouteImport } from './routes/$lang/booking'
+import { Route as LangAdminRouteImport } from './routes/$lang/admin'
+import { Route as LangAboutRouteImport } from './routes/$lang/about'
+import { Route as LangSplatRouteImport } from './routes/$lang/$'
 
-const RulesRoute = RulesRouteImport.update({
-  id: '/rules',
-  path: '/rules',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ReservationRoute = ReservationRouteImport.update({
-  id: '/reservation',
-  path: '/reservation',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PrivacyRoute = PrivacyRouteImport.update({
-  id: '/privacy',
-  path: '/privacy',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PhotosRoute = PhotosRouteImport.update({
-  id: '/photos',
-  path: '/photos',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const OffersRoute = OffersRouteImport.update({
-  id: '/offers',
-  path: '/offers',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const NewsRoute = NewsRouteImport.update({
-  id: '/news',
-  path: '/news',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const FacilitiesRoute = FacilitiesRouteImport.update({
-  id: '/facilities',
-  path: '/facilities',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ContactRoute = ContactRouteImport.update({
-  id: '/contact',
-  path: '/contact',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const BookingRoute = BookingRouteImport.update({
-  id: '/booking',
-  path: '/booking',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AdminRoute = AdminRouteImport.update({
-  id: '/admin',
-  path: '/admin',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AboutRoute = AboutRouteImport.update({
-  id: '/about',
-  path: '/about',
+const LangRouteRoute = LangRouteRouteImport.update({
+  id: '/$lang',
+  path: '/$lang',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -82,187 +35,188 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LangIndexRoute = LangIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => LangRouteRoute,
+} as any)
+const LangRulesRoute = LangRulesRouteImport.update({
+  id: '/rules',
+  path: '/rules',
+  getParentRoute: () => LangRouteRoute,
+} as any)
+const LangReservationRoute = LangReservationRouteImport.update({
+  id: '/reservation',
+  path: '/reservation',
+  getParentRoute: () => LangRouteRoute,
+} as any)
+const LangPrivacyRoute = LangPrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => LangRouteRoute,
+} as any)
+const LangPhotosRoute = LangPhotosRouteImport.update({
+  id: '/photos',
+  path: '/photos',
+  getParentRoute: () => LangRouteRoute,
+} as any)
+const LangOffersRoute = LangOffersRouteImport.update({
+  id: '/offers',
+  path: '/offers',
+  getParentRoute: () => LangRouteRoute,
+} as any)
+const LangNewsRoute = LangNewsRouteImport.update({
+  id: '/news',
+  path: '/news',
+  getParentRoute: () => LangRouteRoute,
+} as any)
+const LangFacilitiesRoute = LangFacilitiesRouteImport.update({
+  id: '/facilities',
+  path: '/facilities',
+  getParentRoute: () => LangRouteRoute,
+} as any)
+const LangContactRoute = LangContactRouteImport.update({
+  id: '/contact',
+  path: '/contact',
+  getParentRoute: () => LangRouteRoute,
+} as any)
+const LangBookingRoute = LangBookingRouteImport.update({
+  id: '/booking',
+  path: '/booking',
+  getParentRoute: () => LangRouteRoute,
+} as any)
+const LangAdminRoute = LangAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => LangRouteRoute,
+} as any)
+const LangAboutRoute = LangAboutRouteImport.update({
+  id: '/about',
+  path: '/about',
+  getParentRoute: () => LangRouteRoute,
+} as any)
+const LangSplatRoute = LangSplatRouteImport.update({
+  id: '/$',
+  path: '/$',
+  getParentRoute: () => LangRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/about': typeof AboutRoute
-  '/admin': typeof AdminRoute
-  '/booking': typeof BookingRoute
-  '/contact': typeof ContactRoute
-  '/facilities': typeof FacilitiesRoute
-  '/news': typeof NewsRoute
-  '/offers': typeof OffersRoute
-  '/photos': typeof PhotosRoute
-  '/privacy': typeof PrivacyRoute
-  '/reservation': typeof ReservationRoute
-  '/rules': typeof RulesRoute
+  '/$lang': typeof LangRouteRouteWithChildren
+  '/$lang/$': typeof LangSplatRoute
+  '/$lang/about': typeof LangAboutRoute
+  '/$lang/admin': typeof LangAdminRoute
+  '/$lang/booking': typeof LangBookingRoute
+  '/$lang/contact': typeof LangContactRoute
+  '/$lang/facilities': typeof LangFacilitiesRoute
+  '/$lang/news': typeof LangNewsRoute
+  '/$lang/offers': typeof LangOffersRoute
+  '/$lang/photos': typeof LangPhotosRoute
+  '/$lang/privacy': typeof LangPrivacyRoute
+  '/$lang/reservation': typeof LangReservationRoute
+  '/$lang/rules': typeof LangRulesRoute
+  '/$lang/': typeof LangIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/about': typeof AboutRoute
-  '/admin': typeof AdminRoute
-  '/booking': typeof BookingRoute
-  '/contact': typeof ContactRoute
-  '/facilities': typeof FacilitiesRoute
-  '/news': typeof NewsRoute
-  '/offers': typeof OffersRoute
-  '/photos': typeof PhotosRoute
-  '/privacy': typeof PrivacyRoute
-  '/reservation': typeof ReservationRoute
-  '/rules': typeof RulesRoute
+  '/$lang/$': typeof LangSplatRoute
+  '/$lang/about': typeof LangAboutRoute
+  '/$lang/admin': typeof LangAdminRoute
+  '/$lang/booking': typeof LangBookingRoute
+  '/$lang/contact': typeof LangContactRoute
+  '/$lang/facilities': typeof LangFacilitiesRoute
+  '/$lang/news': typeof LangNewsRoute
+  '/$lang/offers': typeof LangOffersRoute
+  '/$lang/photos': typeof LangPhotosRoute
+  '/$lang/privacy': typeof LangPrivacyRoute
+  '/$lang/reservation': typeof LangReservationRoute
+  '/$lang/rules': typeof LangRulesRoute
+  '/$lang': typeof LangIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/about': typeof AboutRoute
-  '/admin': typeof AdminRoute
-  '/booking': typeof BookingRoute
-  '/contact': typeof ContactRoute
-  '/facilities': typeof FacilitiesRoute
-  '/news': typeof NewsRoute
-  '/offers': typeof OffersRoute
-  '/photos': typeof PhotosRoute
-  '/privacy': typeof PrivacyRoute
-  '/reservation': typeof ReservationRoute
-  '/rules': typeof RulesRoute
+  '/$lang': typeof LangRouteRouteWithChildren
+  '/$lang/$': typeof LangSplatRoute
+  '/$lang/about': typeof LangAboutRoute
+  '/$lang/admin': typeof LangAdminRoute
+  '/$lang/booking': typeof LangBookingRoute
+  '/$lang/contact': typeof LangContactRoute
+  '/$lang/facilities': typeof LangFacilitiesRoute
+  '/$lang/news': typeof LangNewsRoute
+  '/$lang/offers': typeof LangOffersRoute
+  '/$lang/photos': typeof LangPhotosRoute
+  '/$lang/privacy': typeof LangPrivacyRoute
+  '/$lang/reservation': typeof LangReservationRoute
+  '/$lang/rules': typeof LangRulesRoute
+  '/$lang/': typeof LangIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/about'
-    | '/admin'
-    | '/booking'
-    | '/contact'
-    | '/facilities'
-    | '/news'
-    | '/offers'
-    | '/photos'
-    | '/privacy'
-    | '/reservation'
-    | '/rules'
+    | '/$lang'
+    | '/$lang/$'
+    | '/$lang/about'
+    | '/$lang/admin'
+    | '/$lang/booking'
+    | '/$lang/contact'
+    | '/$lang/facilities'
+    | '/$lang/news'
+    | '/$lang/offers'
+    | '/$lang/photos'
+    | '/$lang/privacy'
+    | '/$lang/reservation'
+    | '/$lang/rules'
+    | '/$lang/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/about'
-    | '/admin'
-    | '/booking'
-    | '/contact'
-    | '/facilities'
-    | '/news'
-    | '/offers'
-    | '/photos'
-    | '/privacy'
-    | '/reservation'
-    | '/rules'
+    | '/$lang/$'
+    | '/$lang/about'
+    | '/$lang/admin'
+    | '/$lang/booking'
+    | '/$lang/contact'
+    | '/$lang/facilities'
+    | '/$lang/news'
+    | '/$lang/offers'
+    | '/$lang/photos'
+    | '/$lang/privacy'
+    | '/$lang/reservation'
+    | '/$lang/rules'
+    | '/$lang'
   id:
     | '__root__'
     | '/'
-    | '/about'
-    | '/admin'
-    | '/booking'
-    | '/contact'
-    | '/facilities'
-    | '/news'
-    | '/offers'
-    | '/photos'
-    | '/privacy'
-    | '/reservation'
-    | '/rules'
+    | '/$lang'
+    | '/$lang/$'
+    | '/$lang/about'
+    | '/$lang/admin'
+    | '/$lang/booking'
+    | '/$lang/contact'
+    | '/$lang/facilities'
+    | '/$lang/news'
+    | '/$lang/offers'
+    | '/$lang/photos'
+    | '/$lang/privacy'
+    | '/$lang/reservation'
+    | '/$lang/rules'
+    | '/$lang/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  AboutRoute: typeof AboutRoute
-  AdminRoute: typeof AdminRoute
-  BookingRoute: typeof BookingRoute
-  ContactRoute: typeof ContactRoute
-  FacilitiesRoute: typeof FacilitiesRoute
-  NewsRoute: typeof NewsRoute
-  OffersRoute: typeof OffersRoute
-  PhotosRoute: typeof PhotosRoute
-  PrivacyRoute: typeof PrivacyRoute
-  ReservationRoute: typeof ReservationRoute
-  RulesRoute: typeof RulesRoute
+  LangRouteRoute: typeof LangRouteRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/rules': {
-      id: '/rules'
-      path: '/rules'
-      fullPath: '/rules'
-      preLoaderRoute: typeof RulesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/reservation': {
-      id: '/reservation'
-      path: '/reservation'
-      fullPath: '/reservation'
-      preLoaderRoute: typeof ReservationRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/privacy': {
-      id: '/privacy'
-      path: '/privacy'
-      fullPath: '/privacy'
-      preLoaderRoute: typeof PrivacyRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/photos': {
-      id: '/photos'
-      path: '/photos'
-      fullPath: '/photos'
-      preLoaderRoute: typeof PhotosRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/offers': {
-      id: '/offers'
-      path: '/offers'
-      fullPath: '/offers'
-      preLoaderRoute: typeof OffersRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/news': {
-      id: '/news'
-      path: '/news'
-      fullPath: '/news'
-      preLoaderRoute: typeof NewsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/facilities': {
-      id: '/facilities'
-      path: '/facilities'
-      fullPath: '/facilities'
-      preLoaderRoute: typeof FacilitiesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/contact': {
-      id: '/contact'
-      path: '/contact'
-      fullPath: '/contact'
-      preLoaderRoute: typeof ContactRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/booking': {
-      id: '/booking'
-      path: '/booking'
-      fullPath: '/booking'
-      preLoaderRoute: typeof BookingRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/admin': {
-      id: '/admin'
-      path: '/admin'
-      fullPath: '/admin'
-      preLoaderRoute: typeof AdminRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/about': {
-      id: '/about'
-      path: '/about'
-      fullPath: '/about'
-      preLoaderRoute: typeof AboutRouteImport
+    '/$lang': {
+      id: '/$lang'
+      path: '/$lang'
+      fullPath: '/$lang'
+      preLoaderRoute: typeof LangRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -272,22 +226,139 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/$lang/': {
+      id: '/$lang/'
+      path: '/'
+      fullPath: '/$lang/'
+      preLoaderRoute: typeof LangIndexRouteImport
+      parentRoute: typeof LangRouteRoute
+    }
+    '/$lang/rules': {
+      id: '/$lang/rules'
+      path: '/rules'
+      fullPath: '/$lang/rules'
+      preLoaderRoute: typeof LangRulesRouteImport
+      parentRoute: typeof LangRouteRoute
+    }
+    '/$lang/reservation': {
+      id: '/$lang/reservation'
+      path: '/reservation'
+      fullPath: '/$lang/reservation'
+      preLoaderRoute: typeof LangReservationRouteImport
+      parentRoute: typeof LangRouteRoute
+    }
+    '/$lang/privacy': {
+      id: '/$lang/privacy'
+      path: '/privacy'
+      fullPath: '/$lang/privacy'
+      preLoaderRoute: typeof LangPrivacyRouteImport
+      parentRoute: typeof LangRouteRoute
+    }
+    '/$lang/photos': {
+      id: '/$lang/photos'
+      path: '/photos'
+      fullPath: '/$lang/photos'
+      preLoaderRoute: typeof LangPhotosRouteImport
+      parentRoute: typeof LangRouteRoute
+    }
+    '/$lang/offers': {
+      id: '/$lang/offers'
+      path: '/offers'
+      fullPath: '/$lang/offers'
+      preLoaderRoute: typeof LangOffersRouteImport
+      parentRoute: typeof LangRouteRoute
+    }
+    '/$lang/news': {
+      id: '/$lang/news'
+      path: '/news'
+      fullPath: '/$lang/news'
+      preLoaderRoute: typeof LangNewsRouteImport
+      parentRoute: typeof LangRouteRoute
+    }
+    '/$lang/facilities': {
+      id: '/$lang/facilities'
+      path: '/facilities'
+      fullPath: '/$lang/facilities'
+      preLoaderRoute: typeof LangFacilitiesRouteImport
+      parentRoute: typeof LangRouteRoute
+    }
+    '/$lang/contact': {
+      id: '/$lang/contact'
+      path: '/contact'
+      fullPath: '/$lang/contact'
+      preLoaderRoute: typeof LangContactRouteImport
+      parentRoute: typeof LangRouteRoute
+    }
+    '/$lang/booking': {
+      id: '/$lang/booking'
+      path: '/booking'
+      fullPath: '/$lang/booking'
+      preLoaderRoute: typeof LangBookingRouteImport
+      parentRoute: typeof LangRouteRoute
+    }
+    '/$lang/admin': {
+      id: '/$lang/admin'
+      path: '/admin'
+      fullPath: '/$lang/admin'
+      preLoaderRoute: typeof LangAdminRouteImport
+      parentRoute: typeof LangRouteRoute
+    }
+    '/$lang/about': {
+      id: '/$lang/about'
+      path: '/about'
+      fullPath: '/$lang/about'
+      preLoaderRoute: typeof LangAboutRouteImport
+      parentRoute: typeof LangRouteRoute
+    }
+    '/$lang/$': {
+      id: '/$lang/$'
+      path: '/$'
+      fullPath: '/$lang/$'
+      preLoaderRoute: typeof LangSplatRouteImport
+      parentRoute: typeof LangRouteRoute
+    }
   }
 }
 
+interface LangRouteRouteChildren {
+  LangSplatRoute: typeof LangSplatRoute
+  LangAboutRoute: typeof LangAboutRoute
+  LangAdminRoute: typeof LangAdminRoute
+  LangBookingRoute: typeof LangBookingRoute
+  LangContactRoute: typeof LangContactRoute
+  LangFacilitiesRoute: typeof LangFacilitiesRoute
+  LangNewsRoute: typeof LangNewsRoute
+  LangOffersRoute: typeof LangOffersRoute
+  LangPhotosRoute: typeof LangPhotosRoute
+  LangPrivacyRoute: typeof LangPrivacyRoute
+  LangReservationRoute: typeof LangReservationRoute
+  LangRulesRoute: typeof LangRulesRoute
+  LangIndexRoute: typeof LangIndexRoute
+}
+
+const LangRouteRouteChildren: LangRouteRouteChildren = {
+  LangSplatRoute: LangSplatRoute,
+  LangAboutRoute: LangAboutRoute,
+  LangAdminRoute: LangAdminRoute,
+  LangBookingRoute: LangBookingRoute,
+  LangContactRoute: LangContactRoute,
+  LangFacilitiesRoute: LangFacilitiesRoute,
+  LangNewsRoute: LangNewsRoute,
+  LangOffersRoute: LangOffersRoute,
+  LangPhotosRoute: LangPhotosRoute,
+  LangPrivacyRoute: LangPrivacyRoute,
+  LangReservationRoute: LangReservationRoute,
+  LangRulesRoute: LangRulesRoute,
+  LangIndexRoute: LangIndexRoute,
+}
+
+const LangRouteRouteWithChildren = LangRouteRoute._addFileChildren(
+  LangRouteRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  AboutRoute: AboutRoute,
-  AdminRoute: AdminRoute,
-  BookingRoute: BookingRoute,
-  ContactRoute: ContactRoute,
-  FacilitiesRoute: FacilitiesRoute,
-  NewsRoute: NewsRoute,
-  OffersRoute: OffersRoute,
-  PhotosRoute: PhotosRoute,
-  PrivacyRoute: PrivacyRoute,
-  ReservationRoute: ReservationRoute,
-  RulesRoute: RulesRoute,
+  LangRouteRoute: LangRouteRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

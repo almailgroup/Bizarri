@@ -29,7 +29,7 @@ import {
 import type { BookingRow } from "@/integrations/supabase/types";
 import { readGuest, rememberGuest } from "@/lib/guest";
 
-export const Route = createFileRoute("/booking")({ component: Booking });
+export const Route = createFileRoute("/$lang/booking")({ component: Booking });
 
 /** Which package shape the calendar is filtered to. */
 type DateFilter = "all" | "weekday" | "weekend";
@@ -872,7 +872,8 @@ function Calendar({
 
         <p className="mt-4 text-sm text-muted-foreground">
           <Link
-            to="/reservation"
+            to="/$lang/reservation"
+            params={{ lang }}
             className="-my-2 inline-block py-2 underline underline-offset-4 hover:text-foreground"
           >
             {tr("checkBooking")}
@@ -1216,7 +1217,8 @@ function BookingForm({
           <span className="text-sm">
             {tr("acceptTerms")}{" "}
             <Link
-              to="/rules"
+              to="/$lang/rules"
+              params={{ lang }}
               target="_blank"
               className="underline underline-offset-4 hover:opacity-70"
             >
@@ -1320,7 +1322,8 @@ function Confirmation({ booking }: { booking: BookingRow }) {
 
       <p className="mt-8 text-sm">
         <Link
-          to="/reservation"
+          to="/$lang/reservation"
+          params={{ lang }}
           className="underline underline-offset-4 text-muted-foreground hover:text-foreground"
         >
           {tr("yourReservation")}

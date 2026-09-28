@@ -1,4 +1,4 @@
-import { Link, useLocation } from "@tanstack/react-router";
+import { Link, useMatchRoute } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { useI18n } from "@/lib/i18n";
 
@@ -19,17 +19,21 @@ export function BrandHomeLink({
   onNavigate?: () => void;
   children: ReactNode;
 }) {
-  const { tr } = useI18n();
-  const location = useLocation();
+  const { tr, lang } = useI18n();
+  // Asked of the router rather than compared as a string: home is /en or /ar
+  // now, and it moved once already.
+  const matchRoute = useMatchRoute();
+  const atHome = !!matchRoute({ to: "/$lang", params: { lang } });
 
   return (
     <Link
-      to="/"
+      to="/$lang"
+      params={{ lang }}
       className={className}
       aria-label={tr("brand")}
       onClick={(e) => {
         onNavigate?.();
-        if (location.pathname !== "/") return;
+        if (!atHome) return;
         e.preventDefault();
         window.scrollTo({
           top: 0,

@@ -6,7 +6,7 @@ import { usePageMeta } from "@/hooks/use-page-meta";
 
 import { AlertCircle, Newspaper } from "lucide-react";
 
-export const Route = createFileRoute("/news")({ component: News });
+export const Route = createFileRoute("/$lang/news")({ component: News });
 
 function News() {
   const { tr, lang } = useI18n();

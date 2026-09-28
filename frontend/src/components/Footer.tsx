@@ -6,7 +6,7 @@ import { useContactInfo } from "@/lib/api";
 import logoWhite from "@/assets/bizarri-logo-white.png";
 
 export function Footer() {
-  const { tr } = useI18n();
+  const { tr, lang } = useI18n();
   const contact = useContactInfo();
   return (
     <footer className="bg-black text-white">
@@ -66,7 +66,8 @@ export function Footer() {
           <ul className="space-y-1 text-sm">
             <li>
               <Link
-                to="/booking"
+                to="/$lang/booking"
+                params={{ lang }}
                 className="-my-1 inline-block py-2 text-white/70 hover:text-white"
               >
                 {tr("bookNow")}
@@ -74,32 +75,46 @@ export function Footer() {
             </li>
             <li>
               <Link
-                to="/facilities"
+                to="/$lang/facilities"
+                params={{ lang }}
                 className="-my-1 inline-block py-2 text-white/70 hover:text-white"
               >
                 {tr("facilities")}
               </Link>
             </li>
             <li>
-              <Link to="/photos" className="-my-1 inline-block py-2 text-white/70 hover:text-white">
+              <Link
+                to="/$lang/photos"
+                params={{ lang }}
+                className="-my-1 inline-block py-2 text-white/70 hover:text-white"
+              >
                 {tr("photos")}
               </Link>
             </li>
             <li>
-              <Link to="/news" className="-my-1 inline-block py-2 text-white/70 hover:text-white">
+              <Link
+                to="/$lang/news"
+                params={{ lang }}
+                className="-my-1 inline-block py-2 text-white/70 hover:text-white"
+              >
                 {tr("news")}
               </Link>
             </li>
             <li>
               <Link
-                to="/privacy"
+                to="/$lang/privacy"
+                params={{ lang }}
                 className="-my-1 inline-block py-2 text-white/70 hover:text-white"
               >
                 {tr("privacy")}
               </Link>
             </li>
             <li>
-              <Link to="/rules" className="-my-1 inline-block py-2 text-white/70 hover:text-white">
+              <Link
+                to="/$lang/rules"
+                params={{ lang }}
+                className="-my-1 inline-block py-2 text-white/70 hover:text-white"
+              >
                 {tr("rules")}
               </Link>
             </li>

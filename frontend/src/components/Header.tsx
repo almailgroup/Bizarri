@@ -1,38 +1,43 @@
-import { Link, useLocation } from "@tanstack/react-router";
+import { Link, useMatchRoute, type LinkProps } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Menu, X, Globe, Ticket } from "lucide-react";
-import { useI18n } from "@/lib/i18n";
+import { useI18n, type TrKey } from "@/lib/i18n";
 import { BrandHomeLink } from "@/components/BrandHomeLink";
 import logo from "@/assets/bizarri-logo.png";
 import logoWhite from "@/assets/bizarri-logo-white.png";
 
 // Home, About and Almail AI were removed from the site navigation; the logo
 // still links home and the assistant is reachable from the chat widget.
-const primaryNav = [
-  { to: "/facilities", key: "facilities" as const },
-  { to: "/photos", key: "photos" as const },
-  { to: "/offers", key: "offers" as const },
-  { to: "/booking", key: "booking" as const },
-  { to: "/contact", key: "contact" as const },
+// Typed as the router's own paths rather than plain strings, so a nav entry
+// that has not been moved under /$lang is a compile error. It was not, and
+// these five silently kept sending Arabic readers to the English page.
+type NavPath = Extract<LinkProps["to"], `/$lang/${string}`>;
+
+const primaryNav: { to: NavPath; key: TrKey }[] = [
+  { to: "/$lang/facilities", key: "facilities" },
+  { to: "/$lang/photos", key: "photos" },
+  { to: "/$lang/offers", key: "offers" },
+  { to: "/$lang/booking", key: "booking" },
+  { to: "/$lang/contact", key: "contact" },
 ];
 
-const menuNav = [
+const menuNav: { to: NavPath; key: TrKey }[] = [
   ...primaryNav.slice(0, 4),
-  { to: "/reservation", key: "yourReservation" as const },
-  { to: "/news", key: "news" as const },
-  { to: "/rules", key: "rules" as const },
-  { to: "/contact", key: "contact" as const },
+  { to: "/$lang/reservation", key: "yourReservation" },
+  { to: "/$lang/news", key: "news" },
+  { to: "/$lang/rules", key: "rules" },
+  { to: "/$lang/contact", key: "contact" },
 ];
 
 export function Header() {
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const { tr, lang, setLang } = useI18n();
-  const location = useLocation();
+  const matchRoute = useMatchRoute();
 
   // The homepage hero is a full-bleed dark image; the bar sits on top of it
   // until the visitor scrolls, then picks up its solid background.
-  const overHero = location.pathname === "/" && !scrolled;
+  const overHero = !!matchRoute({ to: "/$lang", params: { lang } }) && !scrolled;
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
@@ -86,6 +91,7 @@ export function Header() {
               <Link
                 key={n.to}
                 to={n.to}
+                params={{ lang }}
                 className={`whitespace-nowrap text-sm uppercase tracking-wide transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-current ${linkTone}`}
                 activeProps={{
                   className: overHero ? "text-white font-medium" : "text-foreground font-medium",
@@ -100,7 +106,8 @@ export function Header() {
             {/* A shortcut rather than another nav item: returning guests come
                 back to check a status, not to browse. */}
             <Link
-              to="/reservation"
+              to="/$lang/reservation"
+              params={{ lang }}
               className={`hidden items-center gap-1.5 border px-3 py-2 text-xs uppercase tracking-widest transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current sm:flex ${
                 overHero
                   ? "border-white/30 text-white hover:bg-white hover:text-black"
@@ -164,6 +171,7 @@ export function Header() {
               <Link
                 key={n.to}
                 to={n.to}
+                params={{ lang }}
                 onClick={() => setOpen(false)}
                 className="animate-fade-up font-display text-3xl tracking-tight transition-opacity hover:opacity-60 focus-visible:opacity-60 focus-visible:outline-none md:text-5xl"
                 style={{ animationDelay: `${i * 50}ms` }}

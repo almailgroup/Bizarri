@@ -10,7 +10,7 @@ import room3 from "@/assets/room-3.jpg";
 import room4 from "@/assets/room-4.jpg";
 import room5 from "@/assets/room-5.jpg";
 
-export const Route = createFileRoute("/photos")({ component: Photos });
+export const Route = createFileRoute("/$lang/photos")({ component: Photos });
 
 interface Category {
   en: string;

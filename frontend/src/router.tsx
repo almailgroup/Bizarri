@@ -29,3 +29,16 @@ export const getRouter = () => {
 
   return router;
 };
+
+/**
+ * Registers the route tree with the router's types, so `to` on every Link and
+ * navigate is checked against the routes that actually exist rather than
+ * being any string. Without this a link to a page that moved — or to
+ * /booking after everything moved under /$lang — compiles happily and 404s
+ * at runtime.
+ */
+declare module "@tanstack/react-router" {
+  interface Register {
+    router: ReturnType<typeof getRouter>;
+  }
+}

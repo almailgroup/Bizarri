@@ -1,6 +1,39 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, type ReactNode } from "react";
+import { useNavigate, useRouterState } from "@tanstack/react-router";
 
 export type Lang = "en" | "ar";
+
+export const LANGS: Lang[] = ["en", "ar"];
+
+const STORE_KEY = "bizarri_lang";
+
+/**
+ * Which language to send someone to when the URL does not say.
+ *
+ * Only used for the bare domain and for old unprefixed links. Once there is a
+ * prefix it wins outright, so a shared /ar link opens in Arabic even for a
+ * reader whose last visit was in English.
+ */
+export function preferredLang(): Lang {
+  if (typeof window === "undefined") return "en";
+  try {
+    const saved = localStorage.getItem(STORE_KEY);
+    if (saved === "en" || saved === "ar") return saved;
+  } catch {
+    // Private browsing and blocked site data both throw; fall through to the
+    // browser's own preference.
+  }
+  return navigator.languages?.some((l) => l.toLowerCase().startsWith("ar")) ? "ar" : "en";
+}
+
+/** The language segment of a path, or null if it has none. */
+export function langFromPath(pathname: string, base = "/"): Lang | null {
+  const rest = pathname.startsWith(base)
+    ? pathname.slice(base.length)
+    : pathname.replace(/^\//, "");
+  const first = rest.split("/")[0];
+  return first === "en" || first === "ar" ? first : null;
+}
 
 type Dict = Record<string, { en: string; ar: string }>;
 
@@ -408,6 +441,9 @@ export const t: Dict = {
   },
 };
 
+/** Every string the dictionary knows, for anything that stores a key. */
+export type TrKey = keyof typeof t;
+
 interface Ctx {
   lang: Lang;
   setLang: (l: Lang) => void;
@@ -418,13 +454,14 @@ interface Ctx {
 const I18nContext = createContext<Ctx | null>(null);
 
 export function I18nProvider({ children }: { children: ReactNode }) {
-  const [lang, setLangState] = useState<Lang>("en");
+  const navigate = useNavigate();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const saved = localStorage.getItem("bizarri_lang") as Lang | null;
-    if (saved) setLangState(saved);
-  }, []);
+  // Read from the URL rather than held in state: the address bar is what a
+  // reader shares, bookmarks and lands on, so it has to be the thing that
+  // decides. A path with no prefix is on its way to one via a redirect; show
+  // the preference in the meantime rather than flashing the wrong language.
+  const lang = langFromPath(pathname, import.meta.env.BASE_URL) ?? preferredLang();
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -433,8 +470,17 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   }, [lang]);
 
   const setLang = (l: Lang) => {
-    setLangState(l);
-    if (typeof window !== "undefined") localStorage.setItem("bizarri_lang", l);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem(STORE_KEY, l);
+      } catch {
+        // Remembering the choice is a convenience; the URL still carries it.
+      }
+    }
+    // Stay on the page, change its language. "." is the current route with
+    // new params, so /ar/photos is reached from /en/photos without this
+    // having to know what the route was or how to spell it.
+    navigate({ to: ".", params: (prev: Record<string, string>) => ({ ...prev, lang: l }) });
   };
 
   const tr = (key: keyof typeof t) => t[key]?.[lang] ?? String(key);

@@ -10,7 +10,7 @@
 import { chromium } from "playwright";
 import { PNG } from "pngjs";
 
-const B = "http://localhost:4173/";
+const B = "http://localhost:4173/en/";
 // Derived, not written out: the site moved from a /Bizarri/ project page to a
 // custom domain at the root, and a hardcoded home path would have to be found
 // and changed by hand every time that moves again.
@@ -314,11 +314,7 @@ async function check(label, page, locator) {
   await p.waitForTimeout(500);
   await p.locator('[role="dialog"] a').first().click();
   await p.waitForTimeout(900);
-  ck(
-    "The menu logo goes home",
-    new URL(p.url()).pathname.replace(/\/$/, "") === HOME,
-    p.url(),
-  );
+  ck("The menu logo goes home", new URL(p.url()).pathname.replace(/\/$/, "") === HOME, p.url());
   ck("…and closes the menu behind it", (await p.locator('[role="dialog"]').count()) === 0);
   await ctx.close();
 }

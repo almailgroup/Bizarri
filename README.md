@@ -175,10 +175,18 @@ One-time setup in the repository:
 3. Under **Custom domain**, enter `bizarri.com` and tick **Enforce HTTPS**
    once the certificate has been issued.
 
-The site is served at `https://bizarri.com/`. `dist/index.html` is also copied
-to `dist/404.html` so deep links resolve through client-side routing, and
-`frontend/public/CNAME` carries the domain into every deploy so the Pages
-setting is not lost.
+The site is served at `https://bizarri.com/`, and every page lives under its
+language: `https://bizarri.com/en/booking`, `https://bizarri.com/ar/booking`.
+The bare domain redirects to whichever language the visitor last used, or the
+one their browser asks for. Links published before the prefix existed
+(`/booking`) still work — they redirect rather than 404.
+
+The build writes a real `index.html` for every page in both languages, not just
+one at the root. Without those files GitHub Pages would answer `/en/booking`
+with `404.html`: the page renders, because the router takes over, but the HTTP
+status is 404 and search engines drop it. `404.html` remains the fallback for
+anything else, and `frontend/public/CNAME` carries the domain into every deploy
+so the Pages setting is not lost.
 
 `https://<owner>.github.io/Bizarri/` redirects to the domain; GitHub does that
 itself once a custom domain is set.
@@ -192,3 +200,21 @@ delete `frontend/public/CNAME`, and change the absolute URLs in
 `frontend/index.html`, `frontend/public/sitemap.xml` and
 `frontend/public/robots.txt` back. Getting `base` wrong is what a blank page
 looks like: the HTML loads, every asset URL 404s, and no JavaScript runs.
+
+### Adding a language
+
+1. Add it to `Lang` and `LANGS` in [`frontend/src/lib/i18n.tsx`](frontend/src/lib/i18n.tsx),
+   and give every entry in the dictionary a translation.
+2. Add it to `LANGS` in [`frontend/vite.config.ts`](frontend/vite.config.ts) so
+   the build writes its pages.
+3. Regenerate `frontend/public/sitemap.xml` and add its `Disallow: /<lang>/admin`
+   line to `robots.txt`.
+
+The routes themselves need no change: they live under `src/routes/$lang/` and
+the segment is a parameter.
+
+### Adding a page
+
+Put it in `frontend/src/routes/$lang/`. The build picks it up for both
+languages automatically — `vite.config.ts` reads that directory rather than
+keeping its own list. Add it to the sitemap by hand.
