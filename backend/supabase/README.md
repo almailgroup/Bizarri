@@ -160,6 +160,18 @@ supabase functions deploy notify-booking
 supabase functions deploy send-email-code
 ```
 
+### Deploying the functions without the CLI
+
+The dashboard's function editor takes one file, and these import a shared
+module. `functions/bundle.sh` inlines it, writing a self-contained
+`functions/<name>/paste.ts` for each. Paste that into
+**Edge Functions → Deploy a new function → Via editor**, named exactly
+`notify-booking` and `send-email-code` (the names are in the site's code and in
+the webhook).
+
+Regenerate them after changing a function or `_shared/http.ts`; `supabase
+functions deploy` ignores them and uses the real sources.
+
 Switching to a different Supabase project (new account, new org, a fresh
 project) means re-running `supabase link` with the new project's ref and
 updating `frontend/.env` — see the root [README](../../README.md#switching-to-a-new-supabase-project)
