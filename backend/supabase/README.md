@@ -238,6 +238,26 @@ Dashboard → Database → Webhooks → *Create*:
 - Table `public.bookings`, event **Insert**
 - Type **Supabase Edge Function**, function `notify-booking`
 
+### Checking what a database already has
+
+`to_regproc` takes a bare function name and returns null for anything written
+with an argument list, so it reports every function as missing. Use
+`to_regprocedure` for a signature:
+
+```sql
+select
+  to_regclass('public.admins')                             is not null as m1_core,
+  to_regprocedure('public.quote_stay(smallint,date,date)') is not null as m2_booking_logic,
+  to_regprocedure('public.is_admin()')                     is not null as m3_rls,
+  (select count(*) from public.chalets)                    as m4_seeded_chalets,
+  to_regclass('public.audit_log')                          is not null as m5_audit,
+  to_regclass('public.special_occasions')                  is not null as m6_occasions,
+  to_regclass('public.email_verifications')                is not null as m7_email_codes;
+```
+
+Any `false` means that migration has not been applied; `schema.sql` is
+idempotent, so pasting the whole thing is always the fix.
+
 ## Running the tests
 
 111 assertions covering pricing (packages, custom days, special occasions),
