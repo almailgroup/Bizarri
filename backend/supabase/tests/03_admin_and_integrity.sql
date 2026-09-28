@@ -15,6 +15,12 @@ set my.goodref = :'goodref';
 set my.goodid  = :'goodid';
 
 -- guest lookup, as anon, using a ref obtained out of band (as a guest would)
+-- Suite 06 owns the email-code gate. These suites predate it and call
+-- request_booking directly, so switch it off here rather than verifying an
+-- address in front of every one of them.
+update public.settings set value = 'false'::jsonb
+ where key = 'require_email_verification';
+
 set role anon;
 do $$
 declare n integer;

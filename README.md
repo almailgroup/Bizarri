@@ -105,11 +105,21 @@ project — a fresh account, a new org, or the current project was deleted.
 
    ```bash
    supabase functions deploy notify-booking
-   supabase secrets set RESEND_API_KEY=...          # optional: booking emails
+   supabase functions deploy send-email-code
+   supabase secrets set RESEND_API_KEY=...          # REQUIRED: one-time codes
    supabase secrets set NOTIFY_EMAILS=admin@almailgroup.com
    supabase secrets set CALLMEBOT_PHONE=96594040955 # optional: booking WhatsApp alerts
    supabase secrets set CALLMEBOT_APIKEY=...
    supabase secrets set ALLOWED_ORIGINS=https://almailgroup.github.io
+   ```
+
+   **`RESEND_API_KEY` is not optional any more.** A guest must confirm their
+   email with a mailed code before a booking goes through, so without the key
+   nobody can book. If mail is not set up yet, turn the gate off:
+
+   ```sql
+   update public.settings set value = 'false'::jsonb
+    where key = 'require_email_verification';
    ```
 
    Both `NOTIFY_EMAILS` and the `CALLMEBOT_*` pair are just fallbacks — day

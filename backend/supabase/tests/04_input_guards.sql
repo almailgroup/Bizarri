@@ -6,6 +6,12 @@ begin
   if cond then raise notice 'PASS  %  %', label, detail;
   else raise exception 'FAIL  %  %', label, detail; end if;
 end $$;
+-- Suite 06 owns the email-code gate. These suites predate it and call
+-- request_booking directly, so switch it off here rather than verifying an
+-- address in front of every one of them.
+update public.settings set value = 'false'::jsonb
+ where key = 'require_email_verification';
+
 set role anon;
 do $$
 declare b public.bookings; n integer;

@@ -162,6 +162,8 @@ export interface BookingRequestInput {
   /** Object path in the private civil-ids bucket, from uploadCivilId(). */
   civilIdPath: string;
   termsAccepted: boolean;
+  /** Which language the form was filled in, so the guest's copy matches. */
+  lang: "en" | "ar";
 }
 
 /**
@@ -207,6 +209,7 @@ export function useRequestBooking() {
         p_notes: input.notes ?? null,
         p_civil_id_path: input.civilIdPath,
         p_terms_accepted: input.termsAccepted,
+        p_lang: input.lang,
       });
       if (error) fail("Booking failed", error);
       return data as unknown as BookingRow;
@@ -218,12 +221,89 @@ export function useRequestBooking() {
   });
 }
 
+/**
+ * Ask for a one-time code by email.
+ *
+ * Goes to an Edge Function rather than an RPC because the plaintext code must
+ * never come back to the browser — whoever can read it can verify an address
+ * they do not own. The function mints it server-side and mails it.
+ *
+ * Returns emailConfigured: false when the site has no mail key set, which the
+ * form surfaces instead of asking for a code that will never arrive.
+ */
+export function useSendEmailCode() {
+  return useMutation({
+    mutationFn: async ({ email, lang }: { email: string; lang: "en" | "ar" }) => {
+      const { data, error } = await supabase.functions.invoke<{
+        ok?: boolean;
+        emailConfigured?: boolean;
+        error?: string;
+      }>("send-email-code", { body: { email, lang } });
+
+      // A non-2xx from the function arrives as an error with the body still
+      // attached; the message inside it is written for the guest (the rate
+      // limit, mostly), so prefer it over the generic transport wording.
+      if (error) {
+        let message = error.message;
+        const res = (error as { context?: Response }).context;
+        if (res && typeof res.json === "function") {
+          try {
+            const body = (await res.json()) as { error?: string };
+            if (body?.error) message = body.error;
+          } catch {
+            // Body already read or not JSON — keep the transport message.
+          }
+        }
+        throw new Error(message);
+      }
+      if (data?.error) throw new Error(data.error);
+      return { emailConfigured: data?.emailConfigured !== false };
+    },
+  });
+}
+
+/** Check the code. Resolves false for a wrong code; throws once it is expired
+ *  or the attempts are spent, which are different things to tell the guest. */
+export function useVerifyEmailCode() {
+  return useMutation({
+    mutationFn: async ({ email, code }: { email: string; code: string }) => {
+      const { data, error } = await supabase.rpc("verify_email_code", {
+        p_email: email,
+        p_code: code,
+      });
+      if (error) fail("Verification failed", error);
+      return Boolean(data);
+    },
+  });
+}
+
 export function useLookupBooking() {
   return useMutation({
     mutationFn: async ({ ref, email }: { ref: string; email: string }) => {
       const { data, error } = await supabase.rpc("lookup_booking", {
         p_ref: ref,
         p_email: email,
+      });
+      if (error) fail("Lookup failed", error);
+      return (data ?? []) as Pick<
+        BookingRow,
+        "ref" | "status" | "chalet_id" | "start_date" | "end_date" | "days" | "total" | "currency"
+      >[];
+    },
+  });
+}
+
+/**
+ * Find a booking from the phone number alone.
+ *
+ * No second factor by design — see the note on lookup_booking_by_phone() in
+ * the migration. The server throttles repeat lookups on one number.
+ */
+export function useLookupBookingByPhone() {
+  return useMutation({
+    mutationFn: async ({ phone }: { phone: string }) => {
+      const { data, error } = await supabase.rpc("lookup_booking_by_phone", {
+        p_phone: phone,
       });
       if (error) fail("Lookup failed", error);
       return (data ?? []) as Pick<

@@ -91,6 +91,8 @@ export type BookingRow = {
   decided_by: string | null;
   civil_id_path: string | null;
   terms_accepted_at: string | null;
+  /** The language the guest booked in; their confirmation email follows it. */
+  lang: "en" | "ar";
 };
 
 export type NewsRow = {
@@ -230,6 +232,7 @@ export type Database = {
           p_notes?: string | null;
           p_civil_id_path: string;
           p_terms_accepted: boolean;
+          p_lang?: string;
         };
         Returns: BookingRow;
       };
@@ -239,6 +242,17 @@ export type Database = {
           BookingRow,
           "ref" | "status" | "chalet_id" | "start_date" | "end_date" | "days" | "total" | "currency"
         >[];
+      };
+      lookup_booking_by_phone: {
+        Args: { p_phone: string };
+        Returns: Pick<
+          BookingRow,
+          "ref" | "status" | "chalet_id" | "start_date" | "end_date" | "days" | "total" | "currency"
+        >[];
+      };
+      verify_email_code: {
+        Args: { p_email: string; p_code: string };
+        Returns: boolean;
       };
       set_booking_status: {
         Args: { p_id: string; p_status: BookingStatus; p_note?: string | null };

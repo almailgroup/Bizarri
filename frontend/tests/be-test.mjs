@@ -28,6 +28,16 @@ function mock(ctx, state) {
     const send = (data, status = 200) =>
       route.fulfill({ status, contentType: "application/json", body: JSON.stringify(data) });
 
+    // The code is minted and mailed server-side; state.code stands in for the
+    // guest's inbox.
+    if (url.pathname === "/functions/v1/send-email-code") {
+      state.code = "135790";
+      return send({ ok: true, emailConfigured: true });
+    }
+    if (path === "rpc/verify_email_code") {
+      return send(String(body?.p_code ?? "") === state.code);
+    }
+
     if (url.pathname.startsWith("/storage/v1/object/civil-ids/")) {
       return send({ Key: url.pathname.replace("/storage/v1/object/", ""), Id: "obj-1" });
     }
@@ -46,6 +56,9 @@ function mock(ctx, state) {
 
 const baseState = () => ({
   calls: [],
+  // What the mailer "sent"; the form only ever learns it the way a guest
+  // does, by reading it and typing it back.
+  code: null,
   chalets: [
     {
       id: 1,
@@ -209,6 +222,12 @@ await p.waitForTimeout(400);
 await p.locator("input[type=text]").first().fill("Aisha Al-Sabah");
 await p.locator("input[type=tel]").fill("+96594040955");
 await p.locator("input[type=email]").fill("aisha@example.com");
+// The address has to be confirmed before the form will submit.
+await p.getByRole("button", { name: /^Send code$/i }).click();
+await p.waitForTimeout(400);
+await p.getByLabel(/6-digit code/i).fill(st.code);
+await p.getByRole("button", { name: /^Confirm$/i }).click();
+await p.waitForTimeout(400);
 await p.locator("input[type=number]").fill("6");
 // Checkout now requires a Civil ID image and an explicit terms acceptance.
 await p.locator("input[type=file]").setInputFiles({

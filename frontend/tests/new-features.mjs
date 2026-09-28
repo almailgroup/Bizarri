@@ -69,8 +69,25 @@ const session = () => ({
   },
 });
 
+/**
+ * Read the code out of the "inbox" and confirm the address. Every path that
+ * submits the form has to go through this now, which is the point: the gate
+ * is not something the checkout test alone has to remember.
+ */
+async function confirmEmail(p, state) {
+  await p.getByRole("button", { name: /^Send code$/i }).click();
+  await p.waitForTimeout(400);
+  await p.getByLabel(/6-digit code/i).fill(state.code);
+  await p.getByRole("button", { name: /^Confirm$/i }).click();
+  await p.waitForTimeout(400);
+}
+
 function makeState() {
   return {
+    // Whatever the mailer "sent"; the form has to be told it out of band,
+    // exactly as a guest reads it out of their inbox.
+    code: null,
+    codeSentTo: null,
     chalets: [
       {
         id: 1,
@@ -183,6 +200,17 @@ function mock(ctx, state) {
       const key = raw.replace("/storage/v1/object/", "");
       state.uploads.push(key);
       return send({ Key: key, Id: "obj-1" });
+    }
+
+    // The code is minted and mailed server-side; the browser only ever sees
+    // whether that worked. state.code is what the "inbox" received.
+    if (raw === "/functions/v1/send-email-code") {
+      state.code = "123456";
+      state.codeSentTo = body?.email ?? null;
+      return send({ ok: true, emailConfigured: true });
+    }
+    if (path === "rpc/verify_email_code") {
+      return send(String(body?.p_code ?? "") === state.code);
     }
 
     if (path.startsWith("auth:token")) return send(session());
@@ -459,6 +487,10 @@ const bg = (loc) => loc.evaluate((el) => getComputedStyle(el).backgroundColor);
   await p.waitForTimeout(300);
 
   ck(
+    "Submitting without a confirmed email is refused",
+    await p.getByText("Please confirm your email address before sending the request.").isVisible(),
+  );
+  ck(
     "Submitting without a Civil ID is refused",
     await p.getByText("Please attach your Civil ID image.").isVisible(),
   );
@@ -471,7 +503,13 @@ const bg = (loc) => loc.evaluate((el) => getComputedStyle(el).backgroundColor);
     !state.calls.some((c) => c.path === "rpc/request_booking"),
   );
 
-  // Now satisfy both.
+  // Now satisfy all three.
+  await confirmEmail(p, state);
+  ck(
+    "Entering the emailed code confirms the address",
+    await p.getByText("Email confirmed").isVisible(),
+  );
+
   await p.locator("input[type=file]").setInputFiles({
     name: "civil-id.png",
     mimeType: "image/png",
@@ -500,6 +538,11 @@ const bg = (loc) => loc.evaluate((el) => getComputedStyle(el).backgroundColor);
     rpc?.body?.p_civil_id_path,
   );
   ck("request_booking carries the terms acceptance", rpc?.body?.p_terms_accepted === true);
+  ck(
+    "The code was sent to the address on the form",
+    state.codeSentTo === "guest@example.com",
+    state.codeSentTo,
+  );
   ck("Confirmation shows the reference", await p.getByText("BZR-NEW999").isVisible());
   await ctx.close();
 }
@@ -1000,6 +1043,7 @@ async function adminPage(state, tab) {
   await p.getByLabel("Full Name").fill("Next Steps");
   await p.getByLabel("Phone Number", { exact: true }).fill("+96599996666");
   await p.getByLabel("Email", { exact: true }).fill("next@example.com");
+  await confirmEmail(p, state);
   await p.locator("input[type=file]").setInputFiles({
     name: "id.png",
     mimeType: "image/png",
@@ -1209,6 +1253,7 @@ async function adminPage(state, tab) {
   await p.getByLabel("Full Name").fill("Repeat Guest");
   await p.getByLabel("Phone Number", { exact: true }).fill("+96599991111");
   await p.getByLabel("Email", { exact: true }).fill("repeat@example.com");
+  await confirmEmail(p, state);
   await p.locator("input[type=file]").setInputFiles({
     name: "id.png",
     mimeType: "image/png",

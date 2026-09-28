@@ -39,6 +39,8 @@ interface BookingRecord {
   guest_email: string;
   guests: number;
   notes: string | null;
+  /** The language the guest booked in, for their copy of the email. */
+  lang?: string | null;
 }
 
 /** One row from public.settings, or null on any failure — never throws, so a
@@ -116,6 +118,57 @@ function render(b: BookingRecord): string {
       </table>
       <p style="margin-top:24px;font-size:13px;color:#888">
         Accept or reject this request in the admin dashboard.</p>
+    </div>`;
+}
+
+/**
+ * The guest's own copy. Deliberately a different message from the team's: it
+ * leads with the reference, because that is the one thing they need to keep,
+ * and it says the request is not yet confirmed so nobody turns up on the
+ * strength of this email alone.
+ */
+function renderGuest(b: BookingRecord, lang: "en" | "ar"): string {
+  const ar = lang === "ar";
+  const t = ar
+    ? {
+        title: "استلمنا طلب حجزك",
+        ref: "رقم الحجز",
+        chalet: "الشاليه",
+        dates: "التواريخ",
+        total: "الإجمالي",
+        guests: "عدد الضيوف",
+        pending: "طلبك قيد المراجعة. سنتواصل معك قريباً لتأكيد الحجز.",
+        keep: "احتفظ برقم الحجز للاستعلام عن حالته في أي وقت.",
+      }
+    : {
+        title: "We have your booking request",
+        ref: "Booking reference",
+        chalet: "Chalet",
+        dates: "Dates",
+        total: "Total",
+        guests: "Guests",
+        pending: "Your request is being reviewed. We will contact you shortly to confirm.",
+        keep: "Keep this reference to check the status of your booking at any time.",
+      };
+  const row = (label: string, value: string) =>
+    `<tr><td style="padding:6px 16px 6px 0;color:#666">${esc(label)}</td>` +
+    `<td style="padding:6px 0;font-weight:500">${esc(value)}</td></tr>`;
+  return `
+    <div style="font-family:system-ui,sans-serif;max-width:520px" ${ar ? 'dir="rtl"' : ""}>
+      <p style="letter-spacing:.3em;text-transform:uppercase;font-size:11px;color:#888">
+        Bizarri Chalet</p>
+      <h2 style="font-weight:400;margin:4px 0 8px">${esc(t.title)}</h2>
+      <p style="font-size:15px;color:#333;margin:0 0 20px">${esc(t.pending)}</p>
+      <p style="text-transform:uppercase;letter-spacing:.2em;font-size:11px;color:#888;margin:0">
+        ${esc(t.ref)}</p>
+      <p style="font-family:monospace;font-size:26px;margin:4px 0 24px" dir="ltr">${esc(b.ref)}</p>
+      <table style="border-collapse:collapse;font-size:14px">
+        ${row(t.chalet, `Bizarri Chalet ${b.chalet_id}`)}
+        ${row(t.dates, `${b.start_date} \u2192 ${b.end_date} (${b.days})`)}
+        ${row(t.total, `${b.currency} ${b.total}`)}
+        ${row(t.guests, String(b.guests))}
+      </table>
+      <p style="margin-top:24px;font-size:13px;color:#888">${esc(t.keep)}</p>
     </div>`;
 }
 
@@ -201,6 +254,46 @@ async function sendEmail(booking: BookingRecord): Promise<DeliveryResult> {
   return { attempted: true, delivered: true };
 }
 
+/**
+ * The guest's copy. Failing to reach the guest must never look like the
+ * booking failed \u2014 the row already exists by the time this runs \u2014 so this
+ * reports its own outcome and never throws.
+ */
+async function sendGuestEmail(booking: BookingRecord): Promise<DeliveryResult> {
+  const key = Deno.env.get("RESEND_API_KEY");
+  if (!key) return { attempted: false, delivered: false, reason: "no api key" };
+  if (!booking.guest_email) return { attempted: false, delivered: false, reason: "no address" };
+
+  const lang: "en" | "ar" = booking.lang === "ar" ? "ar" : "en";
+  const from = Deno.env.get("NOTIFY_FROM") ?? "Bizarri Chalet <onboarding@resend.dev>";
+  const replyTo = (await notifyEmailsFromSettings())?.[0] ?? Deno.env.get("NOTIFY_EMAILS");
+
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        from,
+        to: [booking.guest_email],
+        subject:
+          lang === "ar"
+            ? `\u0637\u0644\u0628 \u0627\u0644\u062d\u062c\u0632 ${booking.ref} \u2014 \u0634\u0627\u0644\u064a\u0647 \u0628\u064a\u0632\u0627\u0631\u064a`
+            : `Your booking request ${booking.ref} \u2014 Bizarri Chalet`,
+        html: renderGuest(booking, lang),
+        ...(replyTo ? { reply_to: replyTo } : {}),
+      }),
+    });
+    if (!res.ok) {
+      console.error("notify-booking: guest email failed", res.status, await res.text());
+      return { attempted: true, delivered: false };
+    }
+    return { attempted: true, delivered: true };
+  } catch (e) {
+    console.error("notify-booking: guest email error", e);
+    return { attempted: true, delivered: false };
+  }
+}
+
 async function sendAllWhatsApp(booking: BookingRecord): Promise<DeliveryResult> {
   const configured = await notifyWhatsAppFromSettings();
   const envPhone = Deno.env.get("CALLMEBOT_PHONE");
@@ -231,14 +324,15 @@ Deno.serve(async (req: Request) => {
 
     if (!booking?.ref) return json({ error: "No booking in payload" }, 400, origin);
 
-    // The two channels are independent: one being unconfigured or failing
-    // never stops the other from being attempted.
-    const [email, whatsapp] = await Promise.all([
+    // The three sends are independent: one being unconfigured or failing
+    // never stops the others from being attempted.
+    const [email, guestEmail, whatsapp] = await Promise.all([
       sendEmail(booking),
+      sendGuestEmail(booking),
       sendAllWhatsApp(booking),
     ]);
 
-    return json({ ok: true, email, whatsapp }, 200, origin);
+    return json({ ok: true, email, guestEmail, whatsapp }, 200, origin);
   } catch (e) {
     console.error("notify-booking error", e);
     return json({ error: "Unexpected error" }, 500, origin);

@@ -256,8 +256,8 @@ export const t: Dict = {
   // Reservation shortcut
   yourReservation: { en: "Your Reservation", ar: "حجزك" },
   yourReservationIntro: {
-    en: "Already requested a stay? Look it up with your reference and email.",
-    ar: "هل طلبت إقامة بالفعل؟ تتبعها برقم الحجز والبريد الإلكتروني.",
+    en: "Already requested a stay? Look it up with your reference, or with the phone number you booked with.",
+    ar: "هل طلبت إقامة بالفعل؟ تتبعها برقم الحجز، أو برقم الهاتف الذي حجزت به.",
   },
   savedRefNote: {
     en: "We filled in the reference from your last request on this device.",
@@ -304,6 +304,47 @@ export const t: Dict = {
     en: "No request matches that reference and email.",
     ar: "لا يوجد طلب مطابق لهذا الرقم والبريد الإلكتروني.",
   },
+
+  // Looking a booking up two ways
+  lookupByRef: { en: "Reference & email", ar: "رقم الحجز والبريد" },
+  lookupByPhone: { en: "Phone number", ar: "رقم الهاتف" },
+  lookupHow: { en: "How would you like to find your booking?", ar: "كيف تريد البحث عن حجزك؟" },
+  checkByPhoneHint: {
+    en: "Enter the phone number you booked with.",
+    ar: "أدخل رقم الهاتف الذي حجزت به.",
+  },
+  bookingNotFoundPhone: {
+    en: "No request matches that phone number.",
+    ar: "لا يوجد طلب مطابق لرقم الهاتف هذا.",
+  },
+  moreThanOne: { en: "We found more than one request.", ar: "وجدنا أكثر من طلب واحد." },
+
+  // Confirming the email address with a one-time code
+  verifyEmail: { en: "Confirm your email", ar: "تأكيد بريدك الإلكتروني" },
+  verifyEmailHint: {
+    en: "We will email you a 6-digit code, so your booking confirmation reaches you.",
+    ar: "سنرسل إليك رمزاً من ٦ أرقام، حتى يصلك تأكيد الحجز.",
+  },
+  sendCode: { en: "Send code", ar: "إرسال الرمز" },
+  resendCode: { en: "Send a new code", ar: "إرسال رمز جديد" },
+  sendingCode: { en: "Sending…", ar: "جارٍ الإرسال…" },
+  codeSent: {
+    en: "We sent a code to {email}. It expires in 10 minutes.",
+    ar: "أرسلنا رمزاً إلى {email}. ينتهي خلال ١٠ دقائق.",
+  },
+  enterCode: { en: "6-digit code", ar: "الرمز المكوّن من ٦ أرقام" },
+  verifyCode: { en: "Confirm", ar: "تأكيد" },
+  codeWrong: { en: "That code is not correct.", ar: "هذا الرمز غير صحيح." },
+  emailConfirmed: { en: "Email confirmed", ar: "تم تأكيد البريد الإلكتروني" },
+  emailNeedsConfirming: {
+    en: "Please confirm your email address before sending the request.",
+    ar: "يرجى تأكيد بريدك الإلكتروني قبل إرسال الطلب.",
+  },
+  emailNotConfigured: {
+    en: "We cannot send codes right now. Please contact us on WhatsApp to book.",
+    ar: "لا يمكننا إرسال الرموز حالياً. يرجى التواصل معنا عبر واتساب للحجز.",
+  },
+  changeEmail: { en: "Use a different address", ar: "استخدام بريد آخر" },
 
   // Admin: navigation & new panels
   overview: { en: "Overview", ar: "نظرة عامة" },

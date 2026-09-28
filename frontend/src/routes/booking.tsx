@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronLeft, ChevronRight, Paperclip, ShieldCheck } from "lucide-react";
 import { PageShell } from "@/components/PageShell";
+import { EmailVerify } from "@/components/EmailVerify";
 import { rememberBookingRef } from "@/components/BookingLookup";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
 import { useI18n } from "@/lib/i18n";
@@ -941,6 +942,11 @@ function BookingForm({
 }) {
   const { tr, lang } = useI18n();
   const request = useRequestBooking();
+  // The address that was actually proved, not a boolean: editing the field
+  // after confirming has to drop the confirmation, and comparing the two is
+  // the only way to notice.
+  const [verifiedEmail, setVerifiedEmail] = useState<string | null>(null);
+  const emailVerified = verifiedEmail !== null && verifiedEmail === details.email.trim();
   const [uploading, setUploading] = useState(false);
   const [errors, setErrors] = useState<
     Partial<Record<keyof GuestDetails | "civilId" | "terms", string>>
@@ -984,13 +990,16 @@ function BookingForm({
     if (!terms) {
       next.terms = tr("acceptTermsRequired");
     }
+    if (!emailVerified) {
+      next.email = tr("emailNeedsConfirming");
+    }
     setErrors(next);
     return Object.keys(next).length === 0;
   };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validate() || !civilId) return;
+    if (!validate() || !civilId || !emailVerified) return;
 
     let civilIdPath: string;
     setUploading(true);
@@ -1014,6 +1023,7 @@ function BookingForm({
       notes: details.notes,
       civilIdPath,
       termsAccepted: terms,
+      lang,
     });
     rememberGuest({ name: details.name, phone: details.phone, email: details.email });
     onDone(booking);
@@ -1092,6 +1102,15 @@ function BookingForm({
           </label>
         ))}
       </div>
+
+      <EmailVerify
+        email={details.email}
+        verified={emailVerified}
+        onVerified={(e) => {
+          setVerifiedEmail(e);
+          setErrors((prev) => ({ ...prev, email: undefined }));
+        }}
+      />
 
       <div>
         <span className="text-xs uppercase tracking-widest text-muted-foreground">

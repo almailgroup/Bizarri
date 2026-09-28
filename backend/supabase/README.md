@@ -71,6 +71,51 @@ security boundary. The bucket grants anon INSERT only — no select, update or
 delete — so an uploaded ID cannot be read back, overwritten or enumerated by
 another visitor. Admins read it through a short-lived signed URL.
 
+### Confirming the email address
+
+A guest must enter a six-digit code mailed to the address they typed before
+`request_booking()` will accept it. A mistyped address used to fail silently:
+the booking went through, the confirmation bounced, and nobody noticed until
+the guest rang.
+
+The shape matters more than it looks:
+
+- `start_email_verification()` mints the code and **returns the plaintext**, so
+  it is granted to `service_role` and nothing else. The `send-email-code` Edge
+  Function is its only caller. If the browser could call it, verifying an
+  address you do not own would be one request.
+- Only a salted SHA-256 of the code is stored. It expires in 10 minutes, caps
+  at 5 guesses and 5 codes an hour per address.
+- `verify_email_code()` **returns false** for a wrong code rather than raising.
+  Raising would roll back the attempts increment made in the same statement,
+  so the guess counter would never advance and the cap would never fire.
+
+**This puts email delivery on the critical path of every booking.** Without
+`RESEND_API_KEY` no code can be sent and no booking can complete. The switch
+is the `require_email_verification` setting:
+
+```sql
+update public.settings set value = 'false'::jsonb
+ where key = 'require_email_verification';
+```
+
+It defaults to `true`, including on a fresh database, so a site that has not
+been configured is strict rather than quietly open.
+
+### Finding a booking again
+
+Two paths, and they are not equally safe:
+
+- `lookup_booking()` — reference **and** email. The reference is the secret.
+- `lookup_booking_by_phone()` — the phone number alone, **with no second
+  factor**. Anyone who knows a number can see whether it has a stay booked,
+  when, and for how much.
+
+The second is a deliberate choice by the site owner, not an oversight. The
+per-number throttle (20 lookups an hour) slows repeated hits on one victim; it
+does not make the data private and nothing in the function can. Do not widen
+the columns it returns without revisiting that trade.
+
 ## Files
 
 This directory is `backend/supabase/` in the repo — the Supabase CLI requires
@@ -90,9 +135,13 @@ backend/supabase/
     20260921090000_occasions_and_checkout.sql
                                       special occasions, Civil ID + terms gate,
                                       civil-ids storage bucket and its policies
+    20260928090000_email_verification_and_phone_lookup.sql
+                                      one-time email codes, the gate in front of
+                                      request_booking, lookup by phone
   functions/
-    _shared/http.ts                   CORS headers, shared by notify-booking
-    notify-booking/                   email on new booking request
+    _shared/http.ts                   CORS headers, shared by both functions
+    notify-booking/                   emails the team and the guest, WhatsApp
+    send-email-code/                  mails the one-time code
   tests/
     run.sh                            applies migrations to a scratch DB and runs the suites
 ```
@@ -108,6 +157,7 @@ supabase login
 supabase link --project-ref <your-project-ref>
 supabase db push                 # applies supabase/migrations/
 supabase functions deploy notify-booking
+supabase functions deploy send-email-code
 ```
 
 Switching to a different Supabase project (new account, new org, a fresh
@@ -129,16 +179,20 @@ intended behaviour rather than a bug.
 ### Function secrets
 
 ```bash
-supabase secrets set RESEND_API_KEY=...         # optional: booking emails
+supabase secrets set RESEND_API_KEY=...         # REQUIRED: one-time codes
 supabase secrets set NOTIFY_EMAILS=admin@almailgroup.com
 supabase secrets set CALLMEBOT_PHONE=96594040955   # optional: booking WhatsApp alerts
 supabase secrets set CALLMEBOT_APIKEY=...
 supabase secrets set ALLOWED_ORIGINS=https://almailgroup.github.io
 ```
 
-Without `RESEND_API_KEY`, `notify-booking` logs and returns success — a missing
-key must never make booking look broken. Same for the CallMeBot pair: without
-both, WhatsApp is skipped and email still goes out. `ALLOWED_ORIGINS` scopes
+`RESEND_API_KEY` is no longer optional. `notify-booking` still treats it as
+optional — a failed notification must never make a booking that already
+succeeded look broken — but `send-email-code` cannot mint a code without it,
+and the form then tells the guest to use WhatsApp rather than asking for a code
+that will never arrive. Either set the key or turn `require_email_verification`
+off. The CallMeBot pair stays optional: without both, WhatsApp is skipped and
+email still goes out. `ALLOWED_ORIGINS` scopes
 which origins its CORS response allows; it defaults to the production site
 and local dev if unset.
 
@@ -174,9 +228,10 @@ Dashboard → Database → Webhooks → *Create*:
 
 ## Running the tests
 
-77 assertions covering pricing (packages, custom days, special occasions),
+111 assertions covering pricing (packages, custom days, special occasions),
 availability, every RLS boundary, the booking RPC, the Civil ID and terms
-gate, double-booking prevention and the audit trail.
+gate, the email code and the gate it puts in front of booking, lookup by
+phone and its throttle, double-booking prevention and the audit trail.
 
 ```bash
 backend/supabase/tests/run.sh                # local cluster on :55432
