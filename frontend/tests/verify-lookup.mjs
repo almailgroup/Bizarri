@@ -55,6 +55,8 @@ function makeState(over = {}) {
     verifyCalls: [],
     phoneCalls: [],
     refCalls: [],
+    emailCalls: [],
+    bookingsForEmail: [BOOKING],
     bookingsForPhone: [BOOKING],
     ...over,
   };
@@ -95,9 +97,14 @@ async function page(state) {
       if (state.phoneError) return send({ message: state.phoneError }, 400);
       return send(state.bookingsForPhone);
     }
-    if (path === "rpc/lookup_booking") {
+    if (path === "rpc/lookup_booking_by_ref") {
       state.refCalls.push(body);
       return send(body?.p_ref?.toUpperCase() === BOOKING.ref ? [BOOKING] : []);
+    }
+    if (path === "rpc/lookup_booking_by_email") {
+      state.emailCalls.push(body);
+      if (state.emailError) return send({ message: state.emailError }, 400);
+      return send(state.bookingsForEmail ?? []);
     }
 
     if (path === "chalets")
@@ -156,31 +163,61 @@ async function page(state) {
   await p.goto(pageUrl("reservation"), { waitUntil: "load" });
   await p.waitForTimeout(900);
 
-  const refTab = p.getByRole("tab", { name: /Reference & email/i });
+  const refTab = p.getByRole("tab", { name: /Booking reference/i });
+  const emailTab = p.getByRole("tab", { name: /Email address/i });
   const phoneTab = p.getByRole("tab", { name: /Phone number/i });
-  ck("The page offers both ways in", (await refTab.isVisible()) && (await phoneTab.isVisible()));
+  ck(
+    "The page offers all three ways in",
+    (await refTab.isVisible()) && (await emailTab.isVisible()) && (await phoneTab.isVisible()),
+  );
   ck(
     "Reference is the one selected to begin with",
     (await refTab.getAttribute("aria-selected")) === "true",
   );
+
+  // One field each. Asking for two makes the "I have lost it" case worse,
+  // and that case is the only reason this page exists.
+  for (const [name, tab, selector] of [
+    ["reference", refTab, 'input[type="text"]'],
+    ["email", emailTab, 'input[type="email"]'],
+    ["phone", phoneTab, 'input[type="tel"]'],
+  ]) {
+    await tab.click();
+    await p.waitForTimeout(250);
+    ck(
+      `The ${name} tab asks for one thing only`,
+      (await p.locator(selector).isVisible()) && (await p.locator("form input").count()) === 1,
+      `${await p.locator("form input").count()} inputs`,
+    );
+    ck(`…and is the one marked selected`, (await tab.getAttribute("aria-selected")) === "true");
+  }
+
+  await emailTab.click();
+  await p.locator('input[type="email"]').fill("guest@example.com");
+  await p.getByRole("button", { name: /Check status/i }).click();
+  await p.waitForTimeout(700);
   ck(
-    "The reference form asks for the email too",
-    await p.locator('input[type="email"]').isVisible(),
+    "The email goes to the email lookup, not the others",
+    state.emailCalls[0]?.p_email === "guest@example.com" && state.phoneCalls.length === 0,
+    JSON.stringify(state.emailCalls[0]),
+  );
+  ck("The booking comes back", await p.getByText(BOOKING.ref).isVisible());
+
+  await refTab.click();
+  await p.waitForTimeout(300);
+  ck("Switching tabs clears the previous result", (await p.getByText(BOOKING.ref).count()) === 0);
+
+  await p.locator('input[type="text"]').fill(BOOKING.ref.toLowerCase());
+  await p.getByRole("button", { name: /Check status/i }).click();
+  await p.waitForTimeout(700);
+  ck(
+    "The reference alone is enough",
+    state.refCalls[0]?.p_ref === BOOKING.ref.toLowerCase() &&
+      (await p.getByText(BOOKING.ref).isVisible()),
+    state.refCalls[0]?.p_ref,
   );
 
   await phoneTab.click();
-  await p.waitForTimeout(250);
-  ck(
-    "Switching tabs moves the selection",
-    (await phoneTab.getAttribute("aria-selected")) === "true" &&
-      (await refTab.getAttribute("aria-selected")) === "false",
-  );
-  ck(
-    "The phone form asks for one thing only",
-    (await p.locator('input[type="tel"]').isVisible()) &&
-      (await p.locator('input[type="email"]').count()) === 0,
-  );
-
   await p.locator('input[type="tel"]').fill("+965 5111 0002");
   await p.getByRole("button", { name: /Check status/i }).click();
   await p.waitForTimeout(700);
@@ -189,13 +226,7 @@ async function page(state) {
     state.phoneCalls[0]?.p_phone === "+965 5111 0002",
     state.phoneCalls[0]?.p_phone,
   );
-  ck("The booking comes back", await p.getByText(BOOKING.ref).isVisible());
   ck("…with its status", await p.getByText("Accepted", { exact: false }).first().isVisible());
-
-  // Going back to the other tab must not leave this answer sitting there.
-  await refTab.click();
-  await p.waitForTimeout(300);
-  ck("Switching back clears the previous result", (await p.getByText(BOOKING.ref).count()) === 0);
   await ctx.close();
 }
 

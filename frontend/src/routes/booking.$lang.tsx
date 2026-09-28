@@ -667,7 +667,7 @@ function Calendar({
           </p>
         )}
 
-        <div className="relative border border-border p-6 md:p-8">
+        <div className="relative border border-border p-2 sm:p-6 md:p-8">
           {isLoading && (
             <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/70 text-sm uppercase tracking-widest text-muted-foreground">
               {lang === "en" ? "Loading availability…" : "جارٍ تحميل التوفر…"}
@@ -679,24 +679,27 @@ function Calendar({
               onClick={() => changeMonth(-1)}
               disabled={atFirstMonth}
               aria-label={lang === "en" ? "Previous month" : "الشهر السابق"}
-              className="p-2 enabled:hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-25"
+              className="shrink-0 p-2 enabled:hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-25"
             >
               <ChevronLeft className="h-5 w-5 rtl:rotate-180" />
             </button>
-            <p className="font-display text-2xl capitalize" aria-live="polite">
+            <p
+              className="whitespace-nowrap font-display text-xl capitalize sm:text-2xl"
+              aria-live="polite"
+            >
               {monthName}
             </p>
             <button
               onClick={() => changeMonth(1)}
               disabled={atLastMonth}
               aria-label={lang === "en" ? "Next month" : "الشهر التالي"}
-              className="p-2 enabled:hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-25"
+              className="shrink-0 p-2 enabled:hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-25"
             >
               <ChevronRight className="h-5 w-5 rtl:rotate-180" />
             </button>
           </div>
 
-          <div className="mb-2 grid grid-cols-7 gap-1 text-center text-xs uppercase tracking-wider text-muted-foreground">
+          <div className="mb-2 grid grid-cols-7 gap-0.5 text-center text-xs uppercase tracking-wider text-muted-foreground sm:gap-1">
             {weekdayLabels.map((w) => (
               <div key={w} className="py-2">
                 {w}
@@ -708,7 +711,10 @@ function Calendar({
             role="grid"
             aria-label={monthName}
             onKeyDown={onGridKeyDown}
-            className="grid grid-cols-7 gap-1"
+            // Tighter gaps on a phone buy the cells themselves a few pixels
+            // each, which is the difference between a 37px tap target and a
+            // 40px one on a 360px screen.
+            className="grid grid-cols-7 gap-0.5 sm:gap-1"
           >
             {cells.map((d, i) => {
               if (!d) return <div key={`pad-${i}`} />;
@@ -826,7 +832,10 @@ function Calendar({
           </div>
         </div>
 
-        <div className="mt-6 grid gap-3 sm:grid-cols-3">
+        {/* Only once there is something to summarise: three boxes of em-dashes
+            were the tallest thing between the calendar and the button, and
+            said nothing. The calendar states the length on its own. */}
+        <div className={`mt-6 grid gap-3 sm:grid-cols-3 ${start ? "" : "hidden sm:grid"}`}>
           <div className="border border-border p-4">
             <p className="text-xs uppercase tracking-widest text-muted-foreground">
               {tr("checkIn")}

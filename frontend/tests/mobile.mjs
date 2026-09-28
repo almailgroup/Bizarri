@@ -237,6 +237,58 @@ for (const [name, vp] of [
   await ctx.close();
 }
 
+// ======================= the calendar is the page, so it has to fit the phone
+for (const [name, vp] of [
+  ["360px", { width: 360, height: 740 }],
+  ["390px", { width: 390, height: 844 }],
+]) {
+  const ctx = await phone(vp);
+  const p = await ctx.newPage();
+  await p.goto(B + "booking/en", { waitUntil: "load" });
+  await p.waitForTimeout(1400);
+
+  const cell = await p.locator('[role="grid"] button').nth(20).boundingBox();
+  // Above the 24px floor everything must clear, because this is the control
+  // the page exists for and it is tapped over and over.
+  ck(
+    `Day cells are thumb-sized at ${name}`,
+    !!cell && cell.width >= 40 && cell.height >= 40,
+    cell ? `${Math.round(cell.width)}x${Math.round(cell.height)}` : "no cell",
+  );
+
+  // "September 2026" wrapped to two lines at 360px and pushed the arrows out
+  // of line with each other.
+  const month = await p.evaluate(() => {
+    const grid = document.querySelector('[role="grid"]');
+    const label = grid?.getAttribute("aria-label") ?? "";
+    const el = [...document.querySelectorAll("p")].find(
+      (n) => n.textContent.trim() === label && label !== "",
+    );
+    if (!el) return null;
+    const line = parseFloat(getComputedStyle(el).lineHeight) || 0;
+    return { h: Math.round(el.getBoundingClientRect().height), line: Math.round(line) };
+  });
+  ck(
+    `The month sits on one line at ${name}`,
+    !!month && month.line > 0 && month.h <= month.line + 2,
+    month ? `${month.h}px tall, one line is ${month.line}px` : "no month label",
+  );
+
+  // The grid must not be wider than the box drawn around it.
+  const fits = await p.evaluate(() => {
+    const grid = document.querySelector('[role="grid"]');
+    if (!grid) return null;
+    return Math.round(grid.getBoundingClientRect().right - document.documentElement.clientWidth);
+  });
+  ck(
+    `The calendar stays inside the screen at ${name}`,
+    fits !== null && fits <= 0,
+    `${fits}px past the edge`,
+  );
+
+  await ctx.close();
+}
+
 // ================== the fastest way to book is reachable without scrolling
 {
   const ctx = await phone({ width: 390, height: 844 });

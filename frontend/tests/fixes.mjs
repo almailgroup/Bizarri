@@ -83,8 +83,8 @@ async function mk(tz) {
         decided_at: null,
         decided_by: null,
       });
-    if (path === "rpc/lookup_booking") {
-      if (body.p_ref === "BZR-TZ0001" && body.p_email === "t@e.com")
+    if (path === "rpc/lookup_booking_by_ref") {
+      if (String(body.p_ref ?? "").toUpperCase() === "BZR-TZ0001")
         return send([
           {
             ref: "BZR-TZ0001",
@@ -151,7 +151,9 @@ for (let i = 0; i < 20; i++) {
   await p.waitForTimeout(110);
   clicks++;
 }
-const label = await p.locator("p.font-display.text-2xl").first().innerText();
+// The grid labels itself with the month. Reading it from a Tailwind class
+// tied the test to a text size, and it broke the day that size changed.
+const label = await p.locator('[role="grid"]').first().getAttribute("aria-label");
 const stats = await p.evaluate(() => {
   const btns = [...document.querySelectorAll(".grid.grid-cols-7 button")];
   return { total: btns.length, disabled: btns.filter((x) => x.disabled).length };
@@ -178,8 +180,8 @@ await ctx.close();
 ({ p, ctx } = await mk("Asia/Kuwait"));
 await p.goto(pageUrl("reservation"), { waitUntil: "domcontentloaded" });
 await p.waitForTimeout(600);
+// The reference stands on its own now; there is no second field to fill.
 await p.locator('input[placeholder="BZR-XXXXXX"]').fill("BZR-TZ0001");
-await p.locator("input[type=email]").fill("t@e.com");
 await p.getByRole("button", { name: /check status/i }).click();
 await p.waitForTimeout(600);
 ck("Guest lookup shows the status", await p.getByText("Accepted").first().isVisible());

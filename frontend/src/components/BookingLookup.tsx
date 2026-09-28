@@ -1,15 +1,9 @@
 import { useEffect, useState } from "react";
 import { useI18n } from "@/lib/i18n";
-import { useLookupBooking, useLookupBookingByPhone } from "@/lib/api";
+import { useLookupBooking, type FoundBooking, type LookupBy } from "@/lib/api";
 import { formatMoney } from "@/lib/booking";
-import type { BookingRow } from "@/integrations/supabase/types";
 
 const LAST_REF_KEY = "bizarri:lastRef";
-
-type Found = Pick<
-  BookingRow,
-  "ref" | "status" | "chalet_id" | "start_date" | "end_date" | "days" | "total" | "currency"
->;
 
 /** Remember the reference so a returning guest does not have to find the email. */
 export function rememberBookingRef(ref: string) {
@@ -30,36 +24,37 @@ function readLastRef(): string {
 }
 
 /**
- * Two ways in, because guests lose things.
+ * Three ways in, because guests lose things.
  *
- * The reference is the reliable one. The phone number is there for the guest
- * who deleted the email, and it deliberately asks for nothing they had to be
- * told — which does mean anyone who knows a number can see the stay behind
- * it. That trade was made knowingly; see lookup_booking_by_phone() in the
- * migration.
+ * Each asks for one field. Asking for two would make the "I have lost it"
+ * case worse, and that case is the only reason this page exists. Only the
+ * reference is a secret; the other two show a stay to anyone who knows the
+ * address or the number, which is a trade made knowingly — see the notes on
+ * the lookup functions in the migration.
  */
 export function BookingLookup({ heading = true }: { heading?: boolean }) {
   const { tr, lang } = useI18n();
-  const [mode, setMode] = useState<"ref" | "phone">("ref");
-  const byRef = useLookupBooking();
-  const byPhone = useLookupBookingByPhone();
-  const [ref, setRef] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
+  const [by, setBy] = useState<LookupBy>("ref");
+  const lookup = useLookupBooking();
+  const [values, setValues] = useState<Record<LookupBy, string>>({
+    ref: "",
+    email: "",
+    phone: "",
+  });
   const [prefilled, setPrefilled] = useState(false);
 
   // localStorage is not available during SSR, so read it after mount.
   useEffect(() => {
     const last = readLastRef();
     if (last) {
-      setRef(last);
+      setValues((v) => ({ ...v, ref: last }));
       setPrefilled(true);
     }
   }, []);
 
-  const active = mode === "ref" ? byRef : byPhone;
-  const results = (active.data ?? []) as Found[];
+  const results = (lookup.data ?? []) as FoundBooking[];
   const found = results[0];
+  const value = values[by];
 
   const statusLabel = (s: string) =>
     s === "accepted"
@@ -72,45 +67,52 @@ export function BookingLookup({ heading = true }: { heading?: boolean }) {
             : "ملغى"
           : tr("statusPending");
 
-  const switchTo = (next: "ref" | "phone") => {
-    if (next === mode) return;
-    setMode(next);
-    // Results belong to the mode that produced them; leaving them on screen
-    // under the other tab reads as an answer to a question nobody asked.
-    byRef.reset();
-    byPhone.reset();
+  const switchTo = (next: LookupBy) => {
+    if (next === by) return;
+    setBy(next);
+    // Results belong to the question that produced them; leaving them on
+    // screen under another tab reads as an answer to one nobody asked.
+    lookup.reset();
   };
 
-  const tab = (value: "ref" | "phone", label: string) => (
-    <button
-      type="button"
-      role="tab"
-      aria-selected={mode === value}
-      onClick={() => switchTo(value)}
-      // flex-1 with a floor: the two sit side by side where they fit and take
-      // a full row each where they do not, rather than wrapping to two
-      // different widths.
-      className={`min-w-[11rem] flex-1 px-5 py-3 text-sm uppercase tracking-widest transition-colors ${
-        mode === value
-          ? "bg-foreground text-background"
-          : "border border-border text-muted-foreground hover:bg-secondary"
-      }`}
-    >
-      {label}
-    </button>
-  );
+  const tabs: { key: LookupBy; label: string }[] = [
+    { key: "ref", label: tr("lookupByRef") },
+    { key: "email", label: tr("lookupByEmail") },
+    { key: "phone", label: tr("lookupByPhone") },
+  ];
 
-  const field =
-    "min-w-[10rem] flex-1 border border-border bg-secondary px-4 py-3 outline-none focus:border-foreground";
-  const submitButton = (
-    <button
-      type="submit"
-      disabled={active.isPending}
-      className="border border-foreground px-6 py-3 text-sm uppercase tracking-widest transition-colors hover:bg-foreground hover:text-background disabled:opacity-50"
-    >
-      {tr("checkStatus")}
-    </button>
-  );
+  const field = {
+    ref: {
+      hint: tr("checkByRefHint"),
+      placeholder: "BZR-XXXXXX",
+      type: "text",
+      mode: undefined,
+      auto: undefined,
+      label: tr("bookingRef"),
+      empty: tr("bookingNotFoundRef"),
+      mono: true,
+    },
+    email: {
+      hint: tr("checkByEmailHint"),
+      placeholder: "you@example.com",
+      type: "email",
+      mode: "email" as const,
+      auto: "email",
+      label: tr("email"),
+      empty: tr("bookingNotFoundEmail"),
+      mono: false,
+    },
+    phone: {
+      hint: tr("checkByPhoneHint"),
+      placeholder: "+965 XXXXXXXX",
+      type: "tel",
+      mode: "tel" as const,
+      auto: "tel",
+      label: tr("phone"),
+      empty: tr("bookingNotFoundPhone"),
+      mono: false,
+    },
+  }[by];
 
   return (
     <div>
@@ -119,96 +121,90 @@ export function BookingLookup({ heading = true }: { heading?: boolean }) {
       <p className="mt-2 text-sm text-muted-foreground" id="lookup-how">
         {tr("lookupHow")}
       </p>
-      <div role="tablist" aria-labelledby="lookup-how" className="mt-3 flex flex-wrap gap-2">
-        {tab("ref", tr("lookupByRef"))}
-        {tab("phone", tr("lookupByPhone"))}
+      {/* One per row on a phone, so no label is squeezed or wrapped. */}
+      <div role="tablist" aria-labelledby="lookup-how" className="mt-3 grid gap-2 sm:grid-cols-3">
+        {tabs.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            role="tab"
+            aria-selected={by === t.key}
+            onClick={() => switchTo(t.key)}
+            className={`px-4 py-3 text-sm uppercase tracking-widest transition-colors ${
+              by === t.key
+                ? "bg-foreground text-background"
+                : "border border-border text-muted-foreground hover:bg-secondary"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
 
-      <p className="mt-4 text-sm text-muted-foreground">
-        {mode === "ref" ? tr("checkBookingHint") : tr("checkByPhoneHint")}
-      </p>
+      <p className="mt-4 text-sm text-muted-foreground">{field.hint}</p>
 
-      {mode === "ref" ? (
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!ref.trim() || !email.trim()) return;
-            byRef.mutate({ ref, email });
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!value.trim()) return;
+          lookup.mutate({ by, value: value.trim() });
+        }}
+        className="mt-4 flex flex-col gap-3 sm:flex-row"
+      >
+        <input
+          // Keyed by mode so switching tabs gives a genuinely new input
+          // rather than one carrying the old type and autofill behaviour.
+          key={by}
+          type={field.type}
+          inputMode={field.mode}
+          autoComplete={field.auto}
+          value={value}
+          onChange={(e) => {
+            setValues({ ...values, [by]: e.target.value });
+            if (by === "ref") setPrefilled(false);
           }}
-          className="mt-5 flex flex-wrap gap-3"
+          placeholder={field.placeholder}
+          dir="ltr"
+          aria-label={field.label}
+          className={`min-w-0 flex-1 border border-border bg-secondary px-4 py-3 outline-none focus:border-foreground ${
+            field.mono ? "font-mono" : ""
+          }`}
+        />
+        <button
+          type="submit"
+          disabled={lookup.isPending || !value.trim()}
+          className="border border-foreground px-6 py-3 text-sm uppercase tracking-widest transition-colors hover:bg-foreground hover:text-background disabled:opacity-50"
         >
-          <input
-            value={ref}
-            onChange={(e) => {
-              setRef(e.target.value);
-              setPrefilled(false);
-            }}
-            placeholder="BZR-XXXXXX"
-            dir="ltr"
-            aria-label={tr("bookingRef")}
-            className={`${field} font-mono`}
-          />
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder={tr("email")}
-            dir="ltr"
-            aria-label={tr("email")}
-            className={`${field} min-w-[12rem]`}
-          />
-          {submitButton}
-        </form>
-      ) : (
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!phone.trim()) return;
-            byPhone.mutate({ phone });
-          }}
-          className="mt-5 flex flex-wrap gap-3"
-        >
-          <input
-            type="tel"
-            inputMode="tel"
-            autoComplete="tel"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="+965 XXXXXXXX"
-            dir="ltr"
-            aria-label={tr("phone")}
-            className={`${field} min-w-[12rem]`}
-          />
-          {submitButton}
-        </form>
-      )}
+          {tr("checkStatus")}
+        </button>
+      </form>
 
-      {prefilled && mode === "ref" && (
+      {prefilled && by === "ref" && (
         <p className="mt-3 text-xs text-muted-foreground">{tr("savedRefNote")}</p>
       )}
 
-      {active.isSuccess && !found && (
-        <p className="mt-4 text-sm text-muted-foreground">
-          {mode === "ref" ? tr("bookingNotFound") : tr("bookingNotFoundPhone")}
-        </p>
+      {lookup.isSuccess && !found && (
+        <p className="mt-4 text-sm text-muted-foreground">{field.empty}</p>
       )}
-      {active.isError && (
+      {lookup.isError && (
         <p role="alert" className="mt-4 text-sm text-destructive">
-          {(active.error as Error).message}
+          {(lookup.error as Error).message}
         </p>
       )}
 
-      {/* A number can carry more than one stay, so the phone path lists them
-          all rather than silently showing whichever came back first. */}
+      {/* An address or a number can carry more than one stay, so they are all
+          listed rather than whichever came back first. */}
       {results.map((b) => (
-        <div key={b.ref} className="mt-5 border border-border p-6">
+        <div key={b.ref} className="mt-5 border border-border p-5 sm:p-6">
           <p className="font-mono text-xs text-muted-foreground" dir="ltr">
             {b.ref}
           </p>
           <p className="mt-2 font-display text-2xl">{statusLabel(b.status)}</p>
           <p className="mt-2 text-sm text-muted-foreground" dir="ltr">
-            Chalet {b.chalet_id} · {b.start_date} → {b.end_date} ({b.days} {tr("nightsLabel")}) ·{" "}
-            {formatMoney(Number(b.total), lang)}
+            Chalet {b.chalet_id} · {b.start_date} → {b.end_date}
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground" dir="ltr">
+            {b.days} {tr("nightsLabel")} · {formatMoney(Number(b.total), lang)}
           </p>
         </div>
       ))}

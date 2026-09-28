@@ -277,39 +277,34 @@ export function useVerifyEmailCode() {
   });
 }
 
-export function useLookupBooking() {
-  return useMutation({
-    mutationFn: async ({ ref, email }: { ref: string; email: string }) => {
-      const { data, error } = await supabase.rpc("lookup_booking", {
-        p_ref: ref,
-        p_email: email,
-      });
-      if (error) fail("Lookup failed", error);
-      return (data ?? []) as Pick<
-        BookingRow,
-        "ref" | "status" | "chalet_id" | "start_date" | "end_date" | "days" | "total" | "currency"
-      >[];
-    },
-  });
-}
+export type FoundBooking = Pick<
+  BookingRow,
+  "ref" | "status" | "chalet_id" | "start_date" | "end_date" | "days" | "total" | "currency"
+>;
+
+/** The three things a guest might still have. */
+export type LookupBy = "ref" | "email" | "phone";
 
 /**
- * Find a booking from the phone number alone.
+ * Find a booking by whichever one of the three the guest still has.
  *
- * No second factor by design — see the note on lookup_booking_by_phone() in
- * the migration. The server throttles repeat lookups on one number.
+ * Only the reference is a secret; an address or a number is not, so those two
+ * show a stay to anyone who knows them. That is a deliberate trade for the
+ * guest who has lost the reference — see the notes on the functions in the
+ * migration. The server throttles each, hardest on the reference.
  */
-export function useLookupBookingByPhone() {
+export function useLookupBooking() {
   return useMutation({
-    mutationFn: async ({ phone }: { phone: string }) => {
-      const { data, error } = await supabase.rpc("lookup_booking_by_phone", {
-        p_phone: phone,
-      });
+    mutationFn: async ({ by, value }: { by: LookupBy; value: string }) => {
+      const call =
+        by === "ref"
+          ? supabase.rpc("lookup_booking_by_ref", { p_ref: value })
+          : by === "email"
+            ? supabase.rpc("lookup_booking_by_email", { p_email: value })
+            : supabase.rpc("lookup_booking_by_phone", { p_phone: value });
+      const { data, error } = await call;
       if (error) fail("Lookup failed", error);
-      return (data ?? []) as Pick<
-        BookingRow,
-        "ref" | "status" | "chalet_id" | "start_date" | "end_date" | "days" | "total" | "currency"
-      >[];
+      return (data ?? []) as FoundBooking[];
     },
   });
 }

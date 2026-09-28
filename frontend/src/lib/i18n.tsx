@@ -298,8 +298,8 @@ export const t: Dict = {
   // Reservation shortcut
   yourReservation: { en: "Your Reservation", ar: "حجزك" },
   yourReservationIntro: {
-    en: "Already requested a stay? Look it up with your reference, or with the phone number you booked with.",
-    ar: "هل طلبت إقامة بالفعل؟ تتبعها برقم الحجز، أو برقم الهاتف الذي حجزت به.",
+    en: "Already requested a stay? Look it up with your reference, your email address, or the phone number you booked with.",
+    ar: "هل طلبت إقامة بالفعل؟ تتبعها برقم الحجز أو بالبريد الإلكتروني أو برقم الهاتف الذي حجزت به.",
   },
   savedRefNote: {
     en: "We filled in the reference from your last request on this device.",
@@ -352,8 +352,25 @@ export const t: Dict = {
   },
 
   // Looking a booking up two ways
-  lookupByRef: { en: "Reference & email", ar: "رقم الحجز والبريد" },
+  lookupByRef: { en: "Booking reference", ar: "رقم الحجز" },
+  lookupByEmail: { en: "Email address", ar: "البريد الإلكتروني" },
   lookupByPhone: { en: "Phone number", ar: "رقم الهاتف" },
+  checkByRefHint: {
+    en: "Enter the reference from your confirmation email.",
+    ar: "أدخل رقم الحجز من رسالة التأكيد.",
+  },
+  checkByEmailHint: {
+    en: "Enter the email address you booked with.",
+    ar: "أدخل البريد الإلكتروني الذي حجزت به.",
+  },
+  bookingNotFoundRef: {
+    en: "No request matches that reference.",
+    ar: "لا يوجد طلب مطابق لهذا الرقم.",
+  },
+  bookingNotFoundEmail: {
+    en: "No request matches that email address.",
+    ar: "لا يوجد طلب مطابق لهذا البريد الإلكتروني.",
+  },
   lookupHow: { en: "How would you like to find your booking?", ar: "كيف تريد البحث عن حجزك؟" },
   checkByPhoneHint: {
     en: "Enter the phone number you booked with.",

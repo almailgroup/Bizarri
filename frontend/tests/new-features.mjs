@@ -267,7 +267,7 @@ function mock(ctx, state) {
       });
     }
 
-    if (path === "rpc/lookup_booking") {
+    if (path === "rpc/lookup_booking_by_ref") {
       const hit = state.bookings.find(
         (x) =>
           x.ref.toLowerCase() ===
@@ -564,8 +564,8 @@ const bg = (loc) => loc.evaluate((el) => getComputedStyle(el).backgroundColor);
     await p.getByText(/Already requested a stay/i).isVisible(),
   );
 
+  // The reference stands on its own; the email is its own way in now.
   await p.locator('input[placeholder="BZR-XXXXXX"]').fill("BZR-AAA111");
-  await p.locator("input[type=email]").fill("aisha@example.com");
   await p.getByRole("button", { name: /Check status/i }).click();
   await p.waitForTimeout(600);
   ck("Looking up a reference shows its status", await p.getByText("Accepted").first().isVisible());

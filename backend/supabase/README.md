@@ -104,17 +104,24 @@ been configured is strict rather than quietly open.
 
 ### Finding a booking again
 
-Two paths, and they are not equally safe:
+Three paths, one field each, and they are not equally safe:
 
-- `lookup_booking()` — reference **and** email. The reference is the secret.
-- `lookup_booking_by_phone()` — the phone number alone, **with no second
-  factor**. Anyone who knows a number can see whether it has a stay booked,
-  when, and for how much.
+- `lookup_booking_by_ref()` — the reference is the one thing a guest was given
+  that nobody else knows, so it stands on its own, the way a parcel tracking
+  number does. Throttled hardest (10 an hour) because a reference is guessable
+  in a way an address is not.
+- `lookup_booking_by_email()` and `lookup_booking_by_phone()` — **no second
+  factor**. Anyone who knows the address or the number can see whether it has a
+  stay booked, when, and for how much. 20 an hour each.
 
-The second is a deliberate choice by the site owner, not an oversight. The
-per-number throttle (20 lookups an hour) slows repeated hits on one victim; it
-does not make the data private and nothing in the function can. Do not widen
-the columns it returns without revisiting that trade.
+The last two are a deliberate choice by the site owner, not an oversight: a
+guest who has lost the reference is otherwise stuck, and that is the only case
+this page exists for. The throttle slows repeated hits on one subject; it does
+not make the data private and nothing in the functions can. Do not widen the
+columns they return without revisiting that trade.
+
+All three go through `note_lookup()`, which is where the limit lives, so a
+fourth way in cannot ship without one.
 
 ## Files
 

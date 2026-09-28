@@ -243,6 +243,20 @@ export type Database = {
           "ref" | "status" | "chalet_id" | "start_date" | "end_date" | "days" | "total" | "currency"
         >[];
       };
+      lookup_booking_by_ref: {
+        Args: { p_ref: string };
+        Returns: Pick<
+          BookingRow,
+          "ref" | "status" | "chalet_id" | "start_date" | "end_date" | "days" | "total" | "currency"
+        >[];
+      };
+      lookup_booking_by_email: {
+        Args: { p_email: string };
+        Returns: Pick<
+          BookingRow,
+          "ref" | "status" | "chalet_id" | "start_date" | "end_date" | "days" | "total" | "currency"
+        >[];
+      };
       lookup_booking_by_phone: {
         Args: { p_phone: string };
         Returns: Pick<
