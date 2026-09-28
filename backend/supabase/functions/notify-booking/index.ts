@@ -1,10 +1,17 @@
 /**
- * Notifies the team when a booking request arrives — by email, and by
- * WhatsApp via CallMeBot.
+ * Every email the booking flow sends after the request exists.
  *
- * Wired as a Supabase Database Webhook on INSERT into public.bookings, so the
- * notification is a consequence of the row existing rather than something the
- * browser has to remember to do — a guest closing the tab cannot lose it.
+ * On INSERT: the team is told a request arrived, by email and by WhatsApp via
+ * CallMeBot, and the guest gets their own copy with the reference.
+ *
+ * On UPDATE: if the status changed to accepted, rejected or cancelled, the
+ * guest is told what was decided. Any other update — an edited phone number,
+ * an internal note — sends nothing, or every keystroke in the admin panel
+ * would be an email.
+ *
+ * Wired as Supabase Database Webhooks on public.bookings, so a notification is
+ * a consequence of the row changing rather than something a browser has to
+ * remember to do — closing the tab cannot lose it.
  *
  * Recipients for both channels come from public.settings — editable from the
  * admin panel's Site Settings tab — falling back to secrets if the relevant
@@ -39,8 +46,52 @@ interface BookingRecord {
   guest_email: string;
   guests: number;
   notes: string | null;
+  status?: string | null;
   /** The language the guest booked in, for their copy of the email. */
   lang?: string | null;
+}
+
+interface WebhookPayload {
+  type?: string;
+  record?: BookingRecord;
+  old_record?: BookingRecord | null;
+}
+
+/** The decisions worth telling a guest about. */
+const DECISIONS = ["accepted", "rejected", "cancelled"];
+
+/**
+ * What one webhook delivery should cause.
+ *
+ * Pure and exported so it can be tested without a Deno runtime — the routing
+ * is the part with the edge cases, and an UPDATE hook fires on every column,
+ * not just the one that matters.
+ */
+export function classify(payload: WebhookPayload | null): {
+  action: "new" | "decision" | "ignore";
+  reason?: string;
+} {
+  const record = payload?.record;
+  if (!record?.ref) return { action: "ignore", reason: "no booking in payload" };
+
+  // A direct call (no webhook envelope) is treated as a new request, which is
+  // how this function was invoked before there was anything else to do.
+  if (payload?.type === "INSERT" || !payload?.type) return { action: "new" };
+
+  if (payload.type === "UPDATE") {
+    // Without the previous row there is no evidence anything changed, and
+    // "probably a decision" is not good enough to mail a guest about.
+    if (!payload.old_record) return { action: "ignore", reason: "no previous row" };
+    const before = payload.old_record.status ?? null;
+    const after = record.status ?? null;
+    if (before === after) return { action: "ignore", reason: "status unchanged" };
+    if (!after || !DECISIONS.includes(after)) {
+      return { action: "ignore", reason: `status ${after} is not a decision` };
+    }
+    return { action: "decision" };
+  }
+
+  return { action: "ignore", reason: `unhandled event ${payload.type}` };
 }
 
 /** One row from public.settings, or null on any failure — never throws, so a
@@ -172,6 +223,88 @@ function renderGuest(b: BookingRecord, lang: "en" | "ar"): string {
     </div>`;
 }
 
+/**
+ * What the guest is told once a decision is made.
+ *
+ * Three different messages, because "rejected" needs to read as an apology
+ * with a way forward rather than as a status code. The internal admin note is
+ * deliberately not included: the admin panel labels it internal and an admin
+ * writing "haggled, gave discount" there does not expect the guest to read it.
+ */
+function renderDecision(b: BookingRecord, lang: "en" | "ar"): string {
+  const ar = lang === "ar";
+  const status = b.status ?? "";
+  const copy = ar
+    ? {
+        accepted: {
+          title: "تم تأكيد حجزك",
+          body: "يسعدنا تأكيد إقامتك. نتطلع لاستقبالك.",
+        },
+        rejected: {
+          title: "لم نتمكن من تأكيد حجزك",
+          body: "نأسف، هذه التواريخ غير متاحة. تواصل معنا عبر واتساب وسنساعدك في إيجاد موعد آخر.",
+        },
+        cancelled: { title: "تم إلغاء حجزك", body: "تم إلغاء هذا الحجز. إذا لم تطلب ذلك، يرجى التواصل معنا." },
+        ref: "رقم الحجز",
+        chalet: "الشاليه",
+        dates: "التواريخ",
+        total: "الإجمالي",
+        guests: "عدد الضيوف",
+        contact: "لأي استفسار، تواصل معنا على +965 94040955.",
+      }
+    : {
+        accepted: {
+          title: "Your booking is confirmed",
+          body: "We are glad to confirm your stay. We look forward to welcoming you.",
+        },
+        rejected: {
+          title: "We could not confirm your booking",
+          body: "We are sorry \u2014 these dates are not available. Message us on WhatsApp and we will help you find another date.",
+        },
+        cancelled: {
+          title: "Your booking has been cancelled",
+          body: "This booking has been cancelled. If you did not ask for this, please get in touch.",
+        },
+        ref: "Booking reference",
+        chalet: "Chalet",
+        dates: "Dates",
+        total: "Total",
+        guests: "Guests",
+        contact: "Any questions, reach us on +965 94040955.",
+      };
+  const t = (copy as Record<string, { title: string; body: string }>)[status] ?? copy.accepted;
+
+  const row = (label: string, value: string) =>
+    `<tr><td style="padding:6px 16px 6px 0;color:#666">${esc(label)}</td>` +
+    `<td style="padding:6px 0;font-weight:500">${esc(value)}</td></tr>`;
+
+  // Confirmed gets the full stay again; a refusal does not need the price of
+  // something that is not happening.
+  const details =
+    status === "accepted"
+      ? `<table style="border-collapse:collapse;font-size:14px">
+        ${row(copy.chalet, `Bizarri Chalet ${b.chalet_id}`)}
+        ${row(copy.dates, `${b.start_date} \u2192 ${b.end_date} (${b.days})`)}
+        ${row(copy.total, `${b.currency} ${b.total}`)}
+        ${row(copy.guests, String(b.guests))}
+      </table>`
+      : "";
+
+  return `
+    <div style="font-family:system-ui,sans-serif;max-width:520px" ${ar ? 'dir="rtl"' : ""}>
+      <p style="letter-spacing:.3em;text-transform:uppercase;font-size:11px;color:#888">
+        Bizarri Chalet</p>
+      <h2 style="font-weight:400;margin:4px 0 8px">${esc(t.title)}</h2>
+      <p style="font-size:15px;color:#333;margin:0 0 20px">${esc(t.body)}</p>
+      <p style="text-transform:uppercase;letter-spacing:.2em;font-size:11px;color:#888;margin:0">
+        ${esc(copy.ref)}</p>
+      <p style="font-family:monospace;font-size:26px;margin:4px 0 24px" dir="ltr">${esc(b.ref)}</p>
+      ${details}
+      <p style="margin-top:24px;font-size:13px;color:#888" dir="${ar ? "rtl" : "ltr"}">
+        ${esc(copy.contact)}</p>
+    </div>`;
+}
+
 /** Plain-text with WhatsApp's own emphasis markup (*bold*), not HTML. */
 function renderWhatsApp(b: BookingRecord): string {
   const lines = [
@@ -294,6 +427,43 @@ async function sendGuestEmail(booking: BookingRecord): Promise<DeliveryResult> {
   }
 }
 
+/** The decision, to the guest. Never throws, for the same reason as above. */
+async function sendDecisionEmail(booking: BookingRecord): Promise<DeliveryResult> {
+  const key = Deno.env.get("RESEND_API_KEY");
+  if (!key) return { attempted: false, delivered: false, reason: "no api key" };
+  if (!booking.guest_email) return { attempted: false, delivered: false, reason: "no address" };
+
+  const lang: "en" | "ar" = booking.lang === "ar" ? "ar" : "en";
+  const from = Deno.env.get("NOTIFY_FROM") ?? "Bizarri Chalet <onboarding@resend.dev>";
+  const replyTo = (await notifyEmailsFromSettings())?.[0] ?? Deno.env.get("NOTIFY_EMAILS");
+  const confirmed = booking.status === "accepted";
+
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        from,
+        to: [booking.guest_email],
+        subject:
+          lang === "ar"
+            ? `${confirmed ? "\u062a\u0645 \u062a\u0623\u0643\u064a\u062f \u062d\u062c\u0632\u0643" : "\u062a\u062d\u062f\u064a\u062b \u0639\u0644\u0649 \u062d\u062c\u0632\u0643"} ${booking.ref}`
+            : `${confirmed ? "Confirmed" : "Update"}: booking ${booking.ref} \u2014 Bizarri Chalet`,
+        html: renderDecision(booking, lang),
+        ...(replyTo ? { reply_to: replyTo } : {}),
+      }),
+    });
+    if (!res.ok) {
+      console.error("notify-booking: decision email failed", res.status, await res.text());
+      return { attempted: true, delivered: false };
+    }
+    return { attempted: true, delivered: true };
+  } catch (e) {
+    console.error("notify-booking: decision email error", e);
+    return { attempted: true, delivered: false };
+  }
+}
+
 async function sendAllWhatsApp(booking: BookingRecord): Promise<DeliveryResult> {
   const configured = await notifyWhatsAppFromSettings();
   const envPhone = Deno.env.get("CALLMEBOT_PHONE");
@@ -316,13 +486,29 @@ Deno.serve(async (req: Request) => {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405, origin);
 
   try {
-    const payload = await req.json().catch(() => null);
+    const raw = await req.json().catch(() => null);
     // Database Webhooks post { type, table, record, old_record }; a direct
     // call may post the record itself.
-    const booking: BookingRecord | null =
-      (payload?.record as BookingRecord) ?? (payload?.ref ? (payload as BookingRecord) : null);
+    const payload: WebhookPayload | null = raw?.record
+      ? (raw as WebhookPayload)
+      : raw?.ref
+        ? { record: raw as BookingRecord }
+        : null;
 
-    if (!booking?.ref) return json({ error: "No booking in payload" }, 400, origin);
+    const { action, reason } = classify(payload);
+    if (action === "ignore") {
+      // 200, not an error: an update this function has nothing to say about is
+      // a normal event, and a failing webhook would be retried forever.
+      console.log("notify-booking: ignoring delivery -", reason);
+      return json({ ok: true, action, reason }, 200, origin);
+    }
+
+    const booking = payload!.record!;
+
+    if (action === "decision") {
+      const guestEmail = await sendDecisionEmail(booking);
+      return json({ ok: true, action, guestEmail }, 200, origin);
+    }
 
     // The three sends are independent: one being unconfigured or failing
     // never stops the others from being attempted.
@@ -332,7 +518,7 @@ Deno.serve(async (req: Request) => {
       sendAllWhatsApp(booking),
     ]);
 
-    return json({ ok: true, email, guestEmail, whatsapp }, 200, origin);
+    return json({ ok: true, action, email, guestEmail, whatsapp }, 200, origin);
   } catch (e) {
     console.error("notify-booking error", e);
     return json({ error: "Unexpected error" }, 500, origin);
