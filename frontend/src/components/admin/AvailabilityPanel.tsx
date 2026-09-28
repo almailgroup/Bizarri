@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
-import { fmtDate, startOfToday } from "@/lib/booking";
+import { fmtDate, formatMoney, startOfToday } from "@/lib/booking";
 import { useAvailability, useBlockedDates, useSetDayPrice, useToggleBlocked } from "@/lib/api";
 
 export function AvailabilityPanel({ chaletId }: { chaletId: number }) {
@@ -132,9 +132,13 @@ export function AvailabilityPanel({ chaletId }: { chaletId: number }) {
                   } ${past && !isManualBlock && !guestBooked ? "text-muted-foreground/50" : ""}`}
                 >
                   {d.getDate()}
+                  {/* A bare "50" under a date told an admin a number without
+                      saying what it was, at a size they had to lean in for.
+                      The pill carries the currency and reads at a glance,
+                      which is the whole job of this screen. */}
                   {info?.custom && !isManualBlock && !guestBooked && (
-                    <span className="text-[9px] leading-none text-muted-foreground">
-                      {info.price}
+                    <span className="rounded-full bg-secondary px-2 py-0.5 text-xs font-medium leading-none text-foreground">
+                      {formatMoney(info.price, lang)}
                     </span>
                   )}
                 </button>
@@ -151,7 +155,12 @@ export function AvailabilityPanel({ chaletId }: { chaletId: number }) {
               {lang === "en" ? "Booked by a guest" : "محجوز من ضيف"}
             </span>
             <span className="flex items-center gap-2">
-              <span className="h-1 w-1 rounded-full bg-foreground/50" /> {tr("customPricing")}
+              {/* The key has to show what is actually on the grid; it was
+                  still a dot after the price became a pill. */}
+              <span className="rounded-full bg-secondary px-2 py-0.5 text-xs font-medium leading-none text-foreground">
+                {formatMoney(0, lang).replace(/\d+/, "—")}
+              </span>{" "}
+              {tr("customPricing")}
             </span>
           </div>
         </div>

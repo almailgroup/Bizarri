@@ -396,6 +396,10 @@ export const t: Dict = {
     ar: "أرسلنا رمزاً إلى {email}. ينتهي خلال ١٠ دقائق.",
   },
   enterCode: { en: "6-digit code", ar: "الرمز المكوّن من ٦ أرقام" },
+  checkSpam: {
+    en: "Not arrived? Check your spam or junk folder.",
+    ar: "لم يصلك الرمز؟ تحقق من مجلد الرسائل غير المرغوب فيها (Spam / Junk).",
+  },
   verifyCode: { en: "Confirm", ar: "تأكيد" },
   codeWrong: { en: "That code is not correct.", ar: "هذا الرمز غير صحيح." },
   emailConfirmed: { en: "Email confirmed", ar: "تم تأكيد البريد الإلكتروني" },

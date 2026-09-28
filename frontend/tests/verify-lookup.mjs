@@ -318,6 +318,10 @@ async function toCheckout(p) {
 
   const sendBtn = p.getByRole("button", { name: /^Send code$/i });
   ck("The checkout asks to confirm the email", await sendBtn.isVisible());
+  ck(
+    "Nothing is said about spam before a code has been sent",
+    (await p.getByText(/spam or junk/i).count()) === 0,
+  );
   ck("…and will not send before there is an address to send to", await sendBtn.isDisabled());
 
   await p.getByLabel("Email", { exact: true }).fill("not-an-address");
@@ -337,6 +341,12 @@ async function toCheckout(p) {
       .getByText(/guest@example\.com/)
       .first()
       .isVisible(),
+  );
+
+  // The commonest "it never arrived" is a code sitting in a spam folder.
+  ck(
+    "…and the box says where to look if it does not arrive",
+    await p.getByText(/spam or junk/i).isVisible(),
   );
 
   const codeBox = p.getByLabel(/6-digit code/i);

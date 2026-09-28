@@ -196,7 +196,10 @@ function mock(ctx, state) {
       for (; d <= end; d.setDate(d.getDate() + 1)) {
         const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
         const blocked = accepted.some((bk) => iso >= bk.start_date && iso <= bk.end_date);
-        out.push({ day: iso, blocked, price: 75, custom: false });
+        // One custom-priced day a month, so the admin calendar has something
+        // to draw its price badge on.
+        const custom = d.getDate() === 12;
+        out.push({ day: iso, blocked, price: custom ? 50 : 75, custom });
       }
       return send(out);
     }
@@ -536,6 +539,49 @@ async function adminPage(state) {
   ck(
     "…and the login form follows",
     (await p.evaluate(() => document.documentElement.dir)) === "rtl",
+  );
+  await ctx.close();
+}
+
+// ================================= a custom price has to be readable at a glance
+{
+  const state = makeState();
+  const { p, ctx } = await adminPage(state);
+  await p
+    .getByRole("button", { name: /Availability/i })
+    .first()
+    .click();
+  await p.waitForTimeout(1200);
+
+  const badge = await p.evaluate(() => {
+    const cell = [...document.querySelectorAll(".grid.grid-cols-7 button")].find(
+      (btn) => /\d/.test(btn.textContent) && btn.querySelector("span.rounded-full"),
+    );
+    const span = cell?.querySelector("span.rounded-full");
+    if (!span) return null;
+    const cs = getComputedStyle(span);
+    return {
+      text: span.textContent.trim(),
+      px: parseFloat(cs.fontSize),
+      radius: parseFloat(cs.borderRadius),
+      bg: cs.backgroundColor,
+    };
+  });
+
+  ck("A custom price is shown on the day", !!badge, badge?.text);
+  // It used to read "50" at 9px, which says a number without saying what it
+  // is, at a size you have to lean in for.
+  ck(
+    "…with the currency, not a bare number",
+    /KD|\u062f\.\u0643/.test(badge?.text ?? ""),
+    badge?.text,
+  );
+  ck("…at a size that can be read", (badge?.px ?? 0) >= 12, `${badge?.px}px`);
+  ck("…in a pill, not loose text", (badge?.radius ?? 0) >= 8, `radius ${badge?.radius}px`);
+  ck(
+    "…on a light background rather than none",
+    !!badge && badge.bg !== "rgba(0, 0, 0, 0)",
+    badge?.bg,
   );
   await ctx.close();
 }

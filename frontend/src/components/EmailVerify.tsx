@@ -149,6 +149,11 @@ export function EmailVerify({
         </div>
       )}
 
+      {/* The commonest reason a code "never arrives" is that it did, into a
+          folder nobody thought to look in. Said once the code is on its way,
+          not before, when it would only be noise. */}
+      {sent && !error && <p className="mt-3 text-sm text-muted-foreground">{tr("checkSpam")}</p>}
+
       {error && (
         <p role="alert" className="mt-3 text-sm text-destructive">
           {error}
