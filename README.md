@@ -110,7 +110,7 @@ project — a fresh account, a new org, or the current project was deleted.
    supabase secrets set NOTIFY_EMAILS=admin@almailgroup.com
    supabase secrets set CALLMEBOT_PHONE=96594040955 # optional: booking WhatsApp alerts
    supabase secrets set CALLMEBOT_APIKEY=...
-   supabase secrets set ALLOWED_ORIGINS=https://almailgroup.github.io
+   supabase secrets set ALLOWED_ORIGINS=https://bizarri.com,https://www.bizarri.com
    ```
 
    **`RESEND_API_KEY` is not optional any more.** A guest must confirm their
@@ -172,12 +172,23 @@ One-time setup in the repository:
 1. Go to **Settings → Pages**.
 2. Under **Build and deployment → Source**, select **GitHub Actions**.
 
-The site is served at `https://<owner>.github.io/Bizarri/`. The Vite `base`
-path (`/Bizarri/`) is set for that URL; `dist/index.html` is also copied to
-`dist/404.html` so deep links resolve through client-side routing.
+3. Under **Custom domain**, enter `bizarri.com` and tick **Enforce HTTPS**
+   once the certificate has been issued.
 
-### Using a custom domain
+The site is served at `https://bizarri.com/`. `dist/index.html` is also copied
+to `dist/404.html` so deep links resolve through client-side routing, and
+`frontend/public/CNAME` carries the domain into every deploy so the Pages
+setting is not lost.
 
-Set the `BASE_PATH` build variable to `/` and add a `CNAME` file to the build
-output (or configure the domain under Settings → Pages). Update `base` handling
-in [`frontend/vite.config.ts`](frontend/vite.config.ts) accordingly.
+`https://<owner>.github.io/Bizarri/` redirects to the domain; GitHub does that
+itself once a custom domain is set.
+
+### Serving from a sub-path again
+
+The Vite `base` defaults to `/`. To go back to a project page, set the
+`BASE_PATH` build variable in
+[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) to `/Bizarri/`,
+delete `frontend/public/CNAME`, and change the absolute URLs in
+`frontend/index.html`, `frontend/public/sitemap.xml` and
+`frontend/public/robots.txt` back. Getting `base` wrong is what a blank page
+looks like: the HTML loads, every asset URL 404s, and no JavaScript runs.

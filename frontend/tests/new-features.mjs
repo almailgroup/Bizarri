@@ -10,7 +10,7 @@
 import { chromium } from "playwright";
 import { readFile, readdir } from "node:fs/promises";
 
-const B = "http://localhost:4173/Bizarri/";
+const B = "http://localhost:4173/";
 const SUPA = /ycfvqzcnatwacwlcmiej\.supabase\.co/;
 const b = await chromium.launch(
   process.env.PLAYWRIGHT_CHROMIUM_PATH

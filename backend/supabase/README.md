@@ -183,7 +183,7 @@ supabase secrets set RESEND_API_KEY=...         # REQUIRED: one-time codes
 supabase secrets set NOTIFY_EMAILS=admin@almailgroup.com
 supabase secrets set CALLMEBOT_PHONE=96594040955   # optional: booking WhatsApp alerts
 supabase secrets set CALLMEBOT_APIKEY=...
-supabase secrets set ALLOWED_ORIGINS=https://almailgroup.github.io
+supabase secrets set ALLOWED_ORIGINS=https://bizarri.com,https://www.bizarri.com
 ```
 
 `RESEND_API_KEY` is no longer optional. `notify-booking` still treats it as

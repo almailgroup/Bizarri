@@ -9,7 +9,7 @@
  */
 import { chromium } from "playwright";
 
-const B = "http://localhost:4173/Bizarri/";
+const B = "http://localhost:4173/";
 const b = await chromium.launch(
   process.env.PLAYWRIGHT_CHROMIUM_PATH
     ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_PATH }

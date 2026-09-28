@@ -1,57 +1,57 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://almailgroup.github.io/Bizarri/</loc>
+    <loc>https://bizarri.com/</loc>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://almailgroup.github.io/Bizarri/facilities</loc>
+    <loc>https://bizarri.com/facilities</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://almailgroup.github.io/Bizarri/photos</loc>
+    <loc>https://bizarri.com/photos</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://almailgroup.github.io/Bizarri/offers</loc>
+    <loc>https://bizarri.com/offers</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://almailgroup.github.io/Bizarri/booking</loc>
+    <loc>https://bizarri.com/booking</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://almailgroup.github.io/Bizarri/reservation</loc>
+    <loc>https://bizarri.com/reservation</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://almailgroup.github.io/Bizarri/news</loc>
+    <loc>https://bizarri.com/news</loc>
     <changefreq>weekly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://almailgroup.github.io/Bizarri/about</loc>
+    <loc>https://bizarri.com/about</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://almailgroup.github.io/Bizarri/contact</loc>
+    <loc>https://bizarri.com/contact</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://almailgroup.github.io/Bizarri/rules</loc>
+    <loc>https://bizarri.com/rules</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://almailgroup.github.io/Bizarri/privacy</loc>
+    <loc>https://bizarri.com/privacy</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>

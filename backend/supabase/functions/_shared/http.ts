@@ -5,7 +5,12 @@
  * rather than inlined so a second function can reuse it without copy-paste.
  */
 
+// The live site is bizarri.com. send-email-code is called from the browser, so
+// an origin missing here means the guest cannot get a code and cannot book;
+// the github.io host stays for as long as the old URL still resolves.
 const DEFAULT_ORIGINS = [
+  "https://bizarri.com",
+  "https://www.bizarri.com",
   "https://almailgroup.github.io",
   "http://localhost:5173",
   "http://localhost:4173",

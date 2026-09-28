@@ -41,13 +41,12 @@ jobs:
       - name: Build
         run: bun run build
         env:
-          # Served from https://<user>.github.io/Bizarri/
-          BASE_PATH: /Bizarri/
-
-      - name: SPA fallback
-        # GitHub Pages serves 404.html for unknown paths; reuse the SPA shell so
-        # deep links (e.g. /Bizarri/booking) boot the app and route client-side.
-        run: cp dist/index.html dist/404.html
+          # Served from https://bizarri.com/, so assets live at the root. Under
+          # the old /Bizarri/ base every asset URL became
+          # bizarri.com/Bizarri/assets/... , which 404s — no JavaScript runs and
+          # the page stays blank. github.io/Bizarri/ still works: once a custom
+          # domain is set, GitHub redirects it to the domain.
+          BASE_PATH: /
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
