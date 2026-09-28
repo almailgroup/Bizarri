@@ -16,35 +16,44 @@ function Contact() {
       : "تواصل مع شاليه بيزاري عبر الهاتف أو واتساب أو البريد الإلكتروني.",
   );
   const contact = useContactInfo();
+  // `ltr` marks a value that is Latin or numeric rather than prose. On the
+  // Arabic page the surrounding direction is RTL, and a leading "+" or "@" is
+  // bidi-neutral, so it gets laid out at the end of the run: +96594040955
+  // reads back as 96594040955+. The value needs its own direction.
   const items = [
     {
       icon: Phone,
       label: lang === "en" ? "Phone" : "هاتف",
       value: contact.phone,
+      ltr: true,
       href: `tel:${contact.phone}`,
     },
     {
       icon: MessageCircle,
       label: "WhatsApp",
       value: contact.phone,
+      ltr: true,
       href: `https://wa.me/${contact.whatsapp}`,
     },
     {
       icon: Mail,
       label: lang === "en" ? "Email" : "البريد",
       value: contact.email,
+      ltr: true,
       href: `mailto:${contact.email}`,
     },
     {
       icon: Instagram,
       label: "Instagram",
       value: "@bizarri.chalet",
+      ltr: true,
       href: contact.instagram,
     },
     {
       icon: MapPin,
       label: tr("location"),
       value: lang === "en" ? "Open in Maps" : "فتح في الخرائط",
+      ltr: false,
       href: contact.maps,
     },
   ];
@@ -66,12 +75,22 @@ function Contact() {
               href={it.href}
               target={it.href.startsWith("http") ? "_blank" : undefined}
               rel="noopener noreferrer"
-              className="group bg-background p-8 hover:bg-black hover:text-white transition-colors animate-fade-up"
+              // Five cards in two columns leave a sixth cell empty, and the
+              // grid's own background shows through it as a grey block. The
+              // last card takes the whole row instead.
+              className={`group bg-background p-8 hover:bg-black hover:text-white transition-colors animate-fade-up ${
+                i === items.length - 1 ? "sm:col-span-2" : ""
+              }`}
               style={{ animationDelay: `${i * 60}ms` }}
             >
               <it.icon className="w-6 h-6 mb-4" />
               <p className="text-xs uppercase tracking-widest opacity-60">{it.label}</p>
-              <p className="font-display text-2xl mt-2">{it.value}</p>
+              <p className="font-display text-2xl mt-2">
+                {/* The direction goes on an inline run, not the paragraph:
+                    dir on the block would also left-align it, pulling the
+                    value out from under its right-aligned Arabic label. */}
+                {it.ltr ? <span dir="ltr">{it.value}</span> : it.value}
+              </p>
             </a>
           ))}
         </div>
