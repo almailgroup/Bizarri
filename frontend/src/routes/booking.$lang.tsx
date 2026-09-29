@@ -741,7 +741,10 @@ function Calendar({
                 : past
                   ? "cursor-not-allowed text-muted-foreground/30"
                   : selected
-                    ? "bg-foreground font-semibold text-background"
+                    ? // An outlined circle, not a filled one: the ring marks the
+                      // day without hiding its number under a solid block, and
+                      // ring-inset keeps it inside the cell so nothing shifts.
+                      "bg-background font-semibold text-foreground ring-2 ring-inset ring-foreground"
                     : within
                       ? "bg-secondary text-foreground"
                       : offPackage

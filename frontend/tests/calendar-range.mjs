@@ -180,7 +180,13 @@ async function calendar(minStayDays) {
         "borderBottomLeftRadius",
         "borderBottomRightRadius",
       ].map((k) => Math.min(parseFloat(cs[k]) || 0, r.width / 2));
-      return { w: Math.round(r.width), radius: Math.min(...corners), corners };
+      return {
+        w: Math.round(r.width),
+        radius: Math.min(...corners),
+        corners,
+        bg: cs.backgroundColor,
+        ring: cs.boxShadow,
+      };
     };
     const cells = [...document.querySelectorAll('[role="grid"] button')];
     const chosen = cells.filter((c) => c.getAttribute("aria-pressed") === "true");
@@ -194,6 +200,10 @@ async function calendar(minStayDays) {
     return {
       chosen: chosen.map(read),
       between: between ? read(between) : null,
+      // The page colour, to compare the cell against. An earlier version
+      // looked the comparison colour up with a query that could miss, and
+      // when it did the assertion passed on a solid black cell.
+      page: getComputedStyle(document.body).backgroundColor,
     };
   });
 
@@ -209,6 +219,18 @@ async function calendar(minStayDays) {
       .map((c) => `${c.w}px wide, corners ${c.corners.map((x) => x.toFixed(0)).join("/")}`)
       .join(" | "),
   );
+  // An outline, not a fill: the number has to stay readable inside the mark.
+  ck(
+    "…drawn as an outline rather than filled in",
+    shapes.chosen.every((c) => c.ring && c.ring !== "none"),
+    shapes.chosen[0]?.ring?.slice(0, 40),
+  );
+  ck(
+    "…over the page colour, not a solid block",
+    !!shapes.page && shapes.chosen.every((c) => c.bg === shapes.page),
+    `cell ${shapes.chosen[0]?.bg} vs page ${shapes.page}`,
+  );
+
   // The days between stay square, or the run reads as separate marks rather
   // than one stay.
   ck(
