@@ -728,8 +728,6 @@ function Calendar({
               const disabled = past || reserved || offPackage;
               const selected = isEdge(d);
               const within = inRange(d);
-              const firstOfRange = !!start && fmtDate(d) === fmtDate(start);
-              const lastOfRange = !!previewEnd && fmtDate(d) === fmtDate(previewEnd);
               const priced = byDay.get(iso)?.custom === true;
               const occ = occasionFor(d);
               const dayLabel = d.toLocaleDateString(lang === "ar" ? "ar-EG" : "en-US", {
@@ -766,11 +764,13 @@ function Calendar({
                   tabIndex={fmtDate(activeDay) === iso ? 0 : -1}
                   onMouseEnter={() => !disabled && setHoverDay(d)}
                   onMouseLeave={() => setHoverDay(null)}
+                  // The cell is square, so a full radius is a circle. Only
+                  // the two chosen days get one; the days between stay
+                  // rectangular so the run still reads as one stay rather
+                  // than a row of separate marks.
                   className={`relative flex aspect-square flex-col items-center justify-center text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-current ${tone} ${
-                    // Rounding only the outer ends makes the run read as one
-                    // stay rather than a row of separately shaded squares.
-                    firstOfRange ? "rounded-s-full" : ""
-                  } ${lastOfRange ? "rounded-e-full" : ""}`}
+                    selected ? "rounded-full" : ""
+                  }`}
                 >
                   {d.getDate()}
                   {priced && !reserved && !past && (

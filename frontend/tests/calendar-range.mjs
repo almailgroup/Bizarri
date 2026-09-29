@@ -160,6 +160,67 @@ async function calendar(minStayDays) {
   await ctx.close();
 }
 
+// ============================================ the chosen days are circles
+{
+  const { p, ctx, free } = await calendar(1);
+  await free.nth(2).click();
+  await p.waitForTimeout(250);
+  await free.nth(6).click();
+  await p.waitForTimeout(500);
+
+  const shapes = await p.evaluate(() => {
+    const read = (el) => {
+      const r = el.getBoundingClientRect();
+      const cs = getComputedStyle(el);
+      // All four corners. Reading one of them called rounded-s-full a circle,
+      // which is a pill with two square corners.
+      const corners = [
+        "borderTopLeftRadius",
+        "borderTopRightRadius",
+        "borderBottomLeftRadius",
+        "borderBottomRightRadius",
+      ].map((k) => Math.min(parseFloat(cs[k]) || 0, r.width / 2));
+      return { w: Math.round(r.width), radius: Math.min(...corners), corners };
+    };
+    const cells = [...document.querySelectorAll('[role="grid"] button')];
+    const chosen = cells.filter((c) => c.getAttribute("aria-pressed") === "true");
+    // A day inside the stay: shaded, but not one of the two ends.
+    const between = cells.find(
+      (c) =>
+        c.getAttribute("aria-pressed") !== "true" &&
+        getComputedStyle(c).backgroundColor !== "rgba(0, 0, 0, 0)" &&
+        !c.disabled,
+    );
+    return {
+      chosen: chosen.map(read),
+      between: between ? read(between) : null,
+    };
+  });
+
+  ck(
+    "Both ends of the stay are marked",
+    shapes.chosen.length === 2,
+    `${shapes.chosen.length} marked`,
+  );
+  ck(
+    "…and each is a circle",
+    shapes.chosen.length > 0 && shapes.chosen.every((c) => c.radius >= c.w / 2 - 0.5),
+    shapes.chosen
+      .map((c) => `${c.w}px wide, corners ${c.corners.map((x) => x.toFixed(0)).join("/")}`)
+      .join(" | "),
+  );
+  // The days between stay square, or the run reads as separate marks rather
+  // than one stay.
+  ck(
+    "The days between are not",
+    !!shapes.between && shapes.between.radius < 4,
+    shapes.between
+      ? `corners ${shapes.between.corners.map((x) => x.toFixed(0)).join("/")}`
+      : "no day between",
+  );
+  await ctx.close();
+}
+
 // ================================= the minimum is the server's, not the code's
 {
   const { p, ctx, free } = await calendar(3);
