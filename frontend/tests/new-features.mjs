@@ -402,15 +402,15 @@ const bg = (loc) => loc.evaluate((el) => getComputedStyle(el).backgroundColor);
 
   ck(
     "Weekday filter chip is shown",
-    await p.getByRole("button", { name: /^Weekday ·/i }).isVisible(),
+    await p.getByRole("button", { name: /^Weekday/i }).isVisible(),
   );
   ck(
     "Weekend filter chip is shown",
-    await p.getByRole("button", { name: /^Weekend ·/i }).isVisible(),
+    await p.getByRole("button", { name: /^Weekend/i }).isVisible(),
   );
 
   // Weekend: one tap on any Thursday should take the whole Thu-Sat stay.
-  await p.getByRole("button", { name: /^Weekend ·/i }).click();
+  await p.getByRole("button", { name: /^Weekend/i }).click();
   await p.waitForTimeout(250);
   const monday = firstDow(nextMonth, 1);
   ck("Weekend filter disables days outside a Thu-Sat stay", await dayCell(p, monday).isDisabled());
@@ -426,7 +426,7 @@ const bg = (loc) => loc.evaluate((el) => getComputedStyle(el).backgroundColor);
   );
 
   // Weekday: Sun-Wed, 4 days, 300.
-  await p.getByRole("button", { name: /^Weekday ·/i }).click();
+  await p.getByRole("button", { name: /^Weekday/i }).click();
   await p.waitForTimeout(250);
   await dayCell(p, sunA).click();
   await p.waitForTimeout(250);
@@ -444,7 +444,7 @@ const bg = (loc) => loc.evaluate((el) => getComputedStyle(el).backgroundColor);
   const state = makeState();
   const { p, ctx } = await guestPage(state);
   await toCalendarNextMonth(p);
-  await p.getByRole("button", { name: /^Weekend ·/i }).click();
+  await p.getByRole("button", { name: /^Weekend/i }).click();
   await p.waitForTimeout(250);
   await dayCell(p, occFrom).click();
   await p.waitForTimeout(300);
@@ -463,7 +463,7 @@ const bg = (loc) => loc.evaluate((el) => getComputedStyle(el).backgroundColor);
   const state = makeState();
   const { p, ctx } = await guestPage(state);
   await toCalendarNextMonth(p);
-  await p.getByRole("button", { name: /^Weekend ·/i }).click();
+  await p.getByRole("button", { name: /^Weekend/i }).click();
   await p.waitForTimeout(250);
   await dayCell(p, thuA).click();
   await p.waitForTimeout(250);
@@ -885,7 +885,7 @@ async function adminPage(state, tab) {
   const state = makeState();
   const { p, ctx } = await guestPage(state);
   await toCalendarNextMonth(p);
-  await p.getByRole("button", { name: /^Weekend ·/i }).click();
+  await p.getByRole("button", { name: /^Weekend/i }).click();
   await p.waitForTimeout(200);
   await dayCell(p, thuA).click();
   await p.waitForTimeout(200);
@@ -964,7 +964,7 @@ async function adminPage(state, tab) {
   const bar = p.locator("div.fixed.bottom-0", { hasText: "Your stay" });
   ck("No summary bar before any dates are picked", (await bar.count()) === 0);
 
-  await p.getByRole("button", { name: /^Weekend ·/i }).click();
+  await p.getByRole("button", { name: /^Weekend/i }).click();
   await p.waitForTimeout(200);
   await dayCell(p, thuA).click();
   await p.waitForTimeout(300);
@@ -1028,7 +1028,7 @@ async function adminPage(state, tab) {
   const state = makeState();
   const { p, ctx } = await guestPage(state);
   await toCalendarNextMonth(p);
-  await p.getByRole("button", { name: /^Weekend ·/i }).click();
+  await p.getByRole("button", { name: /^Weekend/i }).click();
   await p.waitForTimeout(200);
   await dayCell(p, thuA).click();
   await p.waitForTimeout(200);
@@ -1095,7 +1095,7 @@ async function adminPage(state, tab) {
   // The Civil ID request is the likeliest place to lose someone, so the
   // escape hatch has to be there too — carrying what they already chose.
   await toCalendarNextMonth(p);
-  await p.getByRole("button", { name: /^Weekend ·/i }).click();
+  await p.getByRole("button", { name: /^Weekend/i }).click();
   await p.waitForTimeout(200);
   await dayCell(p, thuA).click();
   await p.waitForTimeout(200);
@@ -1220,7 +1220,7 @@ async function adminPage(state, tab) {
   const state = makeState();
   const { p, ctx } = await guestPage(state);
   await toCalendarNextMonth(p);
-  await p.getByRole("button", { name: /^Weekend ·/i }).click();
+  await p.getByRole("button", { name: /^Weekend/i }).click();
   await p.waitForTimeout(200);
   await dayCell(p, thuA).click();
   await p.waitForTimeout(200);
@@ -1271,7 +1271,7 @@ async function adminPage(state, tab) {
   await p.goto(pageUrl("booking"), { waitUntil: "domcontentloaded" });
   await p.waitForTimeout(800);
   await toCalendarNextMonth(p);
-  await p.getByRole("button", { name: /^Weekend ·/i }).click();
+  await p.getByRole("button", { name: /^Weekend/i }).click();
   await p.waitForTimeout(200);
   await dayCell(p, addDays(thuA, 21)).click();
   await p.waitForTimeout(200);
@@ -1352,7 +1352,7 @@ const leaks = (text) => {
   const cal = leaks(await p.locator("body").innerText());
   ck("No raw i18n keys on the calendar", cal.length === 0, cal.join(", "));
 
-  await p.getByRole("button", { name: /^Weekend ·/i }).click();
+  await p.getByRole("button", { name: /^Weekend/i }).click();
   await p.waitForTimeout(200);
   await dayCell(p, thuA).click();
   await p.waitForTimeout(200);

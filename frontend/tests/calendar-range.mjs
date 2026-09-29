@@ -160,6 +160,101 @@ async function calendar(minStayDays) {
   await ctx.close();
 }
 
+// ================================================= four ways to pick dates
+{
+  const { p, ctx } = await calendar(1);
+
+  for (const [name, note] of [
+    ["All dates", /Any nights/i],
+    ["By day", /One day at a time/i],
+    ["Weekday", /Sun\s*.\s*Wed/i],
+    ["Weekend", /Thu\s*.\s*Sat/i],
+  ]) {
+    const tab = p.getByRole("button", { name: new RegExp(`^${name}`, "i") }).first();
+    ck(`"${name}" is offered`, await tab.isVisible());
+    // A label alone does not tell a guest that "Weekend" means three days
+    // from a Thursday, so each option carries what it actually gives you.
+    ck(
+      `…and says what it means`,
+      note.test((await tab.textContent()) ?? ""),
+      (await tab.textContent())?.replace(/\s+/g, " ").trim(),
+    );
+  }
+
+  for (const [name, price] of [
+    ["By day", /KD\s*75/],
+    ["Weekday", /KD\s*300/],
+    ["Weekend", /KD\s*350/],
+  ]) {
+    const tab = p.getByRole("button", { name: new RegExp(`^${name}`, "i") }).first();
+    ck(`…and what "${name}" costs`, price.test((await tab.textContent()) ?? ""));
+  }
+  ck(
+    "All dates quotes no single price, because it has none",
+    !/KD/.test(
+      (await p
+        .getByRole("button", { name: /^All dates/i })
+        .first()
+        .textContent()) ?? "",
+    ),
+  );
+  await ctx.close();
+}
+
+// ======================================= each shape picks its stay in one tap
+for (const [name, days] of [
+  ["By day", 1],
+  ["Weekend", 3],
+  ["Weekday", 4],
+]) {
+  const { p, ctx } = await calendar(1);
+  await p
+    .getByRole("button", { name: new RegExp(`^${name}`, "i") })
+    .first()
+    .click();
+  await p.waitForTimeout(600);
+
+  const free = p.locator('[role="grid"] button:not([disabled])');
+  ck(
+    `"${name}" leaves some days selectable`,
+    (await free.count()) > 0,
+    `${await free.count()} days`,
+  );
+
+  // One tap, not two: with a shape chosen, the guest should not have to know
+  // which day a weekend starts on.
+  await free.nth(1).click();
+  await p.waitForTimeout(600);
+  const label = days === 1 ? "1 day selected" : `${days} days selected`;
+  ck(
+    `…and one tap selects ${days === 1 ? "that day" : `all ${days} days`}`,
+    await p.getByText(label).isVisible(),
+    label,
+  );
+  await ctx.close();
+}
+
+// Switching shapes must not leave the previous pick behind.
+{
+  const { p, ctx, free } = await calendar(1);
+  await free.nth(2).click();
+  await p.waitForTimeout(250);
+  await free.nth(5).click();
+  await p.waitForTimeout(400);
+  ck("A selection is made under All dates", await p.getByText(/days selected/i).isVisible());
+
+  await p
+    .getByRole("button", { name: /^Weekend/i })
+    .first()
+    .click();
+  await p.waitForTimeout(500);
+  ck(
+    "Changing the shape clears it rather than keeping a stay of the wrong shape",
+    (await p.getByText(/days selected|1 day selected/i).count()) === 0,
+  );
+  await ctx.close();
+}
+
 // ============================================ the chosen days are circles
 {
   const { p, ctx, free } = await calendar(1);

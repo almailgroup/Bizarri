@@ -35,13 +35,38 @@ export const Route = createFileRoute("/booking/$lang")({
   beforeLoad: requireLang,
 });
 
-/** Which package shape the calendar is filtered to. */
-type DateFilter = "all" | "weekday" | "weekend";
+/** Which shape of stay the calendar is filtered to. */
+type DateFilter = "all" | "day" | "weekday" | "weekend";
 
-const FILTER_SHAPE: Record<Exclude<DateFilter, "all">, { startDow: number; length: number }> = {
+/**
+ * startDow null means any day of the week can begin a window, which is what
+ * makes "by day" a filter rather than a special case: it is a package of one
+ * that starts anywhere.
+ */
+const FILTER_SHAPE: Record<
+  Exclude<DateFilter, "all">,
+  { startDow: number | null; length: number }
+> = {
+  day: { startDow: null, length: 1 }, // any single day
   weekday: { startDow: 0, length: 4 }, // Sun–Wed
   weekend: { startDow: 4, length: 3 }, // Thu–Sat
 };
+
+const FILTERS: DateFilter[] = ["all", "day", "weekday", "weekend"];
+
+const FILTER_LABEL = {
+  all: "filterAll",
+  day: "filterByDay",
+  weekday: "filterWeekday",
+  weekend: "filterWeekend",
+} as const;
+
+const FILTER_NOTE = {
+  all: "filterAllNote",
+  day: "filterByDayNote",
+  weekday: "filterWeekdayNote",
+  weekend: "filterWeekendNote",
+} as const;
 
 const MAX_ID_BYTES = 5 * 1024 * 1024;
 const ID_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic", "application/pdf"];
@@ -370,7 +395,7 @@ function Calendar({
     const from = addDays(new Date(month.getFullYear(), month.getMonth(), 1), -7);
     const to = addDays(new Date(month.getFullYear(), month.getMonth() + 1, 0), 7);
     for (let d = from; d <= to; d = addDays(d, 1)) {
-      if (d.getDay() !== startDow) continue;
+      if (startDow !== null && d.getDay() !== startDow) continue;
       const last = addDays(d, length - 1);
       const span = eachDay(d, last);
       if (span.some((x) => dayBlocked(x))) continue;
@@ -576,7 +601,13 @@ function Calendar({
         <h1 className="mb-2 font-display text-3xl md:text-5xl">{tr("selectDates")}</h1>
         <p className="mb-6 text-sm text-muted-foreground">
           {tr("noPaymentNow")}{" "}
-          {filter !== "all" ? tr("filterHint") : !start || end ? tr("pickStart") : tr("pickEnd")}
+          {filter === "day"
+            ? tr("filterDayHint")
+            : filter !== "all"
+              ? tr("filterHint")
+              : !start || end
+                ? tr("pickStart")
+                : tr("pickEnd")}
         </p>
 
         <RatesStrip />
@@ -633,32 +664,54 @@ function Calendar({
           </div>
         )}
 
-        {/* Package filter, above the calendar. */}
-        <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label={tr("filterAll")}>
-          {(["all", "weekday", "weekend"] as DateFilter[]).map((f) => (
-            <button
-              key={f}
-              type="button"
-              onClick={() => {
-                setFilter(f);
-                setStart(null);
-                setEnd(null);
-                setError("");
-              }}
-              aria-pressed={filter === f}
-              className={`border px-4 py-2 text-xs uppercase tracking-widest transition-colors ${
-                filter === f
-                  ? "border-foreground bg-foreground text-background"
-                  : "border-border hover:border-foreground/50"
-              }`}
-            >
-              {f === "all"
-                ? tr("filterAll")
+        {/* How to choose, above the calendar. Each option says what it gives
+            you and what it costs, because "Weekend" on its own does not tell
+            a guest it means three days from a Thursday at 350. */}
+        <div
+          className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4"
+          role="group"
+          aria-label={tr("filterAll")}
+        >
+          {FILTERS.map((f) => {
+            const on = filter === f;
+            const price =
+              f === "day"
+                ? rates &&
+                  tr("filterFrom").replace(
+                    "{price}",
+                    formatMoney(Math.min(rates.dailyWeekday, rates.dailyWeekend), lang),
+                  )
                 : f === "weekday"
-                  ? tr("filterWeekday")
-                  : tr("filterWeekend")}
-            </button>
-          ))}
+                  ? rates && formatMoney(rates.weekday, lang)
+                  : f === "weekend"
+                    ? rates && formatMoney(rates.weekend, lang)
+                    : null;
+            return (
+              <button
+                key={f}
+                type="button"
+                onClick={() => {
+                  setFilter(f);
+                  setStart(null);
+                  setEnd(null);
+                  setHoverDay(null);
+                  setError("");
+                }}
+                aria-pressed={on}
+                className={`flex flex-col gap-1 border p-3 text-start transition-colors ${
+                  on
+                    ? "border-foreground bg-foreground text-background"
+                    : "border-border hover:border-foreground/50"
+                }`}
+              >
+                <span className="text-xs uppercase tracking-widest">{tr(FILTER_LABEL[f])}</span>
+                <span className={`text-xs ${on ? "opacity-70" : "text-muted-foreground"}`}>
+                  {tr(FILTER_NOTE[f])}
+                </span>
+                {price && <span className="text-sm font-medium">{price}</span>}
+              </button>
+            );
+          })}
         </div>
 
         {jumped && (
