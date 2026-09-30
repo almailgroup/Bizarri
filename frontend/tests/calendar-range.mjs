@@ -10,7 +10,7 @@ import { chromium } from "playwright";
 
 const B = "http://localhost:4173/";
 const LANG = "en";
-const pageUrl = (r) => (r ? `${B}${r}/${LANG}` : `${B}${LANG}`);
+const pageUrl = (r, lang = LANG) => (r ? `${B}${r}/${lang}` : `${B}${lang}`);
 const SUPA = /ycfvqzcnatwacwlcmiej\.supabase\.co/;
 
 let fails = 0;
@@ -30,7 +30,7 @@ const b = await chromium.launch(
     : {},
 );
 
-async function calendar(minStayDays) {
+async function calendar(minStayDays, lang = LANG) {
   const ctx = await b.newContext({ viewport: { width: 1100, height: 1000 } });
   await ctx.route(/^https?:\/\/(?!localhost)/, (r) => {
     const u = r.request().url();
@@ -82,10 +82,10 @@ async function calendar(minStayDays) {
   });
   await ctx.addInitScript(() => sessionStorage.setItem("bizarri_intro_seen", "1"));
   const p = await ctx.newPage();
-  await p.goto(pageUrl("booking"), { waitUntil: "load" });
+  await p.goto(pageUrl("booking", lang), { waitUntil: "load" });
   await p.waitForTimeout(1400);
   // Next month, so every day in the grid is in the future.
-  await p.getByRole("button", { name: /Next month/i }).click();
+  await p.getByRole("button", { name: lang === "ar" ? "الشهر التالي" : /Next month/i }).click();
   await p.waitForTimeout(400);
   return { p, ctx, free: p.locator('[role="grid"] button:not([disabled])') };
 }
@@ -157,6 +157,115 @@ async function calendar(minStayDays) {
     /\d{4}-\d{2}-\d{2} → \d{4}-\d{2}-\d{2}/.test(range ?? ""),
     range,
   );
+  await ctx.close();
+}
+
+// ====================================================== the quick picks
+{
+  const { p, ctx } = await calendar(1);
+  const picks = await p.evaluate(() => {
+    const head = [...document.querySelectorAll("p")].find((n) => /quick pick/i.test(n.textContent));
+    const grid = head?.nextElementSibling;
+    return [...(grid?.querySelectorAll("button") ?? [])].map((b) =>
+      b.innerText.replace(/\n+/g, " | "),
+    );
+  });
+
+  ck("Several stays are offered outright", picks.length >= 4, `${picks.length} offered`);
+  ck(
+    "…including tonight, now that one day is a booking",
+    picks.some((t) => /tonight/i.test(t)),
+    picks[0],
+  );
+  ck(
+    "…and a weekend",
+    picks.some((t) => /weekend/i.test(t)),
+  );
+  ck(
+    "…and a full week",
+    picks.some((t) => /full week/i.test(t)),
+  );
+
+  // "This weekend" does not say which Thursday, and that is what a guest is
+  // checking before they tap.
+  ck(
+    "Every pick shows the dates it would book",
+    picks.every((t) => /\d{1,2}\s+\w{3}/.test(t)),
+    picks.find((t) => !/\d{1,2}\s+\w{3}/.test(t)) ?? "all do",
+  );
+  ck(
+    "…and what it costs",
+    picks.every((t) => /KD\s*\d/.test(t)),
+    picks.find((t) => !/KD\s*\d/.test(t)) ?? "all do",
+  );
+  // A locale comma after the weekday reads wrong mid-range: "Thu 1 – Sat, 3 Oct".
+  ck(
+    "…without a comma stranded inside a range",
+    !picks.some((t) => /–\s*\w{3},/.test(t)),
+    picks.find((t) => /–\s*\w{3},/.test(t)) ?? "none",
+  );
+
+  // Tapping one has to land exactly the stay it advertised.
+  const weekend = picks.findIndex((t) => /this weekend/i.test(t));
+  const grid = p.locator('[role="grid"]');
+  await p.evaluate((i) => {
+    const head = [...document.querySelectorAll("p")].find((n) => /quick pick/i.test(n.textContent));
+    head?.nextElementSibling?.querySelectorAll("button")[i].click();
+  }, weekend);
+  await p.waitForTimeout(700);
+  ck("Tapping a pick selects that stay", await p.getByText("3 days selected").isVisible());
+  ck("…and the calendar is showing it", await grid.isVisible());
+  await ctx.close();
+}
+
+// The other spans on this page carry dir="ltr", because a "+" or a "@" beside
+// digits is bidi-neutral and lands at the wrong end without it. A date range is
+// not that: "الخميس ١ – السبت ٣ أكتوبر" is Arabic throughout, so it is one RTL
+// run and a forced dir="ltr" does not reverse it today — it only declares a
+// direction the content is not. It would bite the day one of those dates
+// renders with a Latin month or Latin digits, which is exactly the change
+// nobody would think to re-check. So this pins both: the span runs the way the
+// page does, and the date the stay starts on is the one an Arabic reader meets
+// first.
+{
+  const { p, ctx } = await calendar(1, "ar");
+
+  const laidOut = await p.evaluate(() => {
+    const head = [...document.querySelectorAll("p")].find((n) =>
+      /اختيار سريع|سريع/.test(n.textContent || ""),
+    );
+    const grid = head?.nextElementSibling;
+    for (const b of grid?.querySelectorAll("button") ?? []) {
+      const span = [...b.querySelectorAll("span")].find((s) => s.textContent.includes("–"));
+      if (!span) continue;
+      const t = span.textContent;
+      const i = t.indexOf("–");
+      const at = (n) => {
+        const r = document.createRange();
+        r.setStart(span.firstChild, n);
+        r.setEnd(span.firstChild, n + 1);
+        return r.getBoundingClientRect().left;
+      };
+      return {
+        dir: getComputedStyle(span).direction,
+        first: at(0),
+        last: at(t.length - 1),
+        dash: at(i),
+        text: t,
+      };
+    }
+    return null;
+  });
+
+  ck("A quick pick on the Arabic page spans two dates", laidOut !== null, laidOut?.text);
+  if (laidOut) {
+    ck("…laid out right to left, like the page around it", laidOut.dir === "rtl", laidOut.dir);
+    ck(
+      "…so the date it starts on is the one read first",
+      laidOut.first > laidOut.last,
+      `start at ${Math.round(laidOut.first)}px, end at ${Math.round(laidOut.last)}px`,
+    );
+  }
   await ctx.close();
 }
 

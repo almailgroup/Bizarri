@@ -6,7 +6,7 @@ import { PageShell } from "@/components/PageShell";
 import { EmailVerify } from "@/components/EmailVerify";
 import { rememberBookingRef } from "@/components/BookingLookup";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
-import { useI18n } from "@/lib/i18n";
+import { useI18n, type TrKey } from "@/lib/i18n";
 import { usePageMeta } from "@/hooks/use-page-meta";
 import {
   MIN_STAY_DAYS,
@@ -405,34 +405,49 @@ function Calendar({
   }, [filter, month, byDay]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /**
-   * The next two free Thu-Sat stays, priced. Only offered when the whole
-   * window is actually free, so a quick pick can never lead to a refusal.
+   * The stays people actually ask for, offered outright.
+   *
+   * Each is only offered when every day in it is free and it satisfies the
+   * minimum stay, so a quick pick can never lead to a refusal \u2014 which is the
+   * point of it. Each carries its real dates, because "This weekend" does not
+   * tell anyone which Thursday that is.
    */
   const quickPicks = useMemo(() => {
     if (!rates || !calendar) return [];
-    const firstThu = (() => {
+    const min = rates.minStayDays ?? 1;
+
+    const nextDow = (dow: number) => {
       const d = new Date(today);
-      while (d.getDay() !== 4) d.setDate(d.getDate() + 1);
+      while (d.getDay() !== dow) d.setDate(d.getDate() + 1);
       return d;
-    })();
-    const out: { label: string; start: Date; end: Date; total: number }[] = [];
-    for (const [offset, label] of [
-      [0, lang === "en" ? "This weekend" : "نهاية هذا الأسبوع"],
-      [7, lang === "en" ? "Next weekend" : "نهاية الأسبوع القادم"],
-    ] as const) {
-      const from = addDays(firstThu, offset);
-      const to = addDays(from, 2);
-      if (to > windowEnd) continue;
-      if (eachDay(from, to).some(dayBlocked)) continue;
+    };
+    const thu = nextDow(4);
+    const sun = nextDow(0);
+
+    const candidates: { key: TrKey; start: Date; days: number }[] = [
+      { key: "quickToday", start: today, days: 1 },
+      { key: "quickTomorrow", start: addDays(today, 1), days: 1 },
+      { key: "quickThisWeekend", start: thu, days: 3 },
+      { key: "quickNextWeekend", start: addDays(thu, 7), days: 3 },
+      { key: "quickThisWeek", start: sun, days: 4 },
+      { key: "quickFullWeek", start: sun, days: 7 },
+    ];
+
+    const out: { key: TrKey; start: Date; end: Date; total: number }[] = [];
+    for (const c of candidates) {
+      if (c.days < min) continue;
+      const end = addDays(c.start, c.days - 1);
+      if (end > windowEnd) continue;
+      if (eachDay(c.start, end).some(dayBlocked)) continue;
       out.push({
-        label,
-        start: from,
-        end: to,
-        total: quote(from, to, customPrices, rates, occasions ?? []).total,
+        key: c.key,
+        start: c.start,
+        end,
+        total: quote(c.start, end, customPrices, rates, occasions ?? []).total,
       });
     }
     return out;
-  }, [rates, calendar, today, windowEnd, byDay, customPrices, occasions, lang]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [rates, calendar, today, windowEnd, byDay, customPrices, occasions]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /** The single day in the grid that Tab reaches; arrows move it from there. */
   const activeDay = useMemo(() => {
@@ -539,6 +554,23 @@ function Calendar({
   const isEdge = (d: Date) =>
     (start && fmtDate(d) === fmtDate(start)) || (previewEnd && fmtDate(d) === fmtDate(previewEnd));
 
+  /** "Thu 8 \u2013 Sat 10 Oct", or a single date when the stay is one day. */
+  const spanLabel = (from: Date, to: Date) => {
+    const loc = lang === "ar" ? "ar-EG" : "en-GB";
+    // Locales put a comma after the weekday, which reads wrong in the middle
+    // of a range: "Thu 1 \u2013 Sat, 3 Oct". Both commas, since Arabic has its own.
+    const fmt = (d: Date, withMonth: boolean) =>
+      d
+        .toLocaleDateString(loc, {
+          weekday: "short",
+          day: "numeric",
+          ...(withMonth ? { month: "short" } : {}),
+        })
+        .replace(/[,\u060C]/g, "");
+    if (fmtDate(from) === fmtDate(to)) return fmt(to, true);
+    return `${fmt(from, false)} \u2013 ${fmt(to, true)}`;
+  };
+
   const monthName = month.toLocaleDateString(lang === "ar" ? "ar-EG" : "en-US", {
     month: "long",
     year: "numeric",
@@ -636,33 +668,57 @@ function Calendar({
 
         {/* Most requests are simply "the next free weekend". Offering those
             outright saves paging a calendar to work out which Thursday it is. */}
-        {quickPicks.length > 0 && (
-          <div className="mb-4 flex flex-wrap items-center gap-2">
-            <span className="text-xs uppercase tracking-widest text-muted-foreground">
-              {tr("quickPick")}
-            </span>
-            {quickPicks.map((q) => (
-              <button
-                key={q.label}
-                type="button"
-                onClick={() => {
-                  setFilter("all");
-                  setMonth(startOfMonth(q.start));
-                  setStart(q.start);
-                  setEnd(q.end);
-                  setError("");
-                  setJumped(false);
-                }}
-                className="border border-border px-4 py-2 text-xs uppercase tracking-widest transition-colors hover:border-foreground/50"
-              >
-                {q.label}
-                <span className="ms-2 normal-case tracking-normal text-muted-foreground">
-                  {formatMoney(q.total, lang)}
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
+        <div className="mb-4">
+          <p className="mb-2 text-xs uppercase tracking-widest text-muted-foreground">
+            {tr("quickPick")}
+          </p>
+          {quickPicks.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{tr("quickNone")}</p>
+          ) : (
+            <div
+              className="grid grid-cols-2 gap-2 sm:grid-cols-3"
+              role="group"
+              aria-label={tr("quickPick")}
+            >
+              {quickPicks.map((q) => {
+                const chosen =
+                  !!start &&
+                  !!end &&
+                  fmtDate(start) === fmtDate(q.start) &&
+                  fmtDate(end) === fmtDate(q.end);
+                return (
+                  <button
+                    key={q.key}
+                    type="button"
+                    aria-pressed={chosen}
+                    onClick={() => {
+                      setFilter("all");
+                      setMonth(startOfMonth(q.start));
+                      setStart(q.start);
+                      setEnd(q.end);
+                      setHoverDay(null);
+                      setError("");
+                      setJumped(false);
+                    }}
+                    className={`flex flex-col gap-1 border p-3 text-start transition-colors ${
+                      chosen
+                        ? "border-foreground bg-foreground text-background"
+                        : "border-border hover:border-foreground/50"
+                    }`}
+                  >
+                    <span className="text-xs uppercase tracking-widest">{tr(q.key)}</span>
+                    {/* The dates themselves: "This weekend" does not say which
+                        Thursday, and that is what a guest is checking. */}
+                    <span className={`text-xs ${chosen ? "opacity-70" : "text-muted-foreground"}`}>
+                      {spanLabel(q.start, q.end)}
+                    </span>
+                    <span className="text-sm font-medium">{formatMoney(q.total, lang)}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
 
         {/* How to choose, above the calendar. Each option says what it gives
             you and what it costs, because "Weekend" on its own does not tell

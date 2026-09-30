@@ -125,13 +125,23 @@ const focused = (p) =>
   );
 
   // Tab must pass through the calendar, not get stuck inside it.
+  //
+  // 30 stops, not 20: the shortcuts and the date filter above the grid are ten
+  // buttons on their own, and the header another eight, so a smaller budget
+  // fails on the way down rather than on anything the grid does. The claim
+  // being tested is the day count below -- one stop for the whole month --
+  // and that is what shrinks the walk.
   const seen = [];
-  for (let i = 0; i < 20; i++) {
+  for (let i = 0; i < 30; i++) {
     await p.keyboard.press("Tab");
     seen.push(await focused(p));
   }
   const dayStops = seen.filter((l) => /^\w+day, /.test(l)).length;
-  ck("Tabbing does not have to cross every day", dayStops <= 1, `${dayStops} day stops in 20 tabs`);
+  ck(
+    "Tabbing does not have to cross every day",
+    dayStops <= 1,
+    `${dayStops} day stops in ${seen.length} tabs`,
+  );
   ck(
     "Tab reaches the controls past the calendar",
     seen.some((l) => /clear|continue/i.test(l)),

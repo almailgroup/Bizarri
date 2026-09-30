@@ -792,22 +792,32 @@ async function adminPage(state, tab) {
     );
     const plex = faces.filter((f) => /IBM Plex Sans Arabic/.test(f.family));
     ck("The browser has the family", plex.length > 0, `${faces.length} faces registered`);
-    ck(
-      "Its files are actually downloaded",
-      plex.some((f) => f.status === "loaded"),
-      [...new Set(plex.map((f) => f.status))].join(", "),
-    );
-    // U+0600 is Arabic. A Latin-only font would register no face covering it.
-    ck(
-      "The same family covers Arabic, so nothing is substituted",
-      plex.some((f) => f.status === "loaded" && /0600|0750|FB50|FE70/i.test(f.range ?? "")),
-      plex
-        .filter((f) => f.status === "loaded")
-        .map((f) => (f.range ?? "").slice(0, 40))
-        .join(" / "),
-    );
+
+    // The stylesheet arriving does not mean the font files will: gstatic is a
+    // second host through the same egress proxy, and here it drops the
+    // transfer about two runs in three. Zero files is that, not the site --
+    // the same reasoning as the stylesheet skip above, and the same rule: it
+    // must not read as a failure or as a pass.
     const woff = seen.filter(([, u]) => u.includes("gstatic.com") && u.endsWith(".woff2"));
-    ck("Font files came over the wire", woff.length > 0, `${woff.length} woff2 files`);
+    if (woff.length === 0) {
+      skip("Webfont delivery (files, Arabic coverage)", "no font file reached gstatic.com");
+    } else {
+      ck("Font files came over the wire", true, `${woff.length} woff2 files`);
+      ck(
+        "Its files are actually downloaded",
+        plex.some((f) => f.status === "loaded"),
+        [...new Set(plex.map((f) => f.status))].join(", "),
+      );
+      // U+0600 is Arabic. A Latin-only font would register no face covering it.
+      ck(
+        "The same family covers Arabic, so nothing is substituted",
+        plex.some((f) => f.status === "loaded" && /0600|0750|FB50|FE70/i.test(f.range ?? "")),
+        plex
+          .filter((f) => f.status === "loaded")
+          .map((f) => (f.range ?? "").slice(0, 40))
+          .join(" / "),
+      );
+    }
   }
   await netCtx.close();
 

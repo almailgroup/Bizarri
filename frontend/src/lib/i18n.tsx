@@ -170,6 +170,18 @@ export const t: Dict = {
   filterWeekend: { en: "Weekend", ar: "نهاية الأسبوع" },
   filterWeekendNote: { en: "Thu – Sat · 3 days", ar: "الخميس – السبت · ٣ أيام" },
   filterFrom: { en: "from {price}", ar: "من {price}" },
+  quickToday: { en: "Tonight", ar: "الليلة" },
+  quickTomorrow: { en: "Tomorrow", ar: "غداً" },
+  quickThisWeekend: { en: "This weekend", ar: "نهاية هذا الأسبوع" },
+  quickNextWeekend: { en: "Next weekend", ar: "نهاية الأسبوع القادم" },
+  // Not "Weekday": that is the name of a filter, and two controls a line
+  // apart reading almost the same thing is a question, not a shortcut.
+  quickThisWeek: { en: "This week", ar: "هذا الأسبوع" },
+  quickFullWeek: { en: "A full week", ar: "أسبوع كامل" },
+  quickNone: {
+    en: "Nothing free at short notice — pick your own dates below.",
+    ar: "لا يوجد متاح قريباً — اختر تواريخك أدناه.",
+  },
   filterHint: {
     en: "Tap any highlighted day and the whole stay is selected for you.",
     ar: "اضغط على أي يوم مميّز وسيتم تحديد الإقامة كاملة تلقائياً.",
