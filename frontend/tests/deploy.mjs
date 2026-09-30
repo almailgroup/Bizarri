@@ -123,5 +123,65 @@ ck(
   await b.close();
 }
 
+// ============================== what a search engine is given
+//
+// Search Console reported the bare domain as "Page with redirect" and would
+// not index it. That part is by design -- / is a redirect into a language and
+// /en is the page -- but it did mean a crawler arriving at the domain got an
+// empty <div id="root"> and not one link to follow, and the site described
+// itself nowhere except in prose.
+{
+  const root = readFileSync(dist + "index.html", "utf8");
+
+  // Both names, in the tab, in the search result, and on a shared link.
+  const TITLE = "Bizarri Chalet | شاليه بيزاري";
+  ck("The tab carries both names", root.includes(`<title>${TITLE}</title>`));
+  for (const tag of ["og:title", "twitter:title"]) {
+    ck(
+      `…and so does ${tag}, for a shared link`,
+      new RegExp(`property="${tag}"|name="${tag}"`).test(root) &&
+        root.includes(`content="${TITLE}"`),
+    );
+  }
+
+  // The one thing that must be true without JavaScript.
+  const ld = root.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/);
+  ck("The page ships structured data", !!ld);
+  if (ld) {
+    let data = null;
+    try {
+      data = JSON.parse(ld[1]);
+    } catch (e) {
+      ck("…that is valid JSON", false, String(e));
+    }
+    if (data) {
+      ck("…that is valid JSON", true);
+      ck("…describing a place to stay", data["@type"] === "LodgingBusiness", data["@type"]);
+      // Only ever this number, anywhere on the site.
+      ck("…with the one phone number", data.telephone === "+96594040955", data.telephone);
+      ck("…and both names", data.name === "Bizarri Chalet" && !!data.alternateName, data.name);
+      ck("…and a way to book", data.potentialAction?.["@type"] === "ReserveAction");
+    }
+  }
+
+  // A crawler that does not run JS gets an empty div otherwise.
+  const noscript = root.match(/<noscript>([\s\S]*?)<\/noscript>/);
+  ck("There is something to follow without JavaScript", !!noscript);
+  if (noscript) {
+    ck(
+      "…a link to each language",
+      /href="\/en"/.test(noscript[1]) && /href="\/ar"/.test(noscript[1]),
+    );
+  }
+
+  // Every page in the sitemap has to be a file, or GitHub Pages answers 404
+  // and Google drops it -- a sitemap listing pages that are not there is
+  // worse than no sitemap.
+  const missing = locs
+    .map((u) => u.replace(`https://${domain}/`, ""))
+    .filter((path) => !existsSync(dist + path + "/index.html"));
+  ck("Every sitemap URL is a real file in the build", missing.length === 0, missing.join(", "));
+}
+
 console.log(`\n${fails} failing`);
 process.exit(fails ? 1 : 0);

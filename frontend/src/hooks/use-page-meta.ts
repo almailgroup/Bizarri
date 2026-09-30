@@ -1,6 +1,15 @@
 import { useEffect } from "react";
 
-const SITE = "Bizarri Chalet";
+/**
+ * Both names, always, because both are the name.
+ *
+ * It is what the tab says, what a search result links, and what someone sees
+ * when the page is shared. An Arabic speaker searching شاليه بيزاري should
+ * find the same title an English speaker does rather than a translation of
+ * it, so the site carries one bilingual name in both languages instead of a
+ * different one each way.
+ */
+const SITE = "Bizarri Chalet | شاليه بيزاري";
 
 function setMeta(selector: string, attr: "content", value: string) {
   const el = document.head.querySelector<HTMLMetaElement>(selector);

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" href="%BASE_URL%favicon.ico" />
 
-    <title>Bizarri Chalet — Private Chalet in Kuwait</title>
+    <title>Bizarri Chalet | شاليه بيزاري</title>
     <meta name="description" content="A premium private chalet experience in Kuwait by Almail Group. Modern, smart, and designed for privacy and relaxation." />
     <meta name="theme-color" content="#000000" />
     <meta name="robots" content="index, follow" />
@@ -15,7 +15,7 @@
     <link rel="alternate" hreflang="x-default" href="https://bizarri.com/en" />
 
     <meta property="og:site_name" content="Bizarri Chalet" />
-    <meta property="og:title" content="Bizarri Chalet — Private Chalet in Kuwait" />
+    <meta property="og:title" content="Bizarri Chalet | شاليه بيزاري" />
     <meta property="og:description" content="A premium private chalet experience in Kuwait by Almail Group. Modern, smart, and designed for privacy and relaxation." />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://bizarri.com/en" />
@@ -28,7 +28,7 @@
     <meta property="og:image:alt" content="Bizarri Chalet" />
 
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Bizarri Chalet — Private Chalet in Kuwait" />
+    <meta name="twitter:title" content="Bizarri Chalet | شاليه بيزاري" />
     <meta name="twitter:description" content="A premium private chalet experience in Kuwait by Almail Group. Modern, smart, and designed for privacy and relaxation." />
     <meta name="twitter:image" content="https://bizarri.com/og-image.jpg" />
 
@@ -41,9 +41,71 @@
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap"
     />
+
+    <!--
+      Structured data. Without it a search engine has the page's words but not
+      the fact that they describe a place you can stay in, in Kuwait, with a
+      phone number — so the result is a blue link rather than a business.
+      Static in the shell rather than injected by the app: this is the one
+      thing that has to be true for a crawler that does not run JavaScript.
+
+      Kept to what is certain. There is no street address here because the
+      chalet's exact location is given to guests rather than published, and a
+      wrong or invented PostalAddress is worse than none; the map link is the
+      authority on where it is.
+    -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "LodgingBusiness",
+        "@id": "https://bizarri.com/#chalet",
+        "name": "Bizarri Chalet",
+        "alternateName": "شاليه بيزاري",
+        "url": "https://bizarri.com/en",
+        "image": "https://bizarri.com/og-image.jpg",
+        "description": "A premium private chalet experience in Kuwait by Almail Group. Modern, smart, and designed for privacy and relaxation.",
+        "telephone": "+96594040955",
+        "email": "sales@bizarri.com",
+        "priceRange": "KWD 75–600",
+        "currenciesAccepted": "KWD",
+        "areaServed": { "@type": "Country", "name": "Kuwait" },
+        "address": { "@type": "PostalAddress", "addressCountry": "KW" },
+        "hasMap": "https://maps.app.goo.gl/5wjw1skfpqdnDhFa6",
+        "sameAs": ["https://www.instagram.com/bizarri.chalet"],
+        "parentOrganization": { "@type": "Organization", "name": "Almail Group" },
+        "petsAllowed": false,
+        "potentialAction": {
+          "@type": "ReserveAction",
+          "target": {
+            "@type": "EntryPoint",
+            "urlTemplate": "https://bizarri.com/booking/en",
+            "actionPlatform": [
+              "http://schema.org/DesktopWebPlatform",
+              "http://schema.org/MobileWebPlatform"
+            ]
+          },
+          "result": { "@type": "LodgingReservation", "name": "Booking request" }
+        }
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
+    <!--
+      A crawler that does not run JavaScript sees an empty div and nothing to
+      follow — least of all at https://bizarri.com/, which is only a redirect
+      into a language and so has no content of its own at all. These are the
+      two doors in. Real links, so they are followed; in <noscript> so they
+      never appear for a visitor whose browser did run the app.
+    -->
+    <noscript>
+      <h1>Bizarri Chalet | شاليه بيزاري</h1>
+      <p>A premium private chalet in Kuwait by Almail Group.</p>
+      <ul>
+        <li><a href="/en">English</a></li>
+        <li><a href="/ar">العربية</a></li>
+      </ul>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
