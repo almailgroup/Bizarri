@@ -758,12 +758,23 @@ async function adminPage(state, tab) {
   // Without it the assertion would "pass" against a silent system fallback.
   const netCtx = await b.newContext({ ignoreHTTPSErrors: true });
   const seen = [];
+  const dropped = [];
   netCtx.on("response", (r) => {
     if (/fonts\.(googleapis|gstatic)\.com/.test(r.url())) seen.push([r.status(), r.url()]);
+  });
+  netCtx.on("requestfailed", (r) => {
+    if (/fonts\.(googleapis|gstatic)\.com/.test(r.url())) dropped.push(r.url());
   });
   const fp = await netCtx.newPage();
   await fp.goto(B, { waitUntil: "load" });
   await fp.waitForTimeout(2500);
+  // Ask for the Arabic face by name rather than hoping the page happened to
+  // render enough Arabic to trigger it. A browser fetches only the subsets it
+  // needs, so "did the Arabic file load" was really "did the language switcher
+  // paint before we looked", which is not what the assertion is about.
+  await fp
+    .evaluate(() => document.fonts.load('400 16px "IBM Plex Sans Arabic"', "مرحبا"))
+    .catch(() => {});
   await fp.evaluate(() => document.fonts.ready);
 
   const css = seen.find(([, u]) => u.includes("googleapis.com/css2"));
@@ -793,14 +804,22 @@ async function adminPage(state, tab) {
     const plex = faces.filter((f) => /IBM Plex Sans Arabic/.test(f.family));
     ck("The browser has the family", plex.length > 0, `${faces.length} faces registered`);
 
+    const woff = seen.filter(
+      ([st, u]) => st === 200 && u.includes("gstatic.com") && u.endsWith(".woff2"),
+    );
     // The stylesheet arriving does not mean the font files will: gstatic is a
-    // second host through the same egress proxy, and here it drops the
-    // transfer about two runs in three. Zero files is that, not the site --
-    // the same reasoning as the stylesheet skip above, and the same rule: it
-    // must not read as a failure or as a pass.
-    const woff = seen.filter(([, u]) => u.includes("gstatic.com") && u.endsWith(".woff2"));
-    if (woff.length === 0) {
-      skip("Webfont delivery (files, Arabic coverage)", "no font file reached gstatic.com");
+    // second host through the same egress proxy, and here it drops transfers
+    // often, sometimes all of them and sometimes only one of three. Either way
+    // that is the sandbox, not the site -- the same reasoning as the
+    // stylesheet skip above, and the same rule: it must not read as a failure
+    // or as a pass.
+    if (woff.length === 0 || dropped.length > 0) {
+      skip(
+        "Webfont delivery (files, Arabic coverage)",
+        dropped.length
+          ? `gstatic dropped ${dropped.length} of ${dropped.length + woff.length} files`
+          : "no font file reached gstatic.com",
+      );
     } else {
       ck("Font files came over the wire", true, `${woff.length} woff2 files`);
       ck(

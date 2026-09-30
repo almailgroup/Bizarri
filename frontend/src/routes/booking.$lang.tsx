@@ -18,6 +18,7 @@ import {
   formatMoney,
   formatSpan,
   quote,
+  weekendIsWhole,
   startOfMonth,
   startOfToday,
 } from "@/lib/booking";
@@ -400,6 +401,9 @@ function Calendar({
       const last = addDays(d, length - 1);
       const span = eachDay(d, last);
       if (span.some((x) => dayBlocked(x))) continue;
+      // One rule for every shape: it is what stops "By day" offering a lone
+      // Friday, and it leaves the weekday and weekend windows untouched.
+      if (!weekendIsWhole(d, last)) continue;
       for (const x of span) map.set(fmtDate(x), { start: d, end: last });
     }
     return map;
@@ -440,6 +444,10 @@ function Calendar({
       const end = addDays(c.start, c.days - 1);
       if (end > windowEnd) continue;
       if (eachDay(c.start, end).some(dayBlocked)) continue;
+      // Tonight and Tomorrow are single days, and a single day cannot be a
+      // Thursday, Friday or Saturday any more. Dropping them is the honest
+      // answer: a shortcut that leads to a refusal is not a shortcut.
+      if (!weekendIsWhole(c.start, end)) continue;
       out.push({
         key: c.key,
         start: c.start,
@@ -516,7 +524,12 @@ function Calendar({
   // it has loaded. request_booking() enforces the same number server-side.
   const minStay = rates?.minStayDays ?? MIN_STAY_DAYS;
   const tooShort = current !== null && current.days < minStay;
-  const ready = !!start && !!end && !tooShort;
+  // Thu–Sat is one product, so a stay may not take a slice of it. Checked
+  // here as well as on the tap: a selection can also arrive from a quick
+  // pick or from switching filters, and request_booking() refuses it either
+  // way -- better to say so before the guest fills in a form.
+  const halfWeekend = !!start && !!end && !weekendIsWhole(start, end);
+  const ready = !!start && !!end && !tooShort && !halfWeekend;
 
   // While a check-out day is still being chosen, the day under the pointer
   // stands in for it, so the range and its length can be seen before the tap
@@ -548,7 +561,9 @@ function Calendar({
       return;
     }
     setEnd(d);
-    if (daysBetween(start, d) < minStay) setError(tr("minStay").replace("{n}", String(minStay)));
+    if (!weekendIsWhole(start, d)) setError(tr("weekendWhole"));
+    else if (daysBetween(start, d) < minStay)
+      setError(tr("minStay").replace("{n}", String(minStay)));
   };
 
   const inRange = (d: Date) => start && previewEnd && d >= start && d <= previewEnd;
@@ -567,6 +582,10 @@ function Calendar({
   const goToForm = () => {
     if (!start || !end) {
       setError(tr("pickStart"));
+      return;
+    }
+    if (!weekendIsWhole(start, end)) {
+      setError(tr("weekendWhole"));
       return;
     }
     if (daysBetween(start, end) < minStay) {
@@ -615,16 +634,22 @@ function Calendar({
       <div className="animate-fade-up pb-28 lg:pb-0">
         <Steps current={1} />
         <h1 className="mb-2 font-display text-3xl md:text-5xl">{tr("selectDates")}</h1>
-        <p className="mb-6 text-sm text-muted-foreground">
-          {tr("noPaymentNow")}{" "}
-          {filter === "day"
-            ? tr("filterDayHint")
-            : filter !== "all"
-              ? tr("filterHint")
-              : !start || end
-                ? tr("pickStart")
-                : tr("pickEnd")}
-        </p>
+        <div className="mb-6 text-sm text-muted-foreground">
+          <p>
+            {tr("noPaymentNow")}{" "}
+            {filter === "day"
+              ? tr("filterDayHint")
+              : filter !== "all"
+                ? tr("filterHint")
+                : !start || end
+                  ? tr("pickStart")
+                  : tr("pickEnd")}
+          </p>
+          {/* Only under "All dates". Every other shape draws the range for the
+              guest and cannot produce half a weekend, so saying it there would
+              be a warning about something they cannot do. */}
+          {filter === "all" && <p className="mt-2">{tr("filterAllWeekendNote")}</p>}
+        </div>
 
         <RatesStrip />
 
@@ -710,11 +735,11 @@ function Calendar({
             const on = filter === f;
             const price =
               f === "day"
-                ? rates &&
-                  tr("filterFrom").replace(
-                    "{price}",
-                    formatMoney(Math.min(rates.dailyWeekday, rates.dailyWeekend), lang),
-                  )
+                ? // dailyWeekday, not the lower of the two: a single day can
+                  // only be Sun-Wed now, so there is nothing to compare it
+                  // against. "From", because a custom day price can differ.
+                  rates &&
+                  tr("filterFrom").replace("{price}", formatMoney(rates.dailyWeekday, lang))
                 : f === "weekday"
                   ? rates && formatMoney(rates.weekday, lang)
                   : f === "weekend"

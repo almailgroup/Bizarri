@@ -10,7 +10,10 @@
  * All persistence lives in src/lib/api.ts.
  */
 
-import { dateLocale } from "@/lib/locale";
+// A sibling, not "@/lib/locale": this module is pure domain logic with no
+// build step in its way, and the pricing test imports it straight into Node to
+// check it against what Postgres returned for the same stays.
+import { dateLocale } from "./locale.ts";
 
 /**
  * Fallback minimum stay, for the moment before the rates have loaded.
@@ -125,6 +128,72 @@ export function defaultDayRate(d: Date, rates: Rates): number {
   return isWeekendDay(d) ? rates.dailyWeekend : rates.dailyWeekday;
 }
 
+/** The Thursday and Saturday of the weekend a given day belongs to. */
+export function weekendBlock(d: Date): { from: Date; to: Date } {
+  const dow = d.getDay();
+  return { from: addDays(d, 4 - dow), to: addDays(d, 6 - dow) };
+}
+
+/**
+ * A weekend is sold whole or not at all.
+ *
+ * Sun-Wed can be taken a day at a time at the daily rate, but Thu-Sat is one
+ * three-day product at one price, so a stay may not take a slice of it: no
+ * single Friday, and no stay that runs Sun-Thu and stops before Saturday.
+ * A stay that reaches a weekend has to carry all three of its days.
+ *
+ * Kept next to the pricing rather than in the calendar because the server
+ * enforces the same rule in weekend_is_whole(), and the two have to agree --
+ * the calendar only decides what is easy to ask for, not what is allowed.
+ */
+export function weekendIsWhole(start: Date, end: Date): boolean {
+  for (const d of eachDay(start, end)) {
+    if (!isWeekendDay(d)) continue;
+    const { from, to } = weekendBlock(d);
+    if (from < start || to > end) return false;
+  }
+  return true;
+}
+
+/**
+ * What the days of a stay cost, before any package or occasion rate.
+ *
+ * Mirrors sum_stay_days() in SQL. A complete Thu-Sat costs rates.weekend once
+ * rather than three daily rates; "complete" means all three of its days are
+ * among the days being summed, decided per day rather than assumed, because
+ * this also prices ranges nobody may book -- the calendar quotes what a guest
+ * is dragging across before it knows where they will stop, and a Thu-Fri whose
+ * Saturday is outside the range has to come out as two daily rates rather than
+ * as a weekend that was never there.
+ *
+ * A custom price anywhere in a block takes that block back to per-day, for the
+ * same reason a custom price anywhere in a range suppresses the packages: an
+ * override must never be masked by a flat rate. That is why this takes the
+ * prices rather than being skipped when any exist -- a priced Monday must not
+ * quietly cost the guest a weekend elsewhere in the same stay.
+ */
+function sumStayDays(days: Date[], rates: Rates, prices: Record<string, number>): number {
+  const present = new Set(days.map(fmtDate));
+  const custom = (d: Date) => Object.prototype.hasOwnProperty.call(prices, fmtDate(d));
+  const wholeBlock = (d: Date) => {
+    if (!isWeekendDay(d)) return false;
+    const { from, to } = weekendBlock(d);
+    const block = eachDay(from, to);
+    return block.every((x) => present.has(fmtDate(x))) && !block.some(custom);
+  };
+
+  let total = 0;
+  for (const d of days) {
+    if (wholeBlock(d)) {
+      // The Thursday carries the price of all three days of its weekend.
+      if (d.getDay() === 4) total += rates.weekend;
+      continue;
+    }
+    total += custom(d) ? prices[fmtDate(d)] : defaultDayRate(d, rates);
+  }
+  return total;
+}
+
 /** The package a range matches exactly, by length and start/end weekday. */
 export function matchPackage(start: Date, end: Date): Exclude<PackageKey, "special"> | null {
   const len = daysBetween(start, end);
@@ -142,7 +211,13 @@ export function matchPackage(start: Date, end: Date): Exclude<PackageKey, "speci
  *   2. special occasion  — its flat price, plus per-day defaults for any days
  *                          the stay extends beyond the window.
  *   3. exact package     — fullWeek / weekend / weekday.
- *   4. per-day defaults.
+ *   4. per-day defaults, with a whole Thu–Sat priced as one weekend.
+ *
+ * Step 4 is why Wed–Sat is 75 + 350 and not four daily rates: the weekend is
+ * one product, so it costs the same whether it is taken alone or on the end
+ * of a weekday stay. Sun–Sat still lands on the full-week package above,
+ * which is cheaper than the 300 + 350 the same range would sum to — the most
+ * specific rule that matches wins, and it is the one that favours the guest.
  */
 export function quote(
   start: Date,
@@ -158,7 +233,7 @@ export function quote(
     return { date: iso, price: custom ? prices[iso] : defaultDayRate(d, rates), custom };
   });
   const hasCustom = breakdown.some((b) => b.custom);
-  const perDay = breakdown.reduce((sum, b) => sum + b.price, 0);
+  const perDay = sumStayDays(days, rates, prices);
 
   if (hasCustom) {
     return {
@@ -180,9 +255,14 @@ export function quote(
     .sort((a, b) => b.price - a.price)[0];
 
   if (occasion) {
-    const outside = days
-      .filter((d) => fmtDate(d) < occasion.start || fmtDate(d) > occasion.end)
-      .reduce((sum, d) => sum + defaultDayRate(d, rates), 0);
+    // The same sum over the days the occasion has not already paid for. A
+    // block straddling the edge of that window is not whole among them, so it
+    // falls back to daily rates -- the rule, rather than an exception to it.
+    const outside = sumStayDays(
+      days.filter((d) => fmtDate(d) < occasion.start || fmtDate(d) > occasion.end),
+      rates,
+      prices,
+    );
     return {
       total: occasion.price + outside,
       days: days.length,

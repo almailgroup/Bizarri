@@ -23,7 +23,7 @@ export function RatesPanel() {
 
   const rates = draft ?? DEFAULT_RATES;
 
-  const fields: { key: keyof Rates; label: string; hint: string }[] = [
+  const fields: { key: keyof Rates; label: string; hint: string; muted?: boolean }[] = [
     {
       key: "fullWeek",
       label: tr("fullWeekPkg"),
@@ -37,27 +37,43 @@ export function RatesPanel() {
     {
       key: "weekend",
       label: tr("weekendPkg"),
-      hint: lang === "en" ? "Thu – Sat · 3 days" : "الخميس – السبت · 3 أيام",
+      // Not "if it matches exactly" any more: a weekend cannot be booked in
+      // pieces, so this is what every Thu-Sat costs, alone or inside a longer
+      // stay. It is the only price a guest can reach for those three days.
+      hint: lang === "en" ? "Thu – Sat · always, as one" : "الخميس – السبت · دائماً، ككتلة واحدة",
     },
     {
       key: "dailyWeekday",
       label: tr("weekdayNight"),
-      hint: lang === "en" ? "Fallback rate" : "السعر الاحتياطي",
+      hint: lang === "en" ? "Any single Sun – Wed" : "أي يوم من الأحد إلى الأربعاء",
     },
     {
       key: "dailyWeekend",
       label: tr("weekendNight"),
-      hint: lang === "en" ? "Fallback rate" : "السعر الاحتياطي",
+      // Kept rather than hidden: nothing a guest can book reaches it, since a
+      // weekend day only ever appears inside a whole Thu-Sat, but a custom
+      // day price can still break a block back to daily rates, and it is what
+      // a loose weekend night would cost if the rule were ever relaxed.
+      hint: lang === "en" ? "Not used — see above" : "غير مستخدم — انظر أعلاه",
+      muted: true,
     },
   ];
 
   return (
     <section>
       <h2 className="mb-2 font-display text-3xl">{tr("packageRates")}</h2>
-      <p className="mb-6 text-sm text-muted-foreground">
+      <p className="mb-2 text-sm text-muted-foreground">
         {lang === "en"
           ? "Applied when a stay matches a package exactly. Other stays use the per-day fallback rates; a custom daily price always wins."
           : "تُطبَّق عندما تطابق الإقامة باقة تماماً. الإقامات الأخرى تستخدم الأسعار اليومية الاحتياطية؛ السعر المخصص له الأولوية دائماً."}
+      </p>
+      {/* The rule the panel cannot show by laying out five equal boxes: the
+          weekend is not a package a stay may or may not match, it is the only
+          way those three days are sold. */}
+      <p className="mb-6 border-s-2 border-border ps-4 text-sm text-muted-foreground">
+        {lang === "en"
+          ? "Sun – Wed is sold by the day, and one day is a booking. Thu – Sat is not: it is one three-day stay at the weekend rate, whether it is taken alone or on the end of a longer one, and a guest cannot book part of it. That is why the daily weekend rate no longer prices anything — only a custom day price can break a weekend back into separate days."
+          : "تُباع أيام الأحد إلى الأربعاء باليوم، ويوم واحد يُعدّ حجزاً. أما الخميس إلى السبت فلا: هي إقامة واحدة من ثلاثة أيام بسعر نهاية الأسبوع، سواء حُجزت وحدها أو ضمن إقامة أطول، ولا يمكن للضيف حجز جزء منها. لذلك لم يعد السعر اليومي لنهاية الأسبوع يُسعّر شيئاً — ولا يكسر نهاية الأسبوع إلى أيام منفصلة إلا سعر يومي مخصص."}
       </p>
 
       {save.error && (
@@ -68,7 +84,13 @@ export function RatesPanel() {
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {fields.map((f) => (
-          <label key={f.key} className="block border border-border p-5">
+          <label
+            key={f.key}
+            // The unused one stays editable — it is still the fallback a
+            // custom day price falls back to — but it should not read as one
+            // of the four numbers that price a stay today.
+            className={`block border border-border p-5 ${f.muted ? "opacity-60" : ""}`}
+          >
             <span className="block text-xs uppercase tracking-widest text-muted-foreground">
               {f.label}
             </span>

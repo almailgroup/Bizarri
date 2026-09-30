@@ -213,8 +213,16 @@ const focused = (p) =>
 // ================================================= refusals are announced
 {
   const { p, ctx } = await page();
+  // Walk to a Sunday first. Two adjacent days is under the three-day minimum,
+  // which is the refusal being tested -- but a Thursday and a Friday are also
+  // half a weekend, and that rule answers first, so starting wherever the
+  // month happens to begin tests whichever rule the calendar landed on.
   await p.locator('[role="grid"] button:not([disabled])').first().focus();
-  // Two adjacent days is under the three-day minimum.
+  for (let i = 0; i < 7; i++) {
+    const on = await p.evaluate(() => document.activeElement?.getAttribute("aria-label") ?? "");
+    if (on.startsWith("Sunday")) break;
+    await p.keyboard.press("ArrowRight");
+  }
   await p.keyboard.press("Enter");
   await p.waitForTimeout(150);
   await p.keyboard.press("ArrowRight");

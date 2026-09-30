@@ -97,6 +97,11 @@ export const t: Dict = {
   login: { en: "Login", ar: "تسجيل الدخول" },
   logout: { en: "Logout", ar: "تسجيل الخروج" },
   dashboard: { en: "Admin Dashboard", ar: "لوحة التحكم" },
+  // Thu–Sat is one product at one price, so a stay may not take a slice of it.
+  weekendWhole: {
+    en: "A weekend is booked Thursday to Saturday. Please include all three days.",
+    ar: "نهاية الأسبوع تُحجز من الخميس إلى السبت. يرجى اختيار الأيام الثلاثة كاملة.",
+  },
   pickChalet: { en: "Choose Chalet", ar: "اختر الشاليه" },
   // Nothing used to say that the choice does anything. The calendar, the
   // prices and the quick picks underneath all reload when it changes, and a
@@ -173,8 +178,17 @@ export const t: Dict = {
   reservedLabel: { en: "Reserved", ar: "محجوز" },
   filterAll: { en: "All dates", ar: "كل التواريخ" },
   filterAllNote: { en: "Any nights you like", ar: "أي عدد من الليالي" },
+  // Under "All dates" a guest draws their own range, which is the one place
+  // they can draw half a weekend. Said up front rather than as an error.
+  filterAllWeekendNote: {
+    en: "Weekends are booked Thursday to Saturday, all three days.",
+    ar: "نهايات الأسبوع تُحجز من الخميس إلى السبت، الأيام الثلاثة كاملة.",
+  },
   filterByDay: { en: "By day", ar: "بالأيام" },
-  filterByDayNote: { en: "One day at a time", ar: "يوم واحد في كل مرة" },
+  // Sun-Wed, not "one day at a time": a single day can only be a weekday now,
+  // because Thu-Sat is sold whole. Saying which days saves a guest tapping a
+  // Friday and finding nothing happens.
+  filterByDayNote: { en: "Sun – Wed · one day", ar: "الأحد – الأربعاء · يوم واحد" },
   filterWeekday: { en: "Weekday", ar: "أيام الأسبوع" },
   filterWeekdayNote: { en: "Sun – Wed · 4 days", ar: "الأحد – الأربعاء · 4 أيام" },
   filterWeekend: { en: "Weekend", ar: "نهاية الأسبوع" },

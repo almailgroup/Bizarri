@@ -95,7 +95,10 @@ begin
 
   -- the RPC refuses it
   begin
-    b := public.request_booking(1::smallint, date '2026-10-12', date '2026-10-16',
+    -- Mon-Wed: entirely weekdays, so the only thing wrong with it is that the
+    -- dates are taken. It used to run to the Friday, which is half a weekend
+    -- and now fails the shape check first, testing the wrong rule.
+    b := public.request_booking(1::smallint, date '2026-10-12', date '2026-10-14',
           'Second Guest', '+96588888888', 'second@example.com', 2::smallint, null, 'ids/second.jpg', true);
     perform pg_temp.ok('RPC refuses an overlapping request', false, 'accepted');
   exception when others then

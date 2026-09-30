@@ -160,6 +160,25 @@ async function calendar(minStayDays, lang = LANG) {
   await ctx.close();
 }
 
+/**
+ * Click the nth selectable day that falls on a given weekday.
+ *
+ * Picking cells by index picks whatever the month happens to start on, which
+ * stopped being harmless once Thu-Sat became a block: a test meaning to check
+ * the minimum stay would select a Thursday and a Friday and get told about
+ * weekends instead. Naming the weekday keeps each test on its own rule.
+ */
+const clickDay = (p, dow, nth = 0) =>
+  p.evaluate(
+    ([d, n]) => {
+      const cells = [...document.querySelectorAll('[role="grid"] button:not([disabled])')];
+      const want = cells.filter((b) => (b.getAttribute("aria-label") || "").startsWith(d));
+      want[n]?.click();
+      return want[n]?.getAttribute("aria-label") ?? null;
+    },
+    [dow, nth],
+  );
+
 // ====================================================== the quick picks
 {
   const { p, ctx } = await calendar(1);
@@ -275,7 +294,9 @@ async function calendar(minStayDays, lang = LANG) {
 
   for (const [name, note] of [
     ["All dates", /Any nights/i],
-    ["By day", /One day at a time/i],
+    // Not just "one day": which days, because Thu–Sat is sold whole and a
+    // guest who taps a Friday would otherwise find nothing happens.
+    ["By day", /Sun\s*.\s*Wed\s*.\s*one day/i],
     ["Weekday", /Sun\s*.\s*Wed/i],
     ["Weekend", /Thu\s*.\s*Sat/i],
   ]) {
@@ -455,9 +476,11 @@ for (const [name, days] of [
     await p.getByText(/Minimum stay 3 days/i).isVisible(),
   );
 
-  await free.nth(2).click();
+  // Sun and Mon: weekdays, so the only thing wrong with the range is that it
+  // is two days long.
+  await clickDay(p, "Sunday");
   await p.waitForTimeout(250);
-  await free.nth(3).click();
+  await clickDay(p, "Monday");
   await p.waitForTimeout(400);
   ck(
     "Two days under a three-day minimum is refused",
@@ -473,9 +496,9 @@ for (const [name, days] of [
 
   // A third tap starts a fresh selection rather than extending the old one,
   // so this picks the range again rather than adding a day to it.
-  await free.nth(2).click();
+  await clickDay(p, "Sunday");
   await p.waitForTimeout(250);
-  await free.nth(4).click();
+  await clickDay(p, "Tuesday");
   await p.waitForTimeout(400);
   ck("…while three days is accepted", await p.getByText("3 days selected").isVisible());
   ck("…and clears the complaint", (await p.getByText(/Minimum stay is 3 days/i).count()) === 0);
@@ -490,6 +513,113 @@ for (const [name, days] of [
   const { p, ctx } = await calendar(1);
   // A minimum of one is no minimum; saying so is noise.
   ck("A minimum of one is not announced", (await p.getByText(/Minimum stay/i).count()) === 0);
+  await ctx.close();
+}
+
+// ============================== the weekend is one product
+//
+// Sun-Wed is sold by the day. Thu-Sat is not: it is one three-day stay, so the
+// calendar must not let a guest ask for part of it. request_booking() refuses
+// such a range anyway -- this is about finding that out before filling a form,
+// not instead of the server saying so.
+{
+  const { p, ctx } = await calendar(1);
+
+  const byDay = await p.getByRole("button", { name: /^By day/i }).first();
+  await byDay.click();
+  await p.waitForTimeout(500);
+
+  const offered = await p.evaluate(() =>
+    [...document.querySelectorAll('[role="grid"] button:not([disabled])')].map((b) =>
+      (b.getAttribute("aria-label") || "").split(",")[0].trim(),
+    ),
+  );
+  ck("Single days are still offered", offered.length > 10, `${offered.length} days`);
+  ck(
+    "…but never a Thursday, Friday or Saturday",
+    !offered.some((d) => ["Thursday", "Friday", "Saturday"].includes(d)),
+    [...new Set(offered)].join(", "),
+  );
+
+  // The weekend filter still offers the whole thing.
+  await p
+    .getByRole("button", { name: /^Weekend/i })
+    .first()
+    .click();
+  await p.waitForTimeout(500);
+  const wknd = await p.evaluate(() =>
+    [...document.querySelectorAll('[role="grid"] button:not([disabled])')].map((b) =>
+      (b.getAttribute("aria-label") || "").split(",")[0].trim(),
+    ),
+  );
+  ck(
+    "The weekend shape offers exactly the weekend days",
+    wknd.length > 0 && wknd.every((d) => ["Thursday", "Friday", "Saturday"].includes(d)),
+    [...new Set(wknd)].join(", "),
+  );
+  await ctx.close();
+}
+
+// Under "All dates" the guest draws the range themselves, which is the one
+// place half a weekend can be asked for.
+{
+  const { p, ctx } = await calendar(1);
+
+  ck(
+    "The rule is stated before it is broken",
+    await p.getByText(/Thursday to Saturday, all three days/i).isVisible(),
+  );
+
+  // Thursday to Friday: reaches a weekend and stops before its Saturday.
+  await clickDay(p, "Thursday");
+  await p.waitForTimeout(300);
+  await clickDay(p, "Friday");
+  await p.waitForTimeout(500);
+  ck(
+    "Half a weekend is refused",
+    await p
+      .getByText(/Thursday to Saturday/i)
+      .first()
+      .isVisible(),
+  );
+  ck(
+    "…and cannot be carried forward",
+    !(await p.getByRole("button", { name: /^Continue$/i }).isEnabled()),
+  );
+
+  // Taking the whole thing instead. A tap with both ends already set starts a
+  // fresh selection rather than extending it, so this is the Thursday again
+  // and then its Saturday.
+  await clickDay(p, "Thursday");
+  await p.waitForTimeout(300);
+  await clickDay(p, "Saturday");
+  await p.waitForTimeout(500);
+  ck("Taking the whole weekend is accepted", await p.getByText("3 days selected").isVisible());
+  ck(
+    "…and can be carried forward",
+    await p.getByRole("button", { name: /^Continue$/i }).isEnabled(),
+  );
+  await ctx.close();
+}
+
+// A quick pick that led to a refusal would not be a shortcut.
+{
+  const { p, ctx } = await calendar(1);
+  const picks = await p.evaluate(() => {
+    const head = [...document.querySelectorAll("p")].find((n) => /quick pick/i.test(n.textContent));
+    return [...(head?.nextElementSibling?.querySelectorAll("button") ?? [])].map((b) =>
+      b.innerText.replace(/\n+/g, " "),
+    );
+  });
+  // Tonight and Tomorrow are single days, so they may only appear when that
+  // day is Sun-Wed. Whichever are shown, every one of them has to be bookable.
+  const single = picks.filter((t) => /tonight|tomorrow/i.test(t));
+  const weekendish = single.filter((t) => /Thu|Fri|Sat/.test(t));
+  ck(
+    "No one-day shortcut lands on a weekend",
+    weekendish.length === 0,
+    weekendish.join(" | ") || `${single.length} single-day picks, none on a weekend`,
+  );
   await ctx.close();
 }
 
