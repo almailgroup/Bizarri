@@ -15,6 +15,7 @@ import {
   eachDay,
   fmtDate,
   formatMoney,
+  formatSpan,
   quote,
   startOfMonth,
   startOfToday,
@@ -554,23 +555,6 @@ function Calendar({
   const isEdge = (d: Date) =>
     (start && fmtDate(d) === fmtDate(start)) || (previewEnd && fmtDate(d) === fmtDate(previewEnd));
 
-  /** "Thu 8 \u2013 Sat 10 Oct", or a single date when the stay is one day. */
-  const spanLabel = (from: Date, to: Date) => {
-    const loc = lang === "ar" ? "ar-EG" : "en-GB";
-    // Locales put a comma after the weekday, which reads wrong in the middle
-    // of a range: "Thu 1 \u2013 Sat, 3 Oct". Both commas, since Arabic has its own.
-    const fmt = (d: Date, withMonth: boolean) =>
-      d
-        .toLocaleDateString(loc, {
-          weekday: "short",
-          day: "numeric",
-          ...(withMonth ? { month: "short" } : {}),
-        })
-        .replace(/[,\u060C]/g, "");
-    if (fmtDate(from) === fmtDate(to)) return fmt(to, true);
-    return `${fmt(from, false)} \u2013 ${fmt(to, true)}`;
-  };
-
   const monthName = month.toLocaleDateString(lang === "ar" ? "ar-EG" : "en-US", {
     month: "long",
     year: "numeric",
@@ -710,7 +694,7 @@ function Calendar({
                     {/* The dates themselves: "This weekend" does not say which
                         Thursday, and that is what a guest is checking. */}
                     <span className={`text-xs ${chosen ? "opacity-70" : "text-muted-foreground"}`}>
-                      {spanLabel(q.start, q.end)}
+                      {formatSpan(q.start, q.end, lang)}
                     </span>
                     <span className="text-sm font-medium">{formatMoney(q.total, lang)}</span>
                   </button>

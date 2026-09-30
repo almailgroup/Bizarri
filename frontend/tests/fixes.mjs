@@ -185,7 +185,14 @@ await p.locator('input[placeholder="BZR-XXXXXX"]').fill("BZR-TZ0001");
 await p.getByRole("button", { name: /check status/i }).click();
 await p.waitForTimeout(600);
 ck("Guest lookup shows the status", await p.getByText("Accepted").first().isVisible());
-ck("Guest lookup shows the stored dates", await p.getByText(/2026-10-11.*2026-10-17/).isVisible());
+// The stay is shown in words now rather than as the ISO row, but the point of
+// checking it under a named timezone is unchanged: 2026-10-11 must read as the
+// 11th, a Sunday, in Kuwait as anywhere. Parsing the string as UTC and
+// formatting it locally is what silently moves a stay a day earlier.
+ck(
+  "Guest lookup shows the stored dates, unshifted by the timezone",
+  await p.getByText(/Sun\s*11\s*–\s*Sat\s*17\s*Oct/).isVisible(),
+);
 await p.locator('input[placeholder="BZR-XXXXXX"]').fill("BZR-WRONG1");
 await p.getByRole("button", { name: /check status/i }).click();
 await p.waitForTimeout(600);

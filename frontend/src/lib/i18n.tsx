@@ -153,7 +153,10 @@ export const t: Dict = {
   total: { en: "Total", ar: "الإجمالي" },
   checkIn: { en: "Check-in", ar: "الوصول" },
   checkOut: { en: "Check-out", ar: "المغادرة" },
-  nightsLabel: { en: "Days", ar: "الأيام" },
+  // Never stands alone -- every use is after a number ("3 days", "(3 days)"),
+  // so it is not a label being capitalised, it is a word mid-sentence. The
+  // Arabic was the definite "the days", which after a numeral is simply wrong.
+  nightsLabel: { en: "days", ar: "أيام" },
   unavailableLabel: { en: "Unavailable", ar: "غير متاح" },
   selectedLabel: { en: "Selected", ar: "المحدد" },
   clear: { en: "Clear", ar: "مسح" },
@@ -374,9 +377,18 @@ export const t: Dict = {
   },
 
   // Looking a booking up two ways
+  // Two forms of each: the short one is what the tab shows, the full one is
+  // its accessible name. Three full phrases could only stack one per row on a
+  // phone, which cost about 110px above the fold on the one page whose whole
+  // job is a single field. The hint under the tabs says which is which
+  // anyway ("Enter the reference from your confirmation email"), so nothing
+  // is lost by the tab itself being one word.
   lookupByRef: { en: "Booking reference", ar: "رقم الحجز" },
   lookupByEmail: { en: "Email address", ar: "البريد الإلكتروني" },
   lookupByPhone: { en: "Phone number", ar: "رقم الهاتف" },
+  lookupByRefShort: { en: "Reference", ar: "الرقم" },
+  lookupByEmailShort: { en: "Email", ar: "البريد" },
+  lookupByPhoneShort: { en: "Phone", ar: "الهاتف" },
   checkByRefHint: {
     en: "Enter the reference from your confirmation email.",
     ar: "أدخل رقم الحجز من رسالة التأكيد.",
@@ -394,6 +406,12 @@ export const t: Dict = {
     ar: "لا يوجد طلب مطابق لهذا البريد الإلكتروني.",
   },
   lookupHow: { en: "How would you like to find your booking?", ar: "كيف تريد البحث عن حجزك؟" },
+  // The lookup result names the chalet. It read "Chalet 1" on the Arabic page
+  // too, because the number was glued to an English word in the component.
+  chaletNo: { en: "Chalet", ar: "شاليه" },
+  lookupSearching: { en: "Checking\u2026", ar: "جارٍ البحث\u2026" },
+  lookupOne: { en: "One booking found", ar: "تم العثور على حجز واحد" },
+  lookupMany: { en: "{n} bookings found", ar: "تم العثور على {n} حجوزات" },
   checkByPhoneHint: {
     en: "Enter the phone number you booked with.",
     ar: "أدخل رقم الهاتف الذي حجزت به.",

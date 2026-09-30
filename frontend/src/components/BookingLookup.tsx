@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useI18n } from "@/lib/i18n";
 import { useLookupBooking, type FoundBooking, type LookupBy } from "@/lib/api";
-import { formatMoney } from "@/lib/booking";
+import { formatMoney, formatSpan, parseDate } from "@/lib/booking";
 
 const LAST_REF_KEY = "bizarri:lastRef";
 
@@ -56,6 +56,37 @@ export function BookingLookup({ heading = true }: { heading?: boolean }) {
   const found = results[0];
   const value = values[by];
 
+  /**
+   * Bring the answer to the guest.
+   *
+   * On a phone the form sits near the bottom of the first screen, so a result
+   * rendered under it is off-screen: the guest taps Check status, nothing
+   * appears to happen, and the page looks broken. Scrolling to the answer is
+   * the whole interaction on a small screen. aria-live covers the same gap for
+   * a screen reader, which otherwise hears nothing either.
+   */
+  const answerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!lookup.isSuccess && !lookup.isError) return;
+    const el = answerRef.current;
+    if (!el) return;
+    // Only when it is actually out of sight: on a desktop the answer is
+    // already visible and scrolling under someone is its own annoyance. The
+    // test is whether the first card is readable, not whether its top edge is
+    // on screen -- one that begins above the fold and ends below it shows the
+    // reference and the status and cuts the dates and the price, which is the
+    // half the guest came for.
+    //
+    // The card by name, not the first child: that is the screen-reader-only
+    // count, a clipped 1px box, which always measures as comfortably in view.
+    const card = el.querySelector("[data-result]");
+    if (!card) return;
+    const r = card.getBoundingClientRect();
+    if (r.top < 0 || r.bottom > window.innerHeight) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [lookup.isSuccess, lookup.isError, lookup.data]);
+
   const statusLabel = (s: string) =>
     s === "accepted"
       ? tr("statusAccepted")
@@ -75,10 +106,10 @@ export function BookingLookup({ heading = true }: { heading?: boolean }) {
     lookup.reset();
   };
 
-  const tabs: { key: LookupBy; label: string }[] = [
-    { key: "ref", label: tr("lookupByRef") },
-    { key: "email", label: tr("lookupByEmail") },
-    { key: "phone", label: tr("lookupByPhone") },
+  const tabs: { key: LookupBy; label: string; full: string }[] = [
+    { key: "ref", label: tr("lookupByRefShort"), full: tr("lookupByRef") },
+    { key: "email", label: tr("lookupByEmailShort"), full: tr("lookupByEmail") },
+    { key: "phone", label: tr("lookupByPhoneShort"), full: tr("lookupByPhone") },
   ];
 
   const field = {
@@ -121,16 +152,19 @@ export function BookingLookup({ heading = true }: { heading?: boolean }) {
       <p className="mt-2 text-sm text-muted-foreground" id="lookup-how">
         {tr("lookupHow")}
       </p>
-      {/* One per row on a phone, so no label is squeezed or wrapped. */}
-      <div role="tablist" aria-labelledby="lookup-how" className="mt-3 grid gap-2 sm:grid-cols-3">
+      {/* One row at every width. The short label is what fits three across on
+          a phone; the full phrase stays as the accessible name, so a screen
+          reader still hears "Booking reference" rather than "Reference". */}
+      <div role="tablist" aria-labelledby="lookup-how" className="mt-3 grid grid-cols-3 gap-2">
         {tabs.map((t) => (
           <button
             key={t.key}
             type="button"
             role="tab"
             aria-selected={by === t.key}
+            aria-label={t.full}
             onClick={() => switchTo(t.key)}
-            className={`px-4 py-3 text-sm uppercase tracking-widest transition-colors ${
+            className={`px-2 py-3 text-xs uppercase tracking-widest transition-colors sm:px-4 sm:text-sm ${
               by === t.key
                 ? "bg-foreground text-background"
                 : "border border-border text-muted-foreground hover:bg-secondary"
@@ -170,12 +204,15 @@ export function BookingLookup({ heading = true }: { heading?: boolean }) {
             field.mono ? "font-mono" : ""
           }`}
         />
+        {/* Filled, not outlined. Stacked under three outlined tabs and an
+            outlined input on a phone, an outlined submit is the fourth box in
+            a column of boxes and stops looking like the thing to press. */}
         <button
           type="submit"
           disabled={lookup.isPending || !value.trim()}
-          className="border border-foreground px-6 py-3 text-sm uppercase tracking-widest transition-colors hover:bg-foreground hover:text-background disabled:opacity-50"
+          className="bg-foreground px-6 py-3 text-sm uppercase tracking-widest text-background transition-colors hover:opacity-90 disabled:bg-secondary disabled:text-muted-foreground"
         >
-          {tr("checkStatus")}
+          {lookup.isPending ? tr("lookupSearching") : tr("checkStatus")}
         </button>
       </form>
 
@@ -183,31 +220,73 @@ export function BookingLookup({ heading = true }: { heading?: boolean }) {
         <p className="mt-3 text-xs text-muted-foreground">{tr("savedRefNote")}</p>
       )}
 
-      {lookup.isSuccess && !found && (
-        <p className="mt-4 text-sm text-muted-foreground">{field.empty}</p>
-      )}
-      {lookup.isError && (
-        <p role="alert" className="mt-4 text-sm text-destructive">
-          {(lookup.error as Error).message}
-        </p>
-      )}
+      <div ref={answerRef} aria-live="polite">
+        {lookup.isSuccess && !found && (
+          <p className="mt-4 text-sm text-muted-foreground">{field.empty}</p>
+        )}
+        {lookup.isError && (
+          <p role="alert" className="mt-4 text-sm text-destructive">
+            {(lookup.error as Error).message}
+          </p>
+        )}
 
-      {/* An address or a number can carry more than one stay, so they are all
-          listed rather than whichever came back first. */}
-      {results.map((b) => (
-        <div key={b.ref} className="mt-5 border border-border p-5 sm:p-6">
-          <p className="font-mono text-xs text-muted-foreground" dir="ltr">
-            {b.ref}
+        {/* Said out loud for a screen reader, which has no card to look at.
+            Sighted guests have the cards themselves. */}
+        {results.length > 0 && (
+          <p className="sr-only">
+            {results.length === 1
+              ? tr("lookupOne")
+              : tr("lookupMany").replace("{n}", String(results.length))}
           </p>
-          <p className="mt-2 font-display text-2xl">{statusLabel(b.status)}</p>
-          <p className="mt-2 text-sm text-muted-foreground" dir="ltr">
-            Chalet {b.chalet_id} · {b.start_date} → {b.end_date}
-          </p>
-          <p className="mt-1 text-sm text-muted-foreground" dir="ltr">
-            {b.days} {tr("nightsLabel")} · {formatMoney(Number(b.total), lang)}
-          </p>
-        </div>
-      ))}
+        )}
+
+        {/* An address or a number can carry more than one stay, so they are all
+            listed rather than whichever came back first. */}
+        {results.map((b) => (
+          <div key={b.ref} data-result className="mt-5 border border-border p-4 sm:p-6">
+            {/* Reference, then status, then the stay -- each on its own line.
+                Set side by side, "Pending / waiting list" is long enough to
+                wrap the pair on a phone, which left one card with the
+                reference beside the status and the next with it underneath.
+                A stack is the same shape whatever it says. */}
+            <p className="font-mono text-xs text-muted-foreground">
+              {/* dir on the paragraph would left-align it, and on the Arabic
+                  page that leaves the reference hanging off the side of a card
+                  whose every other line is right-aligned. An inline span sets
+                  the direction of the reference without moving it. */}
+              <span dir="ltr">{b.ref}</span>
+            </p>
+            {/* The status is the answer, so it gets the weight the reference
+                used to carry -- in the colours the admin panel already uses
+                for the same three words, so the two sides of a booking do not
+                describe it differently. */}
+            <p className="mt-2">
+              <span
+                className={`inline-block px-3 py-1.5 text-xs uppercase tracking-widest ${
+                  b.status === "accepted"
+                    ? "bg-foreground text-background"
+                    : b.status === "rejected" || b.status === "cancelled"
+                      ? "bg-destructive text-destructive-foreground"
+                      : "bg-secondary text-foreground"
+                }`}
+              >
+                {statusLabel(b.status)}
+              </span>
+            </p>
+
+            {/* "2026-10-08 → 2026-10-10" is how the row is stored, not how a
+                stay is read. This is the same span, in the same words the
+                calendar offered it in. */}
+            <p className="mt-3 font-display text-xl sm:text-2xl">
+              {formatSpan(parseDate(b.start_date), parseDate(b.end_date), lang)}
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {b.days} {tr("nightsLabel")} · {formatMoney(Number(b.total), lang)} · {tr("chaletNo")}{" "}
+              {b.chalet_id}
+            </p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

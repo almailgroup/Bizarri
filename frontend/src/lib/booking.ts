@@ -213,6 +213,31 @@ export function rangeIsFree(start: Date, end: Date, a: Availability): boolean {
   return eachDay(start, end).every((d) => !isBlocked(d, a));
 }
 
+/**
+ * "Thu 8 \u2013 Sat 10 Oct", or a single date when the stay is one day.
+ *
+ * Shared by the booking calendar and the reservation lookup: a guest who
+ * picked "Thu 1 \u2013 Sat 3 Oct" should be shown the same stay in the same
+ * words when they come back to check it, not the ISO dates the row is
+ * stored as. The year is left off because both places are talking about a
+ * stay that is being chosen or is still ahead.
+ */
+export function formatSpan(from: Date, to: Date, lang: "en" | "ar"): string {
+  const loc = lang === "ar" ? "ar-EG" : "en-GB";
+  // Locales put a comma after the weekday, which reads wrong in the middle
+  // of a range: "Thu 1 \u2013 Sat, 3 Oct". Both commas, since Arabic has its own.
+  const fmt = (d: Date, withMonth: boolean) =>
+    d
+      .toLocaleDateString(loc, {
+        weekday: "short",
+        day: "numeric",
+        ...(withMonth ? { month: "short" } : {}),
+      })
+      .replace(/[,\u060C]/g, "");
+  if (fmtDate(from) === fmtDate(to)) return fmt(to, true);
+  return `${fmt(from, false)} \u2013 ${fmt(to, true)}`;
+}
+
 export function formatMoney(amount: number, lang: "en" | "ar"): string {
   const n = Number.isInteger(amount) ? amount : Number(amount.toFixed(2));
   return lang === "ar" ? `${n} د.ك` : `KD ${n}`;

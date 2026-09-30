@@ -28,6 +28,29 @@ const iso = (d) =>
 const today = new Date();
 today.setHours(0, 0, 0, 0);
 
+// An address or a number can carry more than one stay, and the two statuses
+// are the two a guest actually sees.
+const FOUND = [
+  {
+    ref: "BZR-4K2M9X",
+    status: "accepted",
+    chalet_id: 1,
+    start_date: "2026-10-08",
+    end_date: "2026-10-10",
+    days: 3,
+    total: 350,
+  },
+  {
+    ref: "BZR-7Q1P3D",
+    status: "pending",
+    chalet_id: 1,
+    start_date: "2026-11-12",
+    end_date: "2026-11-18",
+    days: 7,
+    total: 600,
+  },
+];
+
 const NEWS = [
   {
     id: "n1",
@@ -95,6 +118,7 @@ async function phone(vp) {
         updated_by: null,
       });
     if (path === "news") return send(NEWS);
+    if (path.startsWith("rpc/lookup_booking")) return send(FOUND);
     if (path === "rpc/availability_calendar") {
       const out = [];
       const d = new Date(body.p_from + "T00:00:00");
@@ -348,6 +372,127 @@ for (const [name, vp] of [
     "The one-tap weekend is on screen without scrolling",
     top !== null && top < 780,
     `top=${top}px of 844`,
+  );
+  await ctx.close();
+}
+
+// ===================================== the reservation page, on a phone
+//
+// This page is one control and one answer. Both used to be in the wrong place
+// on a 360px screen: the input sat below the fold on arrival, and the answer
+// rendered under it, so tapping Check status appeared to do nothing at all.
+{
+  const ctx = await phone({ width: 360, height: 740 });
+  const p = await ctx.newPage();
+  await p.goto(pageUrl("reservation"), { waitUntil: "load" });
+  await p.waitForTimeout(900);
+
+  const form = await p.evaluate(() => {
+    const input = document.querySelector("input");
+    const submit = [...document.querySelectorAll("button[type=submit]")][0];
+    return {
+      inputBottom: Math.round(input.getBoundingClientRect().bottom),
+      submitBottom: Math.round(submit.getBoundingClientRect().bottom),
+      vh: innerHeight,
+    };
+  });
+  // Not against the full viewport: Playwright's 740px is all glass, while a
+  // real phone spends 90-110px of it on the URL bar. Something that clears
+  // the fold by six pixels here is below it on the device.
+  const fold = form.vh - 110;
+  ck(
+    "The field you came to fill is on screen without scrolling",
+    form.inputBottom <= fold,
+    `input ends at ${form.inputBottom}px, fold at ${fold}`,
+  );
+  ck(
+    "…and so is the button that submits it",
+    form.submitBottom <= fold,
+    `button ends at ${form.submitBottom}px, fold at ${fold}`,
+  );
+
+  await p.fill("input", "BZR-4K2M9X");
+  await p.getByRole("button", { name: /check status/i }).click();
+  await p.waitForTimeout(1500);
+
+  const answer = await p.evaluate(() => {
+    const card = document.querySelector("[aria-live] > div");
+    if (!card) return null;
+    const r = card.getBoundingClientRect();
+    return {
+      top: Math.round(r.top),
+      bottom: Math.round(r.bottom),
+      vh: innerHeight,
+      scrolled: Math.round(scrollY),
+    };
+  });
+  ck("An answer is rendered", answer !== null);
+  // The whole card, not just its top edge: one that starts on screen and ends
+  // past the fold shows the reference and the status and cuts the dates and
+  // the price, which is the half the guest came for.
+  ck(
+    "…and the page brings all of it into view, not just its top edge",
+    answer && answer.top >= 0 && answer.bottom <= answer.vh,
+    answer &&
+      `card spans ${answer.top}-${answer.bottom}px of ${answer.vh}, page scrolled ${answer.scrolled}px`,
+  );
+  // A screen reader has no card to look at, so the result has to be spoken.
+  ck("…and is announced, not just drawn", (await p.locator("[aria-live]").count()) > 0);
+
+  const card = await p.evaluate(() => {
+    const c = document.querySelector("[aria-live] > div");
+    return c?.innerText.replace(/\n+/g, " ") ?? "";
+  });
+  // "2026-10-08 → 2026-10-10" is the stored row, not an answer to "when is my
+  // stay?". The calendar offered it as "Thu 8 – Sat 10 Oct"; so does this.
+  ck("The stay is given in words, not as stored", /Thu\s*8\s*–\s*Sat\s*10\s*Oct/.test(card), card);
+  ck("…and not as ISO dates", !/\d{4}-\d{2}-\d{2}/.test(card), card);
+
+  // Accepted and pending are the whole point of looking; they must not read
+  // the same at a glance.
+  const chips = await p.evaluate(() =>
+    [...document.querySelectorAll("[aria-live] > div")].map((c) => {
+      const el = [...c.querySelectorAll("span")].find((s) => s.className.includes("uppercase"));
+      return el ? getComputedStyle(el).backgroundColor : null;
+    }),
+  );
+  ck(
+    "Accepted and pending do not look alike",
+    chips.length === 2 && chips[0] && chips[1] && chips[0] !== chips[1],
+    chips.join(" vs "),
+  );
+  await ctx.close();
+}
+
+// The reference is Latin in an Arabic card. Setting dir on its paragraph also
+// left-aligns it, which leaves it hanging off the side of a card whose every
+// other line is right-aligned -- the same trap as the footer phone number.
+{
+  const ctx = await phone({ width: 390, height: 844 });
+  const p = await ctx.newPage();
+  await p.goto(`${B}reservation/ar`, { waitUntil: "load" });
+  await p.waitForTimeout(900);
+  await p.fill("input", "BZR-4K2M9X");
+  await p.getByRole("button", { name: "عرض الحالة" }).click();
+  await p.waitForTimeout(1500);
+
+  const sides = await p.evaluate(() => {
+    const card = document.querySelector("[aria-live] > div");
+    if (!card) return null;
+    const box = card.getBoundingClientRect();
+    const ref = [...card.querySelectorAll("p")].find((n) => /BZR-/.test(n.textContent));
+    const meta = [...card.querySelectorAll("p")].find((n) => /·/.test(n.textContent));
+    const gapEnd = (el) => {
+      const r = el.getBoundingClientRect();
+      return Math.round(box.right - r.right);
+    };
+    return { ref: gapEnd(ref), meta: gapEnd(meta) };
+  });
+  ck("The Arabic card shows the reference", sides !== null, JSON.stringify(sides));
+  ck(
+    "…on the same side as everything else in it",
+    sides && Math.abs(sides.ref - sides.meta) < 4,
+    sides && `reference ${sides.ref}px from the end, the rest ${sides.meta}px`,
   );
   await ctx.close();
 }
