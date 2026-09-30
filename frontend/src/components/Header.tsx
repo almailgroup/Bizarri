@@ -1,5 +1,5 @@
 import { Link, useMatchRoute, type LinkProps } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Menu, X, Globe, Ticket } from "lucide-react";
 import { useI18n, type TrKey } from "@/lib/i18n";
 import { BrandHomeLink } from "@/components/BrandHomeLink";
@@ -31,19 +31,35 @@ const menuNav: { to: NavPath; key: TrKey }[] = [
 
 export function Header() {
   const [open, setOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
+  const [atTop, setAtTop] = useState(true);
   const { tr, lang, setLang } = useI18n();
   const matchRoute = useMatchRoute();
+  const sentinel = useRef<HTMLDivElement>(null);
 
   // The homepage hero is a full-bleed dark image; the bar sits on top of it
   // until the visitor scrolls, then picks up its solid background.
-  const overHero = !!matchRoute({ to: "/$lang", params: { lang } }) && !scrolled;
+  const overHero = !!matchRoute({ to: "/$lang", params: { lang } }) && atTop;
 
+  /**
+   * Whether the top of the page is still in view.
+   *
+   * Watched with an observer rather than counted from scroll events, because
+   * the page can move without firing one. The router restores a scroll
+   * position on the way back to a page, the intro releases the body's overflow
+   * lock when it finishes, and the hero image changes the page's height when
+   * it finally loads. Any of those leaves a scroll-event tally holding a stale
+   * answer -- which looks like a white bar sitting over a hero that is plainly
+   * still there, and stays that way until something scrolls.
+   *
+   * The sentinel is a strip at the very top of the document, so "intersecting"
+   * is the question being asked rather than a number to compare against.
+   */
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 40);
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    const el = sentinel.current;
+    if (!el) return;
+    const io = new IntersectionObserver(([entry]) => setAtTop(entry.isIntersecting));
+    io.observe(el);
+    return () => io.disconnect();
   }, []);
 
   // Lock the page behind the full-screen menu, and let Escape close it.
@@ -65,6 +81,11 @@ export function Header() {
 
   return (
     <>
+      {/* Absolute with no positioned ancestor, so it is pinned to the top of
+          the document rather than the viewport: it leaves view precisely when
+          the page has scrolled past the bar's own height. Zero width and
+          aria-hidden -- it is a measurement, not content. */}
+      <div ref={sentinel} aria-hidden className="absolute top-0 h-20 w-0" />
       <header
         className={`fixed inset-x-0 top-0 z-50 transition-colors duration-500 ${
           overHero
