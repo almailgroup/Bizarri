@@ -362,9 +362,11 @@ for (const [name, vp] of [
   const p = await ctx.newPage();
   await p.goto(pageUrl("booking"), { waitUntil: "load" });
   await p.waitForTimeout(1400);
+  // The shortcut cards above the calendar are gone; the weekend shape is the
+  // one tap now, and it is what has to be reachable without scrolling.
   const top = await p.evaluate(() => {
-    const quick = [...document.querySelectorAll("button")].find((x) =>
-      /this weekend|نهاية هذا الأسبوع/i.test(x.textContent || ""),
+    const quick = [...document.querySelectorAll('[role="group"] button[aria-pressed]')].find((x) =>
+      /^weekend|^نهاية الأسبوع/i.test((x.innerText || "").trim()),
     );
     return quick ? Math.round(quick.getBoundingClientRect().top) : null;
   });

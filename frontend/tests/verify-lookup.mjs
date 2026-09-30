@@ -301,11 +301,23 @@ const dayCell = (p, d) =>
 async function toCheckout(p) {
   await p.goto(pageUrl("booking"), { waitUntil: "load" });
   await p.waitForTimeout(1200);
-  await p.getByRole("button", { name: /Next month/i }).click();
-  await p.waitForTimeout(300);
+  // A stay is a shape now: choose the weekend, then tap its Thursday, and the
+  // whole Thu-Sat comes with it. The calendar also opens on the first month
+  // with something bookable, so walk to the month the fixtures describe
+  // rather than pressing Next once.
+  await p
+    .getByRole("button", { name: /^Weekend/i })
+    .first()
+    .click();
+  await p.waitForTimeout(350);
+  const want = thu.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  for (let i = 0; i < 6; i++) {
+    const heading = await p.locator('[role="grid"]').getAttribute("aria-label");
+    if ((heading ?? "").includes(want)) break;
+    await p.getByRole("button", { name: /Next month/i }).click();
+    await p.waitForTimeout(300);
+  }
   await dayCell(p, thu).click();
-  await p.waitForTimeout(250);
-  await dayCell(p, addDays(thu, 2)).click();
   await p.waitForTimeout(350);
   await p.getByRole("button", { name: /^Continue$/i }).click();
   await p.waitForTimeout(700);

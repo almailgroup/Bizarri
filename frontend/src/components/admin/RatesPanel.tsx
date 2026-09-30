@@ -27,7 +27,12 @@ export function RatesPanel() {
     {
       key: "fullWeek",
       label: tr("fullWeekPkg"),
-      hint: lang === "en" ? "Sun – Sat · 7 days" : "الأحد – السبت · 7 أيام",
+      // Unreachable since the booking page stopped offering a free-form
+      // range: every stay it can produce is one day, Sun-Wed or Thu-Sat, and
+      // none of those is a week. quote_stay() still prices an exact Sun-Sat
+      // at this rate, so an admin entering a stay by hand gets it.
+      hint: lang === "en" ? "Not offered on the site" : "غير معروضة على الموقع",
+      muted: true,
     },
     {
       key: "weekday",

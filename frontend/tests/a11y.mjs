@@ -153,7 +153,10 @@ const focused = (p) =>
 // ================================================ arrows move within the grid
 {
   const { p, ctx } = await page();
-  await p.locator('[role="grid"] button:not([disabled])').first().focus();
+  await p
+    .locator('[role="grid"] button:not([disabled]):not([aria-disabled="true"])')
+    .first()
+    .focus();
   const start = await focused(p);
 
   await p.keyboard.press("ArrowRight");
@@ -183,14 +186,15 @@ const focused = (p) =>
 // ================================= a whole booking without touching a mouse
 {
   const { p, ctx } = await page();
-  await p.locator('[role="grid"] button:not([disabled])').first().focus();
+  await p
+    .locator('[role="grid"] button:not([disabled]):not([aria-disabled="true"])')
+    .first()
+    .focus();
 
-  // Pick a check-in, move three days, pick a check-out.
+  // One press takes the whole stay: a day belongs to a shape, and choosing it
+  // chooses the shape's whole window rather than one end of a range.
   await p.keyboard.press("Enter");
-  await p.waitForTimeout(200);
-  for (let i = 0; i < 3; i++) await p.keyboard.press("ArrowRight");
-  await p.keyboard.press("Enter");
-  await p.waitForTimeout(300);
+  await p.waitForTimeout(400);
 
   const checkIn = await p.locator("text=Check-in").locator("..").innerText();
   const checkOut = await p.locator("text=Check-out").locator("..").innerText();
@@ -210,35 +214,37 @@ const focused = (p) =>
   await ctx.close();
 }
 
-// ================================================= refusals are announced
+// ============================ a shape too short to book is not offered
+//
+// This used to select two days under a three-day minimum and check that the
+// refusal was announced. There is no longer a way to ask for one: every shape
+// on offer is at least as long as the minimum, so the refusal it tested
+// cannot be reached from the calendar. Better than announcing a refusal is
+// not making the offer.
 {
   const { p, ctx } = await page();
-  // Walk to a Sunday first. Two adjacent days is under the three-day minimum,
-  // which is the refusal being tested -- but a Thursday and a Friday are also
-  // half a weekend, and that rule answers first, so starting wherever the
-  // month happens to begin tests whichever rule the calendar landed on.
-  await p.locator('[role="grid"] button:not([disabled])').first().focus();
-  for (let i = 0; i < 7; i++) {
-    const on = await p.evaluate(() => document.activeElement?.getAttribute("aria-label") ?? "");
-    if (on.startsWith("Sunday")) break;
-    await p.keyboard.press("ArrowRight");
-  }
-  await p.keyboard.press("Enter");
-  await p.waitForTimeout(150);
-  await p.keyboard.press("ArrowRight");
-  await p.keyboard.press("Enter");
-  await p.waitForTimeout(300);
-
-  const alert = p.locator('[role="alert"]');
-  ck("A refused range raises an alert role", (await alert.count()) > 0);
+  const offered = await p.evaluate(() =>
+    [...document.querySelectorAll('[role="group"] button[aria-pressed]')].map((b) =>
+      b.innerText.split("\n")[0].trim(),
+    ),
+  );
+  ck("Some way to choose a stay is offered", offered.length > 0, offered.join(", "));
+  // The mock sets a three-day minimum, so the one-day shape must be gone.
   ck(
-    "…that says what is wrong",
-    /minimum/i.test((await alert.first().innerText()) ?? ""),
-    await alert.first().innerText(),
+    "…and never one shorter than the minimum stay",
+    !offered.some((t) => /^By day$/i.test(t)),
+    offered.join(", "),
   );
   ck(
-    "…and it reaches the live region too",
-    /minimum/i.test(await p.locator('[aria-live="polite"].sr-only').innerText()),
+    "Choosing one lands a stay that can be carried forward",
+    await (async () => {
+      await p
+        .locator('[role="grid"] button:not([disabled]):not([aria-disabled="true"])')
+        .first()
+        .click();
+      await p.waitForTimeout(400);
+      return p.getByRole("button", { name: /^Continue$/i }).isEnabled();
+    })(),
   );
   await ctx.close();
 }
@@ -253,7 +259,9 @@ const focused = (p) =>
       return { w: s.outlineWidth, style: s.outlineStyle };
     });
   };
-  const day = await ring(p.locator('[role="grid"] button:not([disabled])').first());
+  const day = await ring(
+    p.locator('[role="grid"] button:not([disabled]):not([aria-disabled="true"])').first(),
+  );
   ck(
     "A focused day shows a visible ring",
     day.style !== "none" && parseFloat(day.w) >= 1,

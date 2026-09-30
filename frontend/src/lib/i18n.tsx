@@ -102,6 +102,9 @@ export const t: Dict = {
     en: "A weekend is booked Thursday to Saturday. Please include all three days.",
     ar: "نهاية الأسبوع تُحجز من الخميس إلى السبت. يرجى اختيار الأيام الثلاثة كاملة.",
   },
+  // The three shapes a stay can be. There is no free-form option, so this is
+  // a choice of product rather than a filter over a calendar.
+  pickShape: { en: "Choose your stay", ar: "اختر نوع الإقامة" },
   pickChalet: { en: "Choose Chalet", ar: "اختر الشاليه" },
   // Nothing used to say that the choice does anything. The calendar, the
   // prices and the quick picks underneath all reload when it changes, and a
@@ -153,14 +156,9 @@ export const t: Dict = {
   // Booking calendar
   selectDates: { en: "Select your dates", ar: "اختر تواريخك" },
   pickStart: { en: "Tap a day to start", ar: "اضغط على يوم للبدء" },
-  pickEnd: { en: "Now tap your check-out day", ar: "الآن اضغط على يوم المغادرة" },
   minStay: {
     en: "Minimum stay is {n} days.",
     ar: "الحد الأدنى للإقامة {n} أيام.",
-  },
-  rangeBlocked: {
-    en: "Those dates include a day that isn't available.",
-    ar: "التواريخ المحددة تتضمن يوماً غير متاح.",
   },
   total: { en: "Total", ar: "الإجمالي" },
   checkIn: { en: "Check-in", ar: "الوصول" },
@@ -176,14 +174,6 @@ export const t: Dict = {
   customPricing: { en: "Custom pricing", ar: "تسعير مخصص" },
   bookingRef: { en: "Booking reference", ar: "رقم الحجز" },
   reservedLabel: { en: "Reserved", ar: "محجوز" },
-  filterAll: { en: "All dates", ar: "كل التواريخ" },
-  filterAllNote: { en: "Any nights you like", ar: "أي عدد من الليالي" },
-  // Under "All dates" a guest draws their own range, which is the one place
-  // they can draw half a weekend. Said up front rather than as an error.
-  filterAllWeekendNote: {
-    en: "Weekends are booked Thursday to Saturday, all three days.",
-    ar: "نهايات الأسبوع تُحجز من الخميس إلى السبت، الأيام الثلاثة كاملة.",
-  },
   filterByDay: { en: "By day", ar: "بالأيام" },
   // Sun-Wed, not "one day at a time": a single day can only be a weekday now,
   // because Thu-Sat is sold whole. Saying which days saves a guest tapping a
@@ -194,18 +184,6 @@ export const t: Dict = {
   filterWeekend: { en: "Weekend", ar: "نهاية الأسبوع" },
   filterWeekendNote: { en: "Thu – Sat · 3 days", ar: "الخميس – السبت · 3 أيام" },
   filterFrom: { en: "from {price}", ar: "من {price}" },
-  quickToday: { en: "Tonight", ar: "الليلة" },
-  quickTomorrow: { en: "Tomorrow", ar: "غداً" },
-  quickThisWeekend: { en: "This weekend", ar: "نهاية هذا الأسبوع" },
-  quickNextWeekend: { en: "Next weekend", ar: "نهاية الأسبوع القادم" },
-  // Not "Weekday": that is the name of a filter, and two controls a line
-  // apart reading almost the same thing is a question, not a shortcut.
-  quickThisWeek: { en: "This week", ar: "هذا الأسبوع" },
-  quickFullWeek: { en: "A full week", ar: "أسبوع كامل" },
-  quickNone: {
-    en: "Nothing free at short notice — pick your own dates below.",
-    ar: "لا يوجد متاح قريباً — اختر تواريخك أدناه.",
-  },
   filterHint: {
     en: "Tap any highlighted day and the whole stay is selected for you.",
     ar: "اضغط على أي يوم مميّز وسيتم تحديد الإقامة كاملة تلقائياً.",
@@ -273,7 +251,6 @@ export const t: Dict = {
   // Booking flow guidance
   checkAvailability: { en: "Check availability", ar: "عرض التواريخ المتاحة" },
   bookOnWhatsapp: { en: "Book on WhatsApp", ar: "احجز عبر واتساب" },
-  quickPick: { en: "Quick pick", ar: "اختيار سريع" },
   welcomeBack: {
     en: "We filled in your details from your last booking on this device.",
     ar: "تمت تعبئة بياناتك من حجزك السابق على هذا الجهاز.",

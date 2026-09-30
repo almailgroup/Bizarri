@@ -87,7 +87,11 @@ async function calendar(minStayDays, lang = LANG) {
   // Next month, so every day in the grid is in the future.
   await p.getByRole("button", { name: lang === "ar" ? "الشهر التالي" : /Next month/i }).click();
   await p.waitForTimeout(400);
-  return { p, ctx, free: p.locator('[role="grid"] button:not([disabled])') };
+  return {
+    p,
+    ctx,
+    free: p.locator('[role="grid"] button:not([disabled]):not([aria-disabled="true"])'),
+  };
 }
 
 // ======================================================= one day is a stay
@@ -111,24 +115,43 @@ async function calendar(minStayDays, lang = LANG) {
   await ctx.close();
 }
 
-// ================================================ the count, in the calendar
-{
-  const { p, ctx, free } = await calendar(1);
-  await free.nth(2).click();
-  await p.waitForTimeout(300);
-
-  // Before a second tap, the pointer stands in for it — so the length can be
-  // seen before committing to it.
-  await free.nth(5).hover();
-  await p.waitForTimeout(400);
-  ck(
-    "Hovering previews the length before the tap",
-    await p.getByText("4 days selected").isVisible(),
+/**
+ * Click the nth selectable day that falls on a given weekday.
+ *
+ * Picking cells by index picks whatever the month happens to start on, which
+ * stopped being harmless once Thu-Sat became a block: a test meaning to check
+ * the minimum stay would select a Thursday and a Friday and get told about
+ * weekends instead. Naming the weekday keeps each test on its own rule.
+ */
+const clickDay = (p, dow, nth = 0) =>
+  p.evaluate(
+    ([d, n]) => {
+      const cells = [
+        ...document.querySelectorAll(
+          '[role="grid"] button:not([disabled]):not([aria-disabled="true"])',
+        ),
+      ];
+      const want = cells.filter((b) => (b.getAttribute("aria-label") || "").startsWith(d));
+      want[n]?.click();
+      return want[n]?.getAttribute("aria-label") ?? null;
+    },
+    [dow, nth],
   );
 
-  await free.nth(5).click();
+// ================================================ the count, in the calendar
+{
+  const { p, ctx } = await calendar(1);
+  // Weekday: Sun-Wed, four days, in one tap. There is no hover preview to
+  // test any more -- the pointer used to stand in for a second tap that no
+  // longer exists, because choosing a day now chooses its whole stay.
+  await p
+    .getByRole("button", { name: /^Weekday/i })
+    .first()
+    .click();
   await p.waitForTimeout(400);
-  ck("…and tapping keeps it", await p.getByText("4 days selected").isVisible());
+  await clickDay(p, "Sunday");
+  await p.waitForTimeout(400);
+  ck("One tap counts the whole stay", await p.getByText("4 days selected").isVisible());
 
   // It has to be beside the grid, not in a summary further down the page:
   // that is the whole point of the change.
@@ -160,140 +183,49 @@ async function calendar(minStayDays, lang = LANG) {
   await ctx.close();
 }
 
-/**
- * Click the nth selectable day that falls on a given weekday.
- *
- * Picking cells by index picks whatever the month happens to start on, which
- * stopped being harmless once Thu-Sat became a block: a test meaning to check
- * the minimum stay would select a Thursday and a Friday and get told about
- * weekends instead. Naming the weekday keeps each test on its own rule.
- */
-const clickDay = (p, dow, nth = 0) =>
-  p.evaluate(
-    ([d, n]) => {
-      const cells = [...document.querySelectorAll('[role="grid"] button:not([disabled])')];
-      const want = cells.filter((b) => (b.getAttribute("aria-label") || "").startsWith(d));
-      want[n]?.click();
-      return want[n]?.getAttribute("aria-label") ?? null;
-    },
-    [dow, nth],
-  );
-
-// ====================================================== the quick picks
+// ============================ the shapes carry what the shortcuts used to
+//
+// The quick picks above the calendar are gone. What they did -- name a stay,
+// say when it is and what it costs, and land it in one tap -- is what the
+// three shape cards do now, so this is the same promise tested where it lives.
 {
   const { p, ctx } = await calendar(1);
-  const picks = await p.evaluate(() => {
-    const head = [...document.querySelectorAll("p")].find((n) => /quick pick/i.test(n.textContent));
-    const grid = head?.nextElementSibling;
-    return [...(grid?.querySelectorAll("button") ?? [])].map((b) =>
+
+  const cards = await p.evaluate(() =>
+    [...document.querySelectorAll('[role="group"] button[aria-pressed]')].map((b) =>
       b.innerText.replace(/\n+/g, " | "),
-    );
-  });
-
-  ck("Several stays are offered outright", picks.length >= 4, `${picks.length} offered`);
-  ck(
-    "…including tonight, now that one day is a booking",
-    picks.some((t) => /tonight/i.test(t)),
-    picks[0],
+    ),
   );
+  ck("Every way to book is offered at once", cards.length === 3, cards.join(" / "));
   ck(
-    "…and a weekend",
-    picks.some((t) => /weekend/i.test(t)),
-  );
-  ck(
-    "…and a full week",
-    picks.some((t) => /full week/i.test(t)),
-  );
-
-  // "This weekend" does not say which Thursday, and that is what a guest is
-  // checking before they tap.
-  ck(
-    "Every pick shows the dates it would book",
-    picks.every((t) => /\d{1,2}\s+\w{3}/.test(t)),
-    picks.find((t) => !/\d{1,2}\s+\w{3}/.test(t)) ?? "all do",
+    "Each says which days it means",
+    cards.every((t) => /Sun|Thu/.test(t)),
+    cards.find((t) => !/Sun|Thu/.test(t)) ?? "all do",
   );
   ck(
     "…and what it costs",
-    picks.every((t) => /KD\s*\d/.test(t)),
-    picks.find((t) => !/KD\s*\d/.test(t)) ?? "all do",
-  );
-  // A locale comma after the weekday reads wrong mid-range: "Thu 1 – Sat, 3 Oct".
-  ck(
-    "…without a comma stranded inside a range",
-    !picks.some((t) => /–\s*\w{3},/.test(t)),
-    picks.find((t) => /–\s*\w{3},/.test(t)) ?? "none",
+    cards.every((t) => /KD\s*\d/.test(t)),
+    cards.find((t) => !/KD\s*\d/.test(t)) ?? "all do",
   );
 
-  // Tapping one has to land exactly the stay it advertised.
-  const weekend = picks.findIndex((t) => /this weekend/i.test(t));
-  const grid = p.locator('[role="grid"]');
-  await p.evaluate((i) => {
-    const head = [...document.querySelectorAll("p")].find((n) => /quick pick/i.test(n.textContent));
-    head?.nextElementSibling?.querySelectorAll("button")[i].click();
-  }, weekend);
-  await p.waitForTimeout(700);
-  ck("Tapping a pick selects that stay", await p.getByText("3 days selected").isVisible());
-  ck("…and the calendar is showing it", await grid.isVisible());
+  // And one tap on a highlighted day lands the whole stay it advertised.
+  await p
+    .getByRole("button", { name: /^Weekend/i })
+    .first()
+    .click();
+  await p.waitForTimeout(400);
+  await clickDay(p, "Thursday");
+  await p.waitForTimeout(500);
+  ck("One tap lands the stay it advertised", await p.getByText("3 days selected").isVisible());
+  ck("…and the calendar is showing it", await p.locator('[role="grid"]').isVisible());
   await ctx.close();
 }
 
-// The other spans on this page carry dir="ltr", because a "+" or a "@" beside
-// digits is bidi-neutral and lands at the wrong end without it. A date range is
-// not that: "الخميس ١ – السبت ٣ أكتوبر" is Arabic throughout, so it is one RTL
-// run and a forced dir="ltr" does not reverse it today — it only declares a
-// direction the content is not. It would bite the day one of those dates
-// renders with a Latin month or Latin digits, which is exactly the change
-// nobody would think to re-check. So this pins both: the span runs the way the
-// page does, and the date the stay starts on is the one an Arabic reader meets
-// first.
-{
-  const { p, ctx } = await calendar(1, "ar");
-
-  const laidOut = await p.evaluate(() => {
-    const head = [...document.querySelectorAll("p")].find((n) =>
-      /اختيار سريع|سريع/.test(n.textContent || ""),
-    );
-    const grid = head?.nextElementSibling;
-    for (const b of grid?.querySelectorAll("button") ?? []) {
-      const span = [...b.querySelectorAll("span")].find((s) => s.textContent.includes("–"));
-      if (!span) continue;
-      const t = span.textContent;
-      const i = t.indexOf("–");
-      const at = (n) => {
-        const r = document.createRange();
-        r.setStart(span.firstChild, n);
-        r.setEnd(span.firstChild, n + 1);
-        return r.getBoundingClientRect().left;
-      };
-      return {
-        dir: getComputedStyle(span).direction,
-        first: at(0),
-        last: at(t.length - 1),
-        dash: at(i),
-        text: t,
-      };
-    }
-    return null;
-  });
-
-  ck("A quick pick on the Arabic page spans two dates", laidOut !== null, laidOut?.text);
-  if (laidOut) {
-    ck("…laid out right to left, like the page around it", laidOut.dir === "rtl", laidOut.dir);
-    ck(
-      "…so the date it starts on is the one read first",
-      laidOut.first > laidOut.last,
-      `start at ${Math.round(laidOut.first)}px, end at ${Math.round(laidOut.last)}px`,
-    );
-  }
-  await ctx.close();
-}
-
-// ================================================= four ways to pick dates
+// ================================================= three ways to pick dates
 {
   const { p, ctx } = await calendar(1);
 
   for (const [name, note] of [
-    ["All dates", /Any nights/i],
     // Not just "one day": which days, because Thu–Sat is sold whole and a
     // guest who taps a Friday would otherwise find nothing happens.
     ["By day", /Sun\s*.\s*Wed\s*.\s*one day/i],
@@ -319,14 +251,14 @@ const clickDay = (p, dow, nth = 0) =>
     const tab = p.getByRole("button", { name: new RegExp(`^${name}`, "i") }).first();
     ck(`…and what "${name}" costs`, price.test((await tab.textContent()) ?? ""));
   }
+  // Free-form dates are gone, so there is no shape without a price.
   ck(
-    "All dates quotes no single price, because it has none",
-    !/KD/.test(
-      (await p
-        .getByRole("button", { name: /^All dates/i })
-        .first()
-        .textContent()) ?? "",
-    ),
+    "Every shape on offer quotes one",
+    (await p.evaluate(() =>
+      [...document.querySelectorAll('[role="group"] button[aria-pressed]')].every((b) =>
+        /KD|د\.ك/.test(b.innerText),
+      ),
+    )) === true,
   );
   await ctx.close();
 }
@@ -344,7 +276,7 @@ for (const [name, days] of [
     .click();
   await p.waitForTimeout(600);
 
-  const free = p.locator('[role="grid"] button:not([disabled])');
+  const free = p.locator('[role="grid"] button:not([disabled]):not([aria-disabled="true"])');
   ck(
     `"${name}" leaves some days selectable`,
     (await free.count()) > 0,
@@ -366,12 +298,15 @@ for (const [name, days] of [
 
 // Switching shapes must not leave the previous pick behind.
 {
-  const { p, ctx, free } = await calendar(1);
-  await free.nth(2).click();
-  await p.waitForTimeout(250);
-  await free.nth(5).click();
+  const { p, ctx } = await calendar(1);
+  await p
+    .getByRole("button", { name: /^Weekday/i })
+    .first()
+    .click();
   await p.waitForTimeout(400);
-  ck("A selection is made under All dates", await p.getByText(/days selected/i).isVisible());
+  await clickDay(p, "Sunday");
+  await p.waitForTimeout(400);
+  ck("A stay is selected", await p.getByText(/days selected/i).isVisible());
 
   await p
     .getByRole("button", { name: /^Weekend/i })
@@ -387,10 +322,14 @@ for (const [name, days] of [
 
 // ============================================ the chosen days are circles
 {
-  const { p, ctx, free } = await calendar(1);
-  await free.nth(2).click();
-  await p.waitForTimeout(250);
-  await free.nth(6).click();
+  // Weekday: Sun-Wed, so there are days between the two ends to check.
+  const { p, ctx } = await calendar(1);
+  await p
+    .getByRole("button", { name: /^Weekday/i })
+    .first()
+    .click();
+  await p.waitForTimeout(400);
+  await clickDay(p, "Sunday");
   await p.waitForTimeout(500);
 
   const shapes = await p.evaluate(() => {
@@ -469,41 +408,45 @@ for (const [name, days] of [
 }
 
 // ================================= the minimum is the server's, not the code's
+//
+// The minimum used to be something to bump into: pick two days under a
+// three-day minimum and be told. There is no way to pick two days now, so it
+// decides what is on offer instead -- a shape shorter than the minimum is not
+// shown at all, which is the same rule enforced a step earlier.
 {
-  const { p, ctx, free } = await calendar(3);
+  const { p, ctx } = await calendar(3);
   ck(
     "A minimum above one is stated up front",
     await p.getByText(/Minimum stay 3 days/i).isVisible(),
   );
 
-  // Sun and Mon: weekdays, so the only thing wrong with the range is that it
-  // is two days long.
-  await clickDay(p, "Sunday");
-  await p.waitForTimeout(250);
-  await clickDay(p, "Monday");
-  await p.waitForTimeout(400);
-  ck(
-    "Two days under a three-day minimum is refused",
-    await p
-      .getByText(/Minimum stay is 3 days/i)
-      .first()
-      .isVisible(),
+  const offered = await p.evaluate(() =>
+    [...document.querySelectorAll('[role="group"] button[aria-pressed]')].map((b) =>
+      b.innerText.split("\n")[0].trim(),
+    ),
   );
+  ck("Ways to book are still offered", offered.length > 0, offered.join(", "));
   ck(
-    "…and cannot be carried forward",
-    await p.getByRole("button", { name: /^Continue$/i }).isDisabled(),
+    "…but not the one-day shape, which the server would refuse",
+    !offered.some((t) => /^By day$/i.test(t)),
+    offered.join(", "),
   );
 
-  // A third tap starts a fresh selection rather than extending the old one,
-  // so this picks the range again rather than adding a day to it.
-  await clickDay(p, "Sunday");
-  await p.waitForTimeout(250);
-  await clickDay(p, "Tuesday");
+  // And what is offered is bookable: no shape leads to the complaint.
+  await p
+    .getByRole("button", { name: /^Weekend/i })
+    .first()
+    .click();
   await p.waitForTimeout(400);
-  ck("…while three days is accepted", await p.getByText("3 days selected").isVisible());
-  ck("…and clears the complaint", (await p.getByText(/Minimum stay is 3 days/i).count()) === 0);
+  await clickDay(p, "Thursday");
+  await p.waitForTimeout(500);
+  ck("Choosing one lands a stay", await p.getByText("3 days selected").isVisible());
   ck(
-    "…and can be carried forward",
+    "…with no minimum-stay complaint",
+    (await p.getByText(/Minimum stay is 3 days/i).count()) === 0,
+  );
+  ck(
+    "…and it can be carried forward",
     await p.getByRole("button", { name: /^Continue$/i }).isEnabled(),
   );
   await ctx.close();
@@ -530,9 +473,11 @@ for (const [name, days] of [
   await p.waitForTimeout(500);
 
   const offered = await p.evaluate(() =>
-    [...document.querySelectorAll('[role="grid"] button:not([disabled])')].map((b) =>
-      (b.getAttribute("aria-label") || "").split(",")[0].trim(),
-    ),
+    [
+      ...document.querySelectorAll(
+        '[role="grid"] button:not([disabled]):not([aria-disabled="true"])',
+      ),
+    ].map((b) => (b.getAttribute("aria-label") || "").split(",")[0].trim()),
   );
   ck("Single days are still offered", offered.length > 10, `${offered.length} days`);
   ck(
@@ -548,9 +493,11 @@ for (const [name, days] of [
     .click();
   await p.waitForTimeout(500);
   const wknd = await p.evaluate(() =>
-    [...document.querySelectorAll('[role="grid"] button:not([disabled])')].map((b) =>
-      (b.getAttribute("aria-label") || "").split(",")[0].trim(),
-    ),
+    [
+      ...document.querySelectorAll(
+        '[role="grid"] button:not([disabled]):not([aria-disabled="true"])',
+      ),
+    ].map((b) => (b.getAttribute("aria-label") || "").split(",")[0].trim()),
   );
   ck(
     "The weekend shape offers exactly the weekend days",
@@ -560,44 +507,55 @@ for (const [name, days] of [
   await ctx.close();
 }
 
-// Under "All dates" the guest draws the range themselves, which is the one
-// place half a weekend can be asked for.
+// ==================== half a weekend cannot be asked for at all
+//
+// This used to draw Thursday to Friday by hand and check the refusal. There
+// is no longer a way to draw it: a stay is a shape, and no shape is part of a
+// weekend, so the rule is enforced by what is on offer rather than by turning
+// someone away afterwards.
 {
   const { p, ctx } = await calendar(1);
+  await p
+    .getByRole("button", { name: /^Weekend/i })
+    .first()
+    .click();
+  await p.waitForTimeout(400);
 
-  ck(
-    "The rule is stated before it is broken",
-    await p.getByText(/Thursday to Saturday, all three days/i).isVisible(),
-  );
-
-  // Thursday to Friday: reaches a weekend and stops before its Saturday.
+  // Tapping the Thursday takes the Saturday with it, every time.
   await clickDay(p, "Thursday");
-  await p.waitForTimeout(300);
-  await clickDay(p, "Friday");
   await p.waitForTimeout(500);
-  ck(
-    "Half a weekend is refused",
-    await p
-      .getByText(/Thursday to Saturday/i)
-      .first()
-      .isVisible(),
-  );
-  ck(
-    "…and cannot be carried forward",
-    !(await p.getByRole("button", { name: /^Continue$/i }).isEnabled()),
-  );
-
-  // Taking the whole thing instead. A tap with both ends already set starts a
-  // fresh selection rather than extending it, so this is the Thursday again
-  // and then its Saturday.
-  await clickDay(p, "Thursday");
-  await p.waitForTimeout(300);
-  await clickDay(p, "Saturday");
-  await p.waitForTimeout(500);
-  ck("Taking the whole weekend is accepted", await p.getByText("3 days selected").isVisible());
+  ck("A weekend comes whole", await p.getByText("3 days selected").isVisible());
   ck(
     "…and can be carried forward",
     await p.getByRole("button", { name: /^Continue$/i }).isEnabled(),
+  );
+
+  // Tapping its Friday selects the same three days rather than starting a
+  // shorter one.
+  await clickDay(p, "Friday");
+  await p.waitForTimeout(500);
+  ck(
+    "Tapping its Friday selects the same weekend",
+    await p.getByText("3 days selected").isVisible(),
+  );
+
+  // And under the one-day shape a Friday is not on offer in the first place.
+  await p
+    .getByRole("button", { name: /^By day/i })
+    .first()
+    .click();
+  await p.waitForTimeout(400);
+  const offered = await p.evaluate(() =>
+    [
+      ...document.querySelectorAll(
+        '[role="grid"] button:not([disabled]):not([aria-disabled="true"])',
+      ),
+    ].map((b) => (b.getAttribute("aria-label") || "").split(",")[0].trim()),
+  );
+  ck(
+    "A single day is never a weekend day",
+    offered.length > 0 && !offered.some((d) => ["Thursday", "Friday", "Saturday"].includes(d)),
+    [...new Set(offered)].join(", "),
   );
   await ctx.close();
 }

@@ -39,33 +39,33 @@ export const Route = createFileRoute("/booking/$lang")({
 });
 
 /** Which shape of stay the calendar is filtered to. */
-type DateFilter = "all" | "day" | "weekday" | "weekend";
+/**
+ * Every stay is one of three shapes. There is no free-form option: a guest
+ * picks a shape and then a day inside it, and the calendar selects the whole
+ * stay. Sun-Wed is also sold a day at a time, which is what "day" is.
+ */
+type DateFilter = "day" | "weekday" | "weekend";
 
 /**
  * startDow null means any day of the week can begin a window, which is what
  * makes "by day" a filter rather than a special case: it is a package of one
  * that starts anywhere.
  */
-const FILTER_SHAPE: Record<
-  Exclude<DateFilter, "all">,
-  { startDow: number | null; length: number }
-> = {
+const FILTER_SHAPE: Record<DateFilter, { startDow: number | null; length: number }> = {
   day: { startDow: null, length: 1 }, // any single day
   weekday: { startDow: 0, length: 4 }, // Sun–Wed
   weekend: { startDow: 4, length: 3 }, // Thu–Sat
 };
 
-const FILTERS: DateFilter[] = ["all", "day", "weekday", "weekend"];
+const FILTERS: DateFilter[] = ["day", "weekday", "weekend"];
 
 const FILTER_LABEL = {
-  all: "filterAll",
   day: "filterByDay",
   weekday: "filterWeekday",
   weekend: "filterWeekend",
 } as const;
 
 const FILTER_NOTE = {
-  all: "filterAllNote",
   day: "filterByDayNote",
   weekday: "filterWeekdayNote",
   weekend: "filterWeekendNote",
@@ -175,7 +175,9 @@ function RatesStrip() {
   const items = [
     { label: tr("weekdayPkg"), price: rates.weekday },
     { label: tr("weekendPkg"), price: rates.weekend },
-    { label: tr("fullWeekPkg"), price: rates.fullWeek },
+    // No full week. Nothing on this page can select a Sun–Sat stay any more,
+    // and a price for something the site will not sell is worse than one
+    // fewer row -- a guest who asks for it has to be told no.
     ...upcoming.map((o) => ({
       label: lang === "en" ? o.nameEn : o.nameAr || o.nameEn,
       price: o.price,
@@ -278,7 +280,9 @@ function Calendar({
   const [start, setStart] = useState<Date | null>(null);
   const [end, setEnd] = useState<Date | null>(null);
   const [error, setError] = useState("");
-  const [filter, setFilter] = useState<DateFilter>("all");
+  // A day at a time is the least committing of the three, so it is where the
+  // calendar opens.
+  const [filter, setFilter] = useState<DateFilter>("day");
   const [showForm, setShowForm] = useState(false);
   const [jumped, setJumped] = useState(false);
   // Roving focus for the date grid. Every day used to be its own tab stop,
@@ -347,22 +351,68 @@ function Calendar({
   );
   const atLastMonth = month.getTime() >= lastMonth.getTime();
 
+  /**
+   * Every still-free stay of a given shape that touches a month, keyed by each
+   * of its days, so tapping any of them selects the whole thing.
+   *
+   * Shared with the month-jump below rather than written twice: "has anything
+   * left" has to mean the same thing as "has anything you can tap", or the
+   * calendar opens on a month where every cell is dead and only a small note
+   * explains why.
+   */
+  const windowsIn = (m: Date, f: DateFilter) => {
+    const { startDow, length } = FILTER_SHAPE[f];
+    const map = new Map<string, { start: Date; end: Date }>();
+    // Pad either side so a window straddling a month boundary still resolves.
+    const from = addDays(new Date(m.getFullYear(), m.getMonth(), 1), -7);
+    const to = addDays(new Date(m.getFullYear(), m.getMonth() + 1, 0), 7);
+    for (let d = from; d <= to; d = addDays(d, 1)) {
+      if (startDow !== null && d.getDay() !== startDow) continue;
+      const last = addDays(d, length - 1);
+      const span = eachDay(d, last);
+      if (span.some((x) => dayBlocked(x))) continue;
+      // One rule for every shape: it is what stops "by day" offering a lone
+      // Friday, and it leaves the weekday and weekend windows untouched.
+      if (!weekendIsWhole(d, last)) continue;
+      for (const x of span) map.set(fmtDate(x), { start: d, end: last });
+    }
+    return map;
+  };
+
+  /**
+   * Whether this month has a day you can actually tap.
+   *
+   * Not "is the window map non-empty": that map is padded a week either side
+   * so a stay straddling a month boundary still resolves, so a September that
+   * offers nothing still reports the first window in October. The question is
+   * whether any day drawn in this month's own grid belongs to one.
+   */
   const monthHasFreeDay = (m: Date) => {
+    const w = windowsIn(m, filter);
     const last = new Date(m.getFullYear(), m.getMonth() + 1, 0);
-    for (let d = new Date(m); d <= last; d = addDays(d, 1)) {
-      if (!dayBlocked(d) && !isPast(d)) return true;
+    for (let d = new Date(m.getFullYear(), m.getMonth(), 1); d <= last; d = addDays(d, 1)) {
+      if (w.has(fmtDate(d))) return true;
     }
     return false;
   };
 
-  // Landing on a month with nothing left reads as "fully booked". Move to the
-  // first month that has something, once, and say so.
-  const autoJumped = useRef(false);
+  /**
+   * Landing on a month with nothing tappable reads as "fully booked". Move to
+   * the first month that has something, and say so.
+   *
+   * Re-run when the shape changes, not only once on load: the shapes
+   * themselves depend on the minimum stay, so the one in force at the moment
+   * the calendar arrived is often not the one being shown a tick later. It
+   * used to run once, decide September was fine because a single day was
+   * free, and then sit there after the shape settled on Sun-Wed, which
+   * September had none of -- thirty dead cells and a footnote.
+   */
+  const userPaged = useRef(false);
   useEffect(() => {
-    if (autoJumped.current || !calendar || calendar.length === 0) return;
-    autoJumped.current = true;
-    if (monthHasFreeDay(thisMonth)) return;
-    for (let m = new Date(thisMonth), i = 0; i < 13; i++, m = addDays(startOfMonth(m), 32)) {
+    if (!calendar || calendar.length === 0) return;
+    if (userPaged.current) return;
+    if (monthHasFreeDay(month)) return;
+    for (let m = new Date(month), i = 0; i < 13; i++, m = addDays(startOfMonth(m), 32)) {
       const candidate = startOfMonth(m);
       if (candidate > lastMonth) break;
       if (monthHasFreeDay(candidate)) {
@@ -371,7 +421,7 @@ function Calendar({
         return;
       }
     }
-  }, [calendar]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [calendar, filter, month]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const cells = useMemo(() => {
     const first = new Date(month.getFullYear(), month.getMonth(), 1);
@@ -383,80 +433,10 @@ function Calendar({
     return arr;
   }, [month]);
 
-  /**
-   * With a package filter on, every day that belongs to a complete, still-free
-   * stay of that shape maps to the whole window. Clicking any of them selects
-   * the stay in one tap instead of asking the guest to know that a weekend
-   * starts on Thursday.
-   */
-  const windows = useMemo(() => {
-    if (filter === "all") return null;
-    const { startDow, length } = FILTER_SHAPE[filter];
-    const map = new Map<string, { start: Date; end: Date }>();
-    // Pad either side so a window straddling a month boundary still resolves.
-    const from = addDays(new Date(month.getFullYear(), month.getMonth(), 1), -7);
-    const to = addDays(new Date(month.getFullYear(), month.getMonth() + 1, 0), 7);
-    for (let d = from; d <= to; d = addDays(d, 1)) {
-      if (startDow !== null && d.getDay() !== startDow) continue;
-      const last = addDays(d, length - 1);
-      const span = eachDay(d, last);
-      if (span.some((x) => dayBlocked(x))) continue;
-      // One rule for every shape: it is what stops "By day" offering a lone
-      // Friday, and it leaves the weekday and weekend windows untouched.
-      if (!weekendIsWhole(d, last)) continue;
-      for (const x of span) map.set(fmtDate(x), { start: d, end: last });
-    }
-    return map;
-  }, [filter, month, byDay]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  /**
-   * The stays people actually ask for, offered outright.
-   *
-   * Each is only offered when every day in it is free and it satisfies the
-   * minimum stay, so a quick pick can never lead to a refusal \u2014 which is the
-   * point of it. Each carries its real dates, because "This weekend" does not
-   * tell anyone which Thursday that is.
-   */
-  const quickPicks = useMemo(() => {
-    if (!rates || !calendar) return [];
-    const min = rates.minStayDays ?? 1;
-
-    const nextDow = (dow: number) => {
-      const d = new Date(today);
-      while (d.getDay() !== dow) d.setDate(d.getDate() + 1);
-      return d;
-    };
-    const thu = nextDow(4);
-    const sun = nextDow(0);
-
-    const candidates: { key: TrKey; start: Date; days: number }[] = [
-      { key: "quickToday", start: today, days: 1 },
-      { key: "quickTomorrow", start: addDays(today, 1), days: 1 },
-      { key: "quickThisWeekend", start: thu, days: 3 },
-      { key: "quickNextWeekend", start: addDays(thu, 7), days: 3 },
-      { key: "quickThisWeek", start: sun, days: 4 },
-      { key: "quickFullWeek", start: sun, days: 7 },
-    ];
-
-    const out: { key: TrKey; start: Date; end: Date; total: number }[] = [];
-    for (const c of candidates) {
-      if (c.days < min) continue;
-      const end = addDays(c.start, c.days - 1);
-      if (end > windowEnd) continue;
-      if (eachDay(c.start, end).some(dayBlocked)) continue;
-      // Tonight and Tomorrow are single days, and a single day cannot be a
-      // Thursday, Friday or Saturday any more. Dropping them is the honest
-      // answer: a shortcut that leads to a refusal is not a shortcut.
-      if (!weekendIsWhole(c.start, end)) continue;
-      out.push({
-        key: c.key,
-        start: c.start,
-        end,
-        total: quote(c.start, end, customPrices, rates, occasions ?? []).total,
-      });
-    }
-    return out;
-  }, [rates, calendar, today, windowEnd, byDay, customPrices, occasions]); // eslint-disable-line react-hooks/exhaustive-deps
+  const windows = useMemo(
+    () => windowsIn(month, filter),
+    [filter, month, byDay], // eslint-disable-line react-hooks/exhaustive-deps
+  );
 
   /** The single day in the grid that Tab reaches; arrows move it from there. */
   const activeDay = useMemo(() => {
@@ -511,10 +491,10 @@ function Calendar({
     }
   };
 
-  const monthHasWindow = useMemo(() => {
-    if (!windows) return true;
-    return cells.some((d) => d && windows.has(fmtDate(d)));
-  }, [windows, cells]);
+  const monthHasWindow = useMemo(
+    () => cells.some((d) => d && windows.has(fmtDate(d))),
+    [windows, cells],
+  );
 
   // Shown live while choosing; request_booking() re-derives it server-side and
   // its answer is what is stored.
@@ -523,6 +503,30 @@ function Calendar({
   // rates is the source of truth; the constant only covers the moment before
   // it has loaded. request_booking() enforces the same number server-side.
   const minStay = rates?.minStayDays ?? MIN_STAY_DAYS;
+
+  /**
+   * Only the shapes long enough to book.
+   *
+   * With a three-day minimum, "one day" is a shape the server would refuse,
+   * and offering it is a promise the booking cannot keep -- the guest picks a
+   * day and finds Continue dead, with no way to make it work inside that
+   * shape. Dropping it means every shape on offer is bookable by
+   * construction, which is why the calendar no longer has any way to produce
+   * a stay that is too short.
+   */
+  const shapes = useMemo(() => {
+    const fit = FILTERS.filter((f) => FILTER_SHAPE[f].length >= minStay);
+    // A minimum longer than every shape is a misconfiguration rather than a
+    // reason to offer nothing; the server has the final say either way.
+    return fit.length ? fit : FILTERS;
+  }, [minStay]);
+
+  useEffect(() => {
+    if (shapes.includes(filter)) return;
+    setFilter(shapes[0]);
+    setStart(null);
+    setEnd(null);
+  }, [shapes, filter]);
   const tooShort = current !== null && current.days < minStay;
   // Thu–Sat is one product, so a stay may not take a slice of it. Checked
   // here as well as on the tap: a selection can also arrive from a quick
@@ -531,39 +535,20 @@ function Calendar({
   const halfWeekend = !!start && !!end && !weekendIsWhole(start, end);
   const ready = !!start && !!end && !tooShort && !halfWeekend;
 
-  // While a check-out day is still being chosen, the day under the pointer
-  // stands in for it, so the range and its length can be seen before the tap
-  // that commits them. Only on a pointer: a touch screen has nothing to hover.
-  const [hoverDay, setHoverDay] = useState<Date | null>(null);
-  const previewEnd =
-    end ??
-    (start && hoverDay && hoverDay >= start && !eachDay(start, hoverDay).some(dayBlocked)
-      ? hoverDay
-      : null);
+  // The whole stay is chosen in one tap now, so there is no half-made range
+  // for a pointer to stand in for: what is highlighted is what is selected.
+  const previewEnd = end;
   const selectedDays = start && previewEnd ? daysBetween(start, previewEnd) : 0;
 
+  // One tap selects the whole stay. There is no second tap to set an end:
+  // every shape has a fixed length, so a day is either inside a still-free
+  // window of the chosen shape or it is not selectable at all.
   const selectDay = (d: Date) => {
     setError("");
-    if (windows) {
-      const w = windows.get(fmtDate(d));
-      if (!w) return;
-      setStart(w.start);
-      setEnd(w.end);
-      return;
-    }
-    if (!start || end || d < start) {
-      setStart(d);
-      setEnd(null);
-      return;
-    }
-    if (eachDay(start, d).some(dayBlocked)) {
-      setError(tr("rangeBlocked"));
-      return;
-    }
-    setEnd(d);
-    if (!weekendIsWhole(start, d)) setError(tr("weekendWhole"));
-    else if (daysBetween(start, d) < minStay)
-      setError(tr("minStay").replace("{n}", String(minStay)));
+    const w = windows.get(fmtDate(d));
+    if (!w) return;
+    setStart(w.start);
+    setEnd(w.end);
   };
 
   const inRange = (d: Date) => start && previewEnd && d >= start && d <= previewEnd;
@@ -617,6 +602,9 @@ function Calendar({
 
   const changeMonth = (delta: number) => {
     setJumped(false);
+    // Once the guest pages for themselves, the calendar stops moving under
+    // them: an empty month they chose to look at is their business.
+    userPaged.current = true;
     setMonth(new Date(month.getFullYear(), month.getMonth() + delta, 1));
   };
 
@@ -634,22 +622,9 @@ function Calendar({
       <div className="animate-fade-up pb-28 lg:pb-0">
         <Steps current={1} />
         <h1 className="mb-2 font-display text-3xl md:text-5xl">{tr("selectDates")}</h1>
-        <div className="mb-6 text-sm text-muted-foreground">
-          <p>
-            {tr("noPaymentNow")}{" "}
-            {filter === "day"
-              ? tr("filterDayHint")
-              : filter !== "all"
-                ? tr("filterHint")
-                : !start || end
-                  ? tr("pickStart")
-                  : tr("pickEnd")}
-          </p>
-          {/* Only under "All dates". Every other shape draws the range for the
-              guest and cannot produce half a weekend, so saying it there would
-              be a warning about something they cannot do. */}
-          {filter === "all" && <p className="mt-2">{tr("filterAllWeekendNote")}</p>}
-        </div>
+        <p className="mb-6 text-sm text-muted-foreground">
+          {tr("noPaymentNow")} {filter === "day" ? tr("filterDayHint") : tr("filterHint")}
+        </p>
 
         <RatesStrip />
 
@@ -669,69 +644,15 @@ function Calendar({
           </p>
         )}
 
-        {/* Most requests are simply "the next free weekend". Offering those
-            outright saves paging a calendar to work out which Thursday it is. */}
-        <div className="mb-4">
-          <p className="mb-2 text-xs uppercase tracking-widest text-muted-foreground">
-            {tr("quickPick")}
-          </p>
-          {quickPicks.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{tr("quickNone")}</p>
-          ) : (
-            <div
-              className="grid grid-cols-2 gap-2 sm:grid-cols-3"
-              role="group"
-              aria-label={tr("quickPick")}
-            >
-              {quickPicks.map((q) => {
-                const chosen =
-                  !!start &&
-                  !!end &&
-                  fmtDate(start) === fmtDate(q.start) &&
-                  fmtDate(end) === fmtDate(q.end);
-                return (
-                  <button
-                    key={q.key}
-                    type="button"
-                    aria-pressed={chosen}
-                    onClick={() => {
-                      setFilter("all");
-                      setMonth(startOfMonth(q.start));
-                      setStart(q.start);
-                      setEnd(q.end);
-                      setHoverDay(null);
-                      setError("");
-                      setJumped(false);
-                    }}
-                    className={`flex flex-col gap-1 border p-3 text-start transition-colors ${
-                      chosen
-                        ? "border-foreground bg-foreground text-background"
-                        : "border-border hover:border-foreground/50"
-                    }`}
-                  >
-                    <span className="text-xs uppercase tracking-widest">{tr(q.key)}</span>
-                    {/* The dates themselves: "This weekend" does not say which
-                        Thursday, and that is what a guest is checking. */}
-                    <span className={`text-xs ${chosen ? "opacity-70" : "text-muted-foreground"}`}>
-                      {formatSpan(q.start, q.end, lang)}
-                    </span>
-                    <span className="text-sm font-medium">{formatMoney(q.total, lang)}</span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
         {/* How to choose, above the calendar. Each option says what it gives
             you and what it costs, because "Weekend" on its own does not tell
             a guest it means three days from a Thursday at 350. */}
         <div
-          className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4"
+          className={`mb-4 grid gap-2 ${shapes.length === 2 ? "grid-cols-2" : "grid-cols-3"}`}
           role="group"
-          aria-label={tr("filterAll")}
+          aria-label={tr("pickShape")}
         >
-          {FILTERS.map((f) => {
+          {shapes.map((f) => {
             const on = filter === f;
             const price =
               f === "day"
@@ -753,7 +674,6 @@ function Calendar({
                   setFilter(f);
                   setStart(null);
                   setEnd(null);
-                  setHoverDay(null);
                   setError("");
                 }}
                 aria-pressed={on}
@@ -836,8 +756,17 @@ function Calendar({
               // by the admin — that is what black means. Past days are simply
               // gone, and are faded instead.
               const reserved = !past && dayBlocked(d);
-              const offPackage = !!windows && !windows.has(iso);
-              const disabled = past || reserved || offPackage;
+              const offPackage = !windows.has(iso);
+              // Off-shape days are aria-disabled rather than disabled: a
+              // disabled button cannot take focus, and with "one day" as the
+              // opening shape three columns in seven are off-shape, so arrow
+              // keys had nothing to land on and the grid stopped being
+              // navigable at all. They stay in the roving order, read as
+              // unavailable, and do nothing when pressed -- selectDay already
+              // returns when a day is in no window. Past and reserved days
+              // are genuinely gone rather than merely out of shape, and stay
+              // disabled.
+              const disabled = past || reserved;
               const selected = isEdge(d);
               const within = inRange(d);
               const priced = byDay.get(iso)?.custom === true;
@@ -870,6 +799,7 @@ function Calendar({
                   key={iso}
                   type="button"
                   disabled={disabled}
+                  aria-disabled={offPackage || undefined}
                   onClick={() => selectDay(d)}
                   aria-label={`${dayLabel}${reserved ? ` — ${tr("reservedLabel")}` : ""}${
                     occ ? ` — ${lang === "en" ? occ.nameEn : occ.nameAr || occ.nameEn}` : ""
@@ -877,8 +807,6 @@ function Calendar({
                   aria-pressed={!!selected}
                   data-day={iso}
                   tabIndex={fmtDate(activeDay) === iso ? 0 : -1}
-                  onMouseEnter={() => !disabled && setHoverDay(d)}
-                  onMouseLeave={() => setHoverDay(null)}
                   // The cell is square, so a full radius is a circle. Only
                   // the two chosen days get one; the days between stay
                   // rectangular so the run still reads as one stay rather

@@ -172,8 +172,13 @@ const calCall = st.calls.find((c) => c.path === "rpc/availability_calendar");
 ck("Calendar calls availability_calendar RPC", !!calCall, JSON.stringify(calCall?.body));
 ck("RPC is scoped to a chalet", calCall?.body?.p_chalet_id === 1);
 
-// navigate to October 2026 and check the server's blocked day is disabled
-for (let i = 0; i < 1; i++) {
+// Navigate to October 2026 and check the server's blocked day is disabled.
+// By name rather than by pressing Next a fixed number of times: the calendar
+// now opens on the first month that has a stay you can tap, so where it
+// starts depends on the shape and the day of the month.
+for (let i = 0; i < 6; i++) {
+  const heading = await p.locator('[role="grid"]').getAttribute("aria-label");
+  if (/October 2026/i.test(heading ?? "")) break;
   await p.getByRole("button", { name: "Next month" }).click();
   await p.waitForTimeout(300);
 }
@@ -198,27 +203,43 @@ const total = () =>
     return el ? el.querySelectorAll("p")[1].textContent.trim() : null;
   });
 
-await day(11).click();
-await p.waitForTimeout(200);
-await day(17).click();
-await p.waitForTimeout(400);
-ck("Full week priced from server rates (KD 600)", (await total()) === "KD 600", await total());
+// A stay is a shape now, not a range drawn between two taps, so these say the
+// same things through the shapes: the price on screen is the server's, and a
+// day the server blocked takes its whole window with it.
+const shape = async (name) => {
+  await p
+    .getByRole("button", { name: new RegExp(`^${name}`, "i") })
+    .first()
+    .click();
+  await p.waitForTimeout(400);
+};
 
-await p.getByRole("button", { name: /^Clear$/i }).click();
-await day(4).click();
-await p.waitForTimeout(200);
-await day(7).click();
+// Thu 8 – Sat 10 October 2026 is free; the weekend rate is the server's.
+await shape("Weekend");
+await day(8).click();
 await p.waitForTimeout(400);
-ck(
-  "Custom server price applied (75+200+blocked… range refused)",
-  // Also present in the sr-only live region, so target the visible alert.
-  await p.getByRole("alert").filter({ hasText: "isn't available" }).isVisible(),
+ck("Weekend priced from server rates (KD 350)", (await total()) === "KD 350", await total());
+
+// Sun 11 – Wed 14 is free too, and carries the other package rate.
+await p.getByRole("button", { name: /^Clear$/i }).click();
+await shape("Weekday");
+await day(11).click();
+await p.waitForTimeout(400);
+ck("Weekday priced from server rates (KD 300)", (await total()) === "KD 300", await total());
+
+// The server blocked 2026-10-06, a Wednesday, which sits inside the Sun 4 -
+// Wed 7 window. The whole window goes with it rather than the guest being
+// allowed to choose it and then told no.
+const blockedWindow = await p.evaluate(() =>
+  [...document.querySelectorAll(".grid.grid-cols-7 button")]
+    .find((x) => x.textContent.trim() === "4")
+    ?.getAttribute("aria-disabled"),
 );
+ck("A window holding a blocked day cannot be chosen", blockedWindow === "true", blockedWindow);
 
 await p.getByRole("button", { name: /^Clear$/i }).click();
-await day(11).click();
-await p.waitForTimeout(200);
-await day(17).click();
+await shape("Weekend");
+await day(8).click();
 await p.waitForTimeout(300);
 await p.getByRole("button", { name: /^Continue$/i }).click();
 await p.waitForTimeout(400);

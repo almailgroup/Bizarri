@@ -15,6 +15,10 @@ const ck = (n, c, d = "") => {
   console.log(`${c ? "PASS" : "FAIL"}  ${n}${d ? " — " + d : ""}`);
 };
 
+// Stands in for the guest's inbox: the code is minted server-side, so the
+// test can only know it because the mocked function tells it.
+const state = { code: "" };
+
 async function mk(tz) {
   const ctx = await b.newContext({ viewport: { width: 1280, height: 1000 }, timezoneId: tz });
   await ctx.route(/^https?:\/\/(?!localhost)/, (r) =>
@@ -23,7 +27,14 @@ async function mk(tz) {
   await ctx.route(SUPA, async (route) => {
     const url = new URL(route.request().url());
     const path = url.pathname.replace("/rest/v1/", "");
-    const body = route.request().postDataJSON?.() ?? null;
+    // The Civil ID upload is multipart, and postDataJSON throws on it. Every
+    // other suite guards this; this one had never sent a file before.
+    let body = null;
+    try {
+      body = route.request().postDataJSON?.() ?? null;
+    } catch {
+      body = null;
+    }
     const send = (d) =>
       route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(d) });
     if (path === "chalets")
@@ -37,6 +48,18 @@ async function mk(tz) {
           sort_order: 1,
         },
       ]);
+    // Checkout needs a confirmed address and a Civil ID. Without these the
+    // form simply refuses to submit, and the assertion below lands on the
+    // form's own summary rather than the confirmation -- which is how it
+    // came to be checking the browser's dates instead of the server's.
+    if (url.pathname === "/functions/v1/send-email-code") {
+      state.code = "135790";
+      return send({ ok: true, emailConfigured: true });
+    }
+    if (path === "rpc/verify_email_code") return send(String(body?.p_code ?? "") === state.code);
+    if (url.pathname.startsWith("/storage/v1/object/civil-ids/"))
+      return send({ Key: url.pathname.replace("/storage/v1/object/", ""), Id: "obj-1" });
+
     if (path === "rates")
       return send({
         id: true,
@@ -118,18 +141,40 @@ const day = (n) =>
     .locator(".grid.grid-cols-7 button")
     .filter({ hasText: new RegExp(`^${n}$`) })
     .first();
+// Sun 11 - Wed 14 in one tap. The mocked server answers with 11 - 17
+// whatever was chosen, which is the point: the confirmation has to show the
+// dates the server stored rather than the ones the browser picked, and now
+// that the two deliberately differ it can only pass by reading the response.
+await p
+  .getByRole("button", { name: /^Weekday/i })
+  .first()
+  .click();
+await p.waitForTimeout(400);
 await day(11).click();
-await p.waitForTimeout(200);
-await day(17).click();
 await p.waitForTimeout(400);
 await p.getByRole("button", { name: /^Continue$/i }).click();
 await p.waitForTimeout(400);
 await p.locator("input[type=text]").first().fill("Test Guest");
 await p.locator("input[type=tel]").fill("+96594040955");
 await p.locator("input[type=email]").fill("t@e.com");
+await p.getByRole("button", { name: /^Send code$/i }).click();
+await p.waitForTimeout(400);
+await p.getByLabel(/6-digit code/i).fill(state.code);
+await p.getByRole("button", { name: /^Confirm$/i }).click();
+await p.waitForTimeout(400);
 await p.locator("input[type=number]").fill("2");
+await p.locator("input[type=file]").setInputFiles({
+  name: "civil-id.png",
+  mimeType: "image/png",
+  buffer: Buffer.from("89504e470d0a1a0a", "hex"),
+});
+await p.waitForTimeout(500);
+await p.locator('input[type="checkbox"]').first().check();
 await p.getByRole("button", { name: /submit booking request/i }).click();
-await p.waitForTimeout(900);
+await p.waitForTimeout(1200);
+// Assert we are actually on the confirmation. The dates live beside the
+// reference there; anywhere else on the page they are the browser's own.
+ck("The request goes through to a confirmation", (await p.getByText("BZR-TZ0001").count()) > 0);
 const shown = await p.evaluate(
   () => document.body.innerText.match(/\d{4}-\d{2}-\d{2}\s*→\s*\d{4}-\d{2}-\d{2}/)?.[0] ?? "none",
 );

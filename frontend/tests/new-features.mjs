@@ -328,12 +328,56 @@ async function guestPage(state, route = "booking") {
 }
 
 /** Advance the guest calendar from this month to next month. */
+/**
+ * Show next month, wherever the calendar happened to open.
+ *
+ * It used to press Next once, which assumed the calendar always starts on
+ * this month. It now opens on the first month that has a stay you can tap,
+ * so that depends on the shape and on how late in the month the suite runs;
+ * pressing blindly can overshoot into a month the fixtures say nothing about.
+ */
+/** Show this month, which the calendar may have skipped past on opening. */
+async function toCalendarThisMonth(p) {
+  const want = today.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  for (let i = 0; i < 6; i++) {
+    const heading = await p.locator('[role="grid"]').getAttribute("aria-label");
+    if ((heading ?? "").includes(want)) return true;
+    const prev = p.getByRole("button", { name: /Previous month/i });
+    if (await prev.isDisabled()) return false;
+    await prev.click();
+    await p.waitForTimeout(250);
+  }
+  return false;
+}
+
 async function toCalendarNextMonth(p) {
-  await p.getByRole("button", { name: /Next month/i }).click();
-  await p.waitForTimeout(250);
+  const want = nextMonth.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  for (let i = 0; i < 6; i++) {
+    const heading = await p.locator('[role="grid"]').getAttribute("aria-label");
+    if ((heading ?? "").includes(want)) return;
+    await p.getByRole("button", { name: /Next month/i }).click();
+    await p.waitForTimeout(250);
+  }
 }
 
 // (?!\d) so "October 1" does not also match "October 15".
+/**
+ * Select the Thu-Sat stay that begins on this Thursday.
+ *
+ * A day is only selectable inside a window of the chosen shape, so the shape
+ * has to be chosen first. Tests that only want "a booking in progress" used
+ * to tap a day and get one; now they have to say which kind.
+ */
+const pickWeekend = async (p, d) => {
+  await p
+    .getByRole("button", { name: /^Weekend/i })
+    .first()
+    .click();
+  await p.waitForTimeout(350);
+  await dayCell(p, d).click();
+  await p.waitForTimeout(300);
+};
+
 const dayCell = (p, d) =>
   p.getByRole("button", {
     name: new RegExp(
@@ -365,8 +409,15 @@ const bg = (loc) => loc.evaluate((el) => getComputedStyle(el).backgroundColor);
   );
 
   // Selection must no longer use black, or it would read as reserved.
+  // A Thursday belongs to the weekend shape, so choose that first: under the
+  // default one-day shape it is not selectable at all.
+  await p
+    .getByRole("button", { name: /^Weekend/i })
+    .first()
+    .click();
+  await p.waitForTimeout(400);
   await freeCell.click();
-  await p.waitForTimeout(200);
+  await p.waitForTimeout(300);
   ck(
     "Selected day is distinct from reserved (not black)",
     (await bg(freeCell)) !== "rgb(0, 0, 0)",
@@ -380,7 +431,10 @@ const bg = (loc) => loc.evaluate((el) => getComputedStyle(el).backgroundColor);
   const state = makeState();
   const { p, ctx } = await guestPage(state);
   await p.waitForTimeout(400);
-  if (today.getDate() > 1) {
+  // The calendar opens on the first month with something bookable, which may
+  // not be this one; a past day only exists to look at in this one.
+  const onThisMonth = await toCalendarThisMonth(p);
+  if (onThisMonth && today.getDate() > 1) {
     const yesterday = addDays(today, -1);
     const cell = dayCell(p, yesterday);
     ck(
@@ -389,7 +443,11 @@ const bg = (loc) => loc.evaluate((el) => getComputedStyle(el).backgroundColor);
       await bg(cell),
     );
   } else {
-    ck("A past day is faded, not black (black means reserved)", true, "skipped: 1st of month");
+    ck(
+      "A past day is faded, not black (black means reserved)",
+      true,
+      onThisMonth ? "skipped: 1st of month" : "skipped: this month has nothing bookable",
+    );
   }
   await ctx.close();
 }
@@ -413,7 +471,12 @@ const bg = (loc) => loc.evaluate((el) => getComputedStyle(el).backgroundColor);
   await p.getByRole("button", { name: /^Weekend/i }).click();
   await p.waitForTimeout(250);
   const monday = firstDow(nextMonth, 1);
-  ck("Weekend filter disables days outside a Thu-Sat stay", await dayCell(p, monday).isDisabled());
+  // aria-disabled, not disabled: an off-shape day stays focusable so the
+  // arrow keys still cross the grid, but does nothing when pressed.
+  ck(
+    "Weekend shape marks days outside a Thu-Sat stay unavailable",
+    (await dayCell(p, monday).getAttribute("aria-disabled")) === "true",
+  );
   await dayCell(p, thuA).click();
   await p.waitForTimeout(250);
   const checkIn = await p.locator("text=Check-in").locator("..").innerText();
@@ -1014,7 +1077,7 @@ async function adminPage(state, tab) {
     "The chalet is chosen on the calendar itself",
     await p.getByText("Choose Chalet").first().isVisible(),
   );
-  await dayCell(p, thuA).click();
+  await pickWeekend(p, thuA);
   await p.waitForTimeout(200);
   await p.getByRole("button", { name: /Bizarri Chalet 2/i }).click();
   await p.waitForTimeout(500);
@@ -1266,9 +1329,11 @@ async function adminPage(state, tab) {
     (await p.locator("body").innerText()).toLowerCase().includes("rates at a glance"),
   );
 
-  // One tap for the stay most people actually want.
-  const quick = p.getByRole("button", { name: /this weekend/i }).first();
-  ck("A one-tap 'this weekend' is offered", await quick.isVisible());
+  // One tap for the stay most people actually want. The shortcuts that used
+  // to sit above the calendar are gone; the weekend shape is the one tap now,
+  // and it says what it gives you and what it costs on the card itself.
+  const quick = p.getByRole("button", { name: /^Weekend/i }).first();
+  ck("A one-tap weekend is offered", await quick.isVisible());
   ck(
     "…and it shows what that costs before you commit",
     /\d/.test(await quick.innerText()),
@@ -1276,6 +1341,11 @@ async function adminPage(state, tab) {
   );
 
   await quick.click();
+  await p.waitForTimeout(400);
+  // The shortcut used to jump the calendar to the month it was offering.
+  // Choosing a shape does not move the calendar, so the month comes first.
+  await toCalendarNextMonth(p);
+  await dayCell(p, thuA).click();
   await p.waitForTimeout(400);
   const checkIn = await p.locator("text=Check-in").locator("..").innerText();
   const checkOut = await p.locator("text=Check-out").locator("..").innerText();
