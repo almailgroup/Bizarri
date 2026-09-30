@@ -95,11 +95,22 @@ project — a fresh account, a new org, or the current project was deleted.
    supabase db push
    ```
 
-   **Without the CLI:** `backend/supabase/bundle.sh > schema.sql` concatenates
-   the migrations into one script to paste into the Supabase SQL editor
-   (Dashboard → SQL Editor → New query → Run). It is idempotent, so running it
-   twice is harmless. This also creates the private `civil-ids` storage bucket
-   and its policies.
+   **Without the CLI:** paste
+   [`backend/supabase/schema-parts/`](backend/supabase/schema-parts) into the
+   Supabase SQL editor (Dashboard → SQL Editor → New query → Run), one file at
+   a time, in numbered order. Each part is idempotent, so a part that has
+   already been run can be run again. This also creates the private
+   `civil-ids` storage bucket and its policies.
+
+   There is a single-file `backend/supabase/schema.sql` as well, but it is
+   2,300 lines and the dashboard's editor can silently truncate a paste that
+   long. That shows up as a syntax error partway down a statement which is
+   perfectly valid in the file — the rest of it simply never arrived. The
+   parts exist to avoid that; use them unless you have the CLI.
+
+   Both are generated from `backend/supabase/migrations/` — edit the
+   migrations, then `backend/supabase/bundle.sh > backend/supabase/schema.sql`
+   and `backend/supabase/bundle.sh --split`.
 
 4. **Deploy the Edge Functions and their secrets:**
 

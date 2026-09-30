@@ -167,6 +167,25 @@ supabase functions deploy notify-booking
 supabase functions deploy send-email-code
 ```
 
+### Applying the schema without the CLI
+
+`bundle.sh --split` writes `schema-parts/NN-<name>.sql`, one per migration, in
+the order they must be run. Paste each into the SQL editor and Run, in order.
+
+Use these rather than the single `schema.sql`: it is 2,300 lines, and a paste
+that long can be truncated by the editor without saying so. What that looks
+like is a syntax error at a `;` partway down a statement that is complete and
+valid in the file — Postgres reached the end of what actually arrived. Each
+part is small enough to paste whole, and each is idempotent, so re-running one
+you have already applied is harmless.
+
+Regenerate both after changing a migration:
+
+```bash
+backend/supabase/bundle.sh > backend/supabase/schema.sql
+backend/supabase/bundle.sh --split
+```
+
 ### Deploying the functions without the CLI
 
 The dashboard's function editor takes one file, and these import a shared
