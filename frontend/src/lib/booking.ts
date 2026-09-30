@@ -10,6 +10,8 @@
  * All persistence lives in src/lib/api.ts.
  */
 
+import { dateLocale } from "@/lib/locale";
+
 /**
  * Fallback minimum stay, for the moment before the rates have loaded.
  *
@@ -223,7 +225,7 @@ export function rangeIsFree(start: Date, end: Date, a: Availability): boolean {
  * stay that is being chosen or is still ahead.
  */
 export function formatSpan(from: Date, to: Date, lang: "en" | "ar"): string {
-  const loc = lang === "ar" ? "ar-EG" : "en-GB";
+  const loc = dateLocale(lang);
   // Locales put a comma after the weekday, which reads wrong in the middle
   // of a range: "Thu 1 \u2013 Sat, 3 Oct". Both commas, since Arabic has its own.
   const fmt = (d: Date, withMonth: boolean) =>

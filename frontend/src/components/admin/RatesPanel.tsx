@@ -27,17 +27,17 @@ export function RatesPanel() {
     {
       key: "fullWeek",
       label: tr("fullWeekPkg"),
-      hint: lang === "en" ? "Sun – Sat · 7 days" : "الأحد – السبت · ٧ أيام",
+      hint: lang === "en" ? "Sun – Sat · 7 days" : "الأحد – السبت · 7 أيام",
     },
     {
       key: "weekday",
       label: tr("weekdayPkg"),
-      hint: lang === "en" ? "Sun – Wed · 4 days" : "الأحد – الأربعاء · ٤ أيام",
+      hint: lang === "en" ? "Sun – Wed · 4 days" : "الأحد – الأربعاء · 4 أيام",
     },
     {
       key: "weekend",
       label: tr("weekendPkg"),
-      hint: lang === "en" ? "Thu – Sat · 3 days" : "الخميس – السبت · ٣ أيام",
+      hint: lang === "en" ? "Thu – Sat · 3 days" : "الخميس – السبت · 3 أيام",
     },
     {
       key: "dailyWeekday",

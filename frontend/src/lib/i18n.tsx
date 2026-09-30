@@ -98,8 +98,15 @@ export const t: Dict = {
   logout: { en: "Logout", ar: "تسجيل الخروج" },
   dashboard: { en: "Admin Dashboard", ar: "لوحة التحكم" },
   pickChalet: { en: "Choose Chalet", ar: "اختر الشاليه" },
-  bizarri1: { en: "Bizarri Chalet 1", ar: "شاليه بيزاري ١" },
-  bizarri2: { en: "Bizarri Chalet 2", ar: "شاليه بيزاري ٢" },
+  // Nothing used to say that the choice does anything. The calendar, the
+  // prices and the quick picks underneath all reload when it changes, and a
+  // guest had to notice that for themselves.
+  pickChaletNote: {
+    en: "Dates and prices below are for the chalet you choose.",
+    ar: "التواريخ والأسعار بالأسفل تخص الشاليه الذي تختاره.",
+  },
+  bizarri1: { en: "Bizarri Chalet 1", ar: "شاليه بيزاري 1" },
+  bizarri2: { en: "Bizarri Chalet 2", ar: "شاليه بيزاري 2" },
   latestNews: { en: "Latest News", ar: "آخر الأخبار" },
   noNews: { en: "No news yet. Check back soon.", ar: "لا توجد أخبار بعد. عودوا قريباً." },
   introMember: { en: "A Member of Almail Group", ar: "عضو في مجموعة الميل" },
@@ -113,7 +120,7 @@ export const t: Dict = {
     en: "Two fixed stays, each with the whole chalet to yourself.",
     ar: "إقامتان محددتان، ولك الشاليه بالكامل في كلٍ منهما.",
   },
-  nights3: { en: "3 nights", ar: "٣ ليالٍ" },
+  nights3: { en: "3 nights", ar: "3 ليالٍ" },
   nights2: { en: "2 nights", ar: "ليلتان" },
   theChalet: { en: "The Chalet", ar: "الشاليه" },
   seeAllFacilities: { en: "See all facilities", ar: "عرض كل المرافق" },
@@ -127,13 +134,13 @@ export const t: Dict = {
     ar: "باقات بسعر ثابت للشاليه بالكامل. التواريخ المخصصة تُسعّر يومياً.",
   },
   fullWeekPkg: { en: "Full Week Package", ar: "باقة الأسبوع الكامل" },
-  days7: { en: "7 days", ar: "٧ أيام" },
-  days4: { en: "4 days", ar: "٤ أيام" },
-  days3: { en: "3 days", ar: "٣ أيام" },
+  days7: { en: "7 days", ar: "7 أيام" },
+  days4: { en: "4 days", ar: "4 أيام" },
+  days3: { en: "3 days", ar: "3 أيام" },
   perDayRates: { en: "Custom dates", ar: "تواريخ مخصصة" },
   perDayIntro: {
     en: "Any other stay of 3 days or more is priced per day.",
-    ar: "أي إقامة أخرى من ٣ أيام فأكثر تُسعّر يومياً.",
+    ar: "أي إقامة أخرى من 3 أيام فأكثر تُسعّر يومياً.",
   },
   weekdayNight: { en: "Sun – Wed, per day", ar: "الأحد – الأربعاء، لليوم" },
   weekendNight: { en: "Thu – Sat, per day", ar: "الخميس – السبت، لليوم" },
@@ -169,9 +176,9 @@ export const t: Dict = {
   filterByDay: { en: "By day", ar: "بالأيام" },
   filterByDayNote: { en: "One day at a time", ar: "يوم واحد في كل مرة" },
   filterWeekday: { en: "Weekday", ar: "أيام الأسبوع" },
-  filterWeekdayNote: { en: "Sun – Wed · 4 days", ar: "الأحد – الأربعاء · ٤ أيام" },
+  filterWeekdayNote: { en: "Sun – Wed · 4 days", ar: "الأحد – الأربعاء · 4 أيام" },
   filterWeekend: { en: "Weekend", ar: "نهاية الأسبوع" },
-  filterWeekendNote: { en: "Thu – Sat · 3 days", ar: "الخميس – السبت · ٣ أيام" },
+  filterWeekendNote: { en: "Thu – Sat · 3 days", ar: "الخميس – السبت · 3 أيام" },
   filterFrom: { en: "from {price}", ar: "من {price}" },
   quickToday: { en: "Tonight", ar: "الليلة" },
   quickTomorrow: { en: "Tomorrow", ar: "غداً" },
@@ -224,14 +231,14 @@ export const t: Dict = {
   civilId: { en: "Civil ID image", ar: "صورة البطاقة المدنية" },
   civilIdHint: {
     en: "Required to confirm your stay. JPG, PNG or PDF, up to 5 MB.",
-    ar: "مطلوبة لتأكيد إقامتك. JPG أو PNG أو PDF، بحد أقصى ٥ ميجابايت.",
+    ar: "مطلوبة لتأكيد إقامتك. JPG أو PNG أو PDF، بحد أقصى 5 ميجابايت.",
   },
   civilIdChoose: { en: "Choose file", ar: "اختر ملفاً" },
   civilIdMissing: {
     en: "Please attach your Civil ID image.",
     ar: "يرجى إرفاق صورة البطاقة المدنية.",
   },
-  civilIdTooBig: { en: "That file is larger than 5 MB.", ar: "حجم الملف يتجاوز ٥ ميجابايت." },
+  civilIdTooBig: { en: "That file is larger than 5 MB.", ar: "حجم الملف يتجاوز 5 ميجابايت." },
   civilIdWrongType: {
     en: "Please attach a JPG, PNG or PDF.",
     ar: "يرجى إرفاق ملف JPG أو PNG أو PDF.",
@@ -286,7 +293,7 @@ export const t: Dict = {
   },
   weReplyIn: {
     en: "We confirm most requests within 24 hours.",
-    ar: "نؤكد معظم الطلبات خلال ٢٤ ساعة.",
+    ar: "نؤكد معظم الطلبات خلال 24 ساعة.",
   },
   whyCivilId: {
     en: "Kuwait chalet rentals require ID on file. It is stored privately and seen only by our team.",
@@ -359,7 +366,7 @@ export const t: Dict = {
   guestsLabel: { en: "Guests", ar: "الضيوف" },
   horizonNote: {
     en: "Booking opens 12 months ahead. For later dates, please contact us.",
-    ar: "الحجز متاح حتى ١٢ شهراً مقدماً. للتواريخ الأبعد، يرجى التواصل معنا.",
+    ar: "الحجز متاح حتى 12 شهراً مقدماً. للتواريخ الأبعد، يرجى التواصل معنا.",
   },
   quickLinks: { en: "Links", ar: "روابط" },
   viewSite: { en: "View site", ar: "عرض الموقع" },
@@ -426,16 +433,16 @@ export const t: Dict = {
   verifyEmail: { en: "Confirm your email", ar: "تأكيد بريدك الإلكتروني" },
   verifyEmailHint: {
     en: "We will email you a 6-digit code, so your booking confirmation reaches you.",
-    ar: "سنرسل إليك رمزاً من ٦ أرقام، حتى يصلك تأكيد الحجز.",
+    ar: "سنرسل إليك رمزاً من 6 أرقام، حتى يصلك تأكيد الحجز.",
   },
   sendCode: { en: "Send code", ar: "إرسال الرمز" },
   resendCode: { en: "Send a new code", ar: "إرسال رمز جديد" },
   sendingCode: { en: "Sending…", ar: "جارٍ الإرسال…" },
   codeSent: {
     en: "We sent a code to {email}. It expires in 10 minutes.",
-    ar: "أرسلنا رمزاً إلى {email}. ينتهي خلال ١٠ دقائق.",
+    ar: "أرسلنا رمزاً إلى {email}. ينتهي خلال 10 دقائق.",
   },
-  enterCode: { en: "6-digit code", ar: "الرمز المكوّن من ٦ أرقام" },
+  enterCode: { en: "6-digit code", ar: "الرمز المكوّن من 6 أرقام" },
   checkSpam: {
     en: "Not arrived? Check your spam or junk folder.",
     ar: "لم يصلك الرمز؟ تحقق من مجلد الرسائل غير المرغوب فيها (Spam / Junk).",

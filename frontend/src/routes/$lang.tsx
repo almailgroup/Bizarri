@@ -32,7 +32,7 @@ export const Route = createFileRoute("/$lang")({
 const highlights = [
   { icon: Cpu, en: "Fully automated smart home", ar: "منزل ذكي مؤتمت بالكامل" },
   { icon: Waves, en: "Private pool & beach access", ar: "مسبح خاص وإطلالة على الشاطئ" },
-  { icon: Tv, en: '65" TV with 5.1 sound bar', ar: "تلفزيون ٦٥ بوصة مع ساوند بار ٥.١" },
+  { icon: Tv, en: '65" TV with 5.1 sound bar', ar: "تلفزيون 65 بوصة مع ساوند بار 5.1" },
   { icon: Bed, en: "Premium California King bed", ar: "سرير كاليفورنيا كنغ فاخر" },
   { icon: ChefHat, en: "Full kitchen with Nespresso", ar: "مطبخ متكامل مع نسبريسو" },
   { icon: Wifi, en: "5G internet throughout", ar: "إنترنت الجيل الخامس في كل مكان" },

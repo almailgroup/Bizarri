@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
+import { dateLocale } from "@/lib/locale";
 import { fmtDate, formatMoney, startOfToday } from "@/lib/booking";
 import { useAvailability, useBlockedDates, useSetDayPrice, useToggleBlocked } from "@/lib/api";
 
@@ -49,7 +50,7 @@ export function AvailabilityPanel({ chaletId }: { chaletId: number }) {
     return arr;
   }, [month]);
 
-  const monthName = month.toLocaleDateString(lang === "ar" ? "ar-EG" : "en-US", {
+  const monthName = month.toLocaleDateString(dateLocale(lang, "en-US"), {
     month: "long",
     year: "numeric",
   });

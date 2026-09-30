@@ -130,6 +130,160 @@ ck("The footer number does too", foot === "+96594040955", `reads "${foot}"`);
   );
 }
 
+// ============================== one digit set on the Arabic page
+//
+// "ar-EG" numbers a date in Arabic-Indic digits, and the dictionary used to
+// spell a few out the same way. Nothing else on the site could join them: a
+// price is "350 د.ك", a booking reference is BZR-4K2M9X, the phone number is
+// +965 94040955, and the day cells of the booking calendar are a plain 1, 2,
+// 3 -- so the month heading read ٢٠٢٦ directly above a grid of Western days.
+// Latin is the only digit set all of it can agree on.
+{
+  const SUPA = /ycfvqzcnatwacwlcmiej\.supabase\.co/;
+  const iso = (d) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const dctx = await b.newContext({ viewport: { width: 1200, height: 1000 } });
+  await dctx.route(/^https?:\/\/(?!localhost)/, (r) => {
+    const u = r.request().url();
+    if (!SUPA.test(u)) return r.abort();
+    const path = new URL(u).pathname.replace("/rest/v1/", "");
+    let body = null;
+    try {
+      body = r.request().postDataJSON?.() ?? null;
+    } catch {
+      body = null;
+    }
+    const send = (d) =>
+      r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(d) });
+    if (path === "chalets")
+      return send([
+        {
+          id: 1,
+          slug: "b1",
+          name_en: "Bizarri Chalet 1",
+          name_ar: "شاليه بيزاري 1",
+          active: true,
+          sort_order: 1,
+        },
+        {
+          id: 2,
+          slug: "b2",
+          name_en: "Bizarri Chalet 2",
+          name_ar: "شاليه بيزاري 2",
+          active: true,
+          sort_order: 2,
+        },
+      ]);
+    if (path === "rates")
+      return send({
+        id: true,
+        full_week: 600,
+        weekend: 350,
+        weekday: 300,
+        daily_weekday: 75,
+        daily_weekend: 120,
+        currency: "KWD",
+        min_stay_days: 1,
+        updated_at: "",
+        updated_by: null,
+      });
+    if (path === "news")
+      return send([
+        {
+          id: "n1",
+          title_en: "Hours",
+          title_ar: "المواعيد",
+          body_en: "x",
+          body_ar: "س",
+          published: true,
+          published_at: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+          updated_at: "",
+        },
+      ]);
+    if (path.startsWith("rpc/lookup_booking"))
+      return send([
+        {
+          ref: "BZR-4K2M9X",
+          status: "accepted",
+          chalet_id: 1,
+          start_date: "2026-10-08",
+          end_date: "2026-10-10",
+          days: 3,
+          total: 350,
+        },
+      ]);
+    if (path === "rpc/availability_calendar") {
+      const out = [];
+      const d = new Date(body.p_from + "T00:00:00");
+      const e = new Date(body.p_to + "T00:00:00");
+      for (; d <= e; d.setDate(d.getDate() + 1)) {
+        const k = iso(d);
+        out.push({ day: k, blocked: k < iso(today), price: 75, custom: false });
+      }
+      return send(out);
+    }
+    return send([]);
+  });
+  await dctx.addInitScript(() => sessionStorage.setItem("bizarri_intro_seen", "1"));
+  const dp = await dctx.newPage();
+
+  const found = [];
+  for (const route of ["", "facilities", "booking", "offers", "news", "reservation", "contact"]) {
+    await dp.goto(pageUrl(route), { waitUntil: "load" });
+    await dp.waitForTimeout(1200);
+    if (route === "reservation") {
+      // The lookup result is the densest run of numbers on the site: a
+      // reference, a date range, a day count and a price on four lines.
+      await dp.fill("input", "BZR-4K2M9X");
+      await dp.getByRole("button", { name: "عرض الحالة" }).click();
+      await dp.waitForTimeout(1200);
+    }
+    const hits = await dp.evaluate(() => {
+      const re = /[\u0660-\u0669\u06F0-\u06F9]/;
+      const out = [];
+      const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+      let n;
+      while ((n = w.nextNode()))
+        if (re.test(n.textContent)) out.push(n.textContent.trim().slice(0, 30));
+      return [...new Set(out)];
+    });
+    if (hits.length) found.push(`/${route || "home"}: ${hits.join(", ")}`);
+  }
+  ck(
+    "No Arabic page mixes Arabic-Indic digits into Latin ones",
+    found.length === 0,
+    found.join(" | "),
+  );
+
+  // The month heading and the grid it sits over are the pair that gave this
+  // away, so they are named rather than left to the sweep above.
+  await dp.goto(pageUrl("booking"), { waitUntil: "load" });
+  await dp.waitForTimeout(1200);
+  const cal = await dp.evaluate(() => {
+    const grid = document.querySelector('[role="grid"]');
+    // The month title is the one short line naming a year, either way it is
+    // numbered -- picking it by year rather than by position, so that moving
+    // the weekday header row does not silently change what is measured.
+    const heading =
+      [...document.querySelectorAll("h2,h3,p,span")]
+        .filter((n) => n.children.length === 0)
+        .map((n) => n.textContent.trim())
+        .find((t) => t.length < 30 && /(\d|[\u0660-\u0669]){4}/.test(t)) ?? "";
+    const days = [...(grid?.querySelectorAll("button") ?? [])].map((x) => x.textContent.trim());
+    return { heading, day: days.find((d) => /\d|[\u0660-\u0669]/.test(d)) ?? "" };
+  });
+  ck(
+    "The calendar heading is numbered the same way as its own days",
+    /[0-9]/.test(cal.heading) && /[0-9]/.test(cal.day),
+    `${cal.heading} over ${cal.day}`,
+  );
+  await dctx.close();
+}
+
 await b.close();
 console.log(`\n${fails} failing`);
 process.exit(fails ? 1 : 0);

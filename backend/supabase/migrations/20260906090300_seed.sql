@@ -3,8 +3,10 @@
 -- ============================================================================
 
 insert into public.chalets (id, slug, name_en, name_ar, sort_order) values
-  (1, 'bizarri-1', 'Bizarri Chalet 1', 'شاليه بيزاري ١', 1),
-  (2, 'bizarri-2', 'Bizarri Chalet 2', 'شاليه بيزاري ٢', 2)
+  -- Latin digits, like every other number on the Arabic site: see
+  -- 20260930120000_latin_digits_in_arabic_names.sql.
+  (1, 'bizarri-1', 'Bizarri Chalet 1', 'شاليه بيزاري 1', 1),
+  (2, 'bizarri-2', 'Bizarri Chalet 2', 'شاليه بيزاري 2', 2)
 on conflict (id) do nothing;
 
 insert into public.rates (id) values (true)

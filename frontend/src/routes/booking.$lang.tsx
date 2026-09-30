@@ -7,6 +7,7 @@ import { EmailVerify } from "@/components/EmailVerify";
 import { rememberBookingRef } from "@/components/BookingLookup";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
 import { useI18n, type TrKey } from "@/lib/i18n";
+import { dateLocale } from "@/lib/locale";
 import { usePageMeta } from "@/hooks/use-page-meta";
 import {
   MIN_STAY_DAYS,
@@ -205,28 +206,46 @@ function RatesStrip() {
   );
 }
 
+/**
+ * Which chalet the calendar underneath is about.
+ *
+ * It used to be a label and two pills reading BIZARRI CHALET 1 and BIZARRI
+ * CHALET 2, in small wide-tracked capitals. Everything but the last character
+ * of each was identical, so telling them apart meant reading both to the end
+ * -- the one job the control has. The names now get the room and the weight
+ * to be read at a glance, in the same card shape as the quick picks and the
+ * date filter further down, so the page speaks one visual language.
+ *
+ * Nothing said the choice did anything, either; the note does.
+ */
 function ChaletPicker({
   chaletId,
   setChaletId,
-  compact = false,
 }: {
   chaletId: number;
   setChaletId: (id: number) => void;
-  compact?: boolean;
 }) {
-  const { lang } = useI18n();
+  const { tr, lang } = useI18n();
   const { data: chalets } = useChalets();
+  const list = chalets ?? [];
 
-  if (compact) {
-    return (
-      <div className="flex flex-wrap gap-2">
-        {(chalets ?? []).map((c) => (
+  // One chalet is not a choice. A lone button that cannot be turned off, under
+  // a heading asking which one you want, is a question with one answer.
+  if (list.length < 2) return null;
+
+  return (
+    <div className="mb-6">
+      <p className="mb-2 text-xs uppercase tracking-widest text-muted-foreground" id="pick-chalet">
+        {tr("pickChalet")}
+      </p>
+      <div className="grid grid-cols-2 gap-2" role="group" aria-labelledby="pick-chalet">
+        {list.map((c) => (
           <button
             key={c.id}
             type="button"
             onClick={() => setChaletId(c.id)}
             aria-pressed={chaletId === c.id}
-            className={`border px-4 py-2 text-xs uppercase tracking-widest transition-colors ${
+            className={`border p-3 text-start font-display text-sm transition-colors sm:p-4 sm:text-lg ${
               chaletId === c.id
                 ? "border-foreground bg-foreground text-background"
                 : "border-border hover:border-foreground/50"
@@ -236,26 +255,7 @@ function ChaletPicker({
           </button>
         ))}
       </div>
-    );
-  }
-
-  return (
-    <div className="grid gap-4 sm:grid-cols-2">
-      {(chalets ?? []).map((c) => (
-        <button
-          key={c.id}
-          onClick={() => setChaletId(c.id)}
-          aria-pressed={chaletId === c.id}
-          className={`border p-6 text-start transition-colors ${
-            chaletId === c.id
-              ? "border-foreground bg-foreground text-background"
-              : "border-border hover:border-foreground/50"
-          }`}
-        >
-          <p className="text-xs uppercase tracking-widest opacity-70">Chalet {c.id}</p>
-          <p className="mt-2 font-display text-2xl">{lang === "en" ? c.name_en : c.name_ar}</p>
-        </button>
-      ))}
+      <p className="mt-2 text-xs text-muted-foreground">{tr("pickChaletNote")}</p>
     </div>
   );
 }
@@ -555,7 +555,7 @@ function Calendar({
   const isEdge = (d: Date) =>
     (start && fmtDate(d) === fmtDate(start)) || (previewEnd && fmtDate(d) === fmtDate(previewEnd));
 
-  const monthName = month.toLocaleDateString(lang === "ar" ? "ar-EG" : "en-US", {
+  const monthName = month.toLocaleDateString(dateLocale(lang, "en-US"), {
     month: "long",
     year: "numeric",
   });
@@ -628,21 +628,15 @@ function Calendar({
 
         <RatesStrip />
 
-        <div className="mb-6 flex flex-wrap items-center gap-3">
-          <span className="text-xs uppercase tracking-widest text-muted-foreground">
-            {tr("pickChalet")}
-          </span>
-          <ChaletPicker
-            chaletId={chaletId}
-            setChaletId={(id) => {
-              setChaletId(id);
-              setStart(null);
-              setEnd(null);
-              setError("");
-            }}
-            compact
-          />
-        </div>
+        <ChaletPicker
+          chaletId={chaletId}
+          setChaletId={(id) => {
+            setChaletId(id);
+            setStart(null);
+            setEnd(null);
+            setError("");
+          }}
+        />
 
         {loadError && (
           <p className="mb-4 border border-destructive p-4 text-sm text-destructive">
@@ -823,7 +817,7 @@ function Calendar({
               const within = inRange(d);
               const priced = byDay.get(iso)?.custom === true;
               const occ = occasionFor(d);
-              const dayLabel = d.toLocaleDateString(lang === "ar" ? "ar-EG" : "en-US", {
+              const dayLabel = d.toLocaleDateString(dateLocale(lang, "en-US"), {
                 weekday: "long",
                 day: "numeric",
                 month: "long",
@@ -1138,7 +1132,7 @@ function BookingForm({
     }
     const guests = Number(details.guests);
     if (!Number.isInteger(guests) || guests < 1 || guests > 20) {
-      next.guests = lang === "en" ? "Between 1 and 20 guests." : "بين ١ و ٢٠ ضيفاً.";
+      next.guests = lang === "en" ? "Between 1 and 20 guests." : "بين 1 و 20 ضيفاً.";
     }
     if (!civilId) {
       next.civilId = tr("civilIdMissing");

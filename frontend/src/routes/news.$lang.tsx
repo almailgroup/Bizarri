@@ -2,6 +2,7 @@ import { requireLang } from "@/lib/lang-route";
 import { createFileRoute } from "@tanstack/react-router";
 import { PageShell } from "@/components/PageShell";
 import { useI18n } from "@/lib/i18n";
+import { dateLocale } from "@/lib/locale";
 import { usePublishedNews } from "@/lib/api";
 import { usePageMeta } from "@/hooks/use-page-meta";
 
@@ -59,7 +60,7 @@ function News() {
             <article key={it.id} className="border border-border p-8 hover-lift animate-fade-up">
               <p className="text-xs tracking-widest uppercase text-muted-foreground mb-3">
                 {new Date(it.published_at ?? it.created_at).toLocaleDateString(
-                  lang === "ar" ? "ar-EG" : "en-US",
+                  dateLocale(lang, "en-US"),
                   {
                     day: "numeric",
                     month: "long",

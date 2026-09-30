@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { useI18n } from "@/lib/i18n";
+import { dateLocale } from "@/lib/locale";
 import { eachDay, formatMoney, parseDate, startOfToday } from "@/lib/booking";
 import { useBookings, useChalets } from "@/lib/api";
 import type { BookingRow } from "@/integrations/supabase/types";
@@ -54,7 +55,7 @@ export function OverviewPanel() {
     return c ? (lang === "en" ? c.name_en : c.name_ar) : `Chalet ${id}`;
   };
 
-  const monthLabel = today.toLocaleDateString(lang === "ar" ? "ar-EG" : "en-US", {
+  const monthLabel = today.toLocaleDateString(dateLocale(lang, "en-US"), {
     month: "long",
     year: "numeric",
   });

@@ -36,10 +36,10 @@ function Facilities() {
 
   const tech = [
     { icon: Wifi, en: "5G Internet", ar: "إنترنت الجيل الخامس" },
-    { icon: Radio, en: "WIFI 2.4Ghz / 5Ghz", ar: "واي فاي ٢.٤ / ٥ جيجاهرتز" },
+    { icon: Radio, en: "WIFI 2.4Ghz / 5Ghz", ar: "واي فاي 2.4 / 5 جيجاهرتز" },
     { icon: Plug, en: "Outlets & USB ports throughout", ar: "منافذ كهرباء و USB في كل مكان" },
     { icon: Cpu, en: "Fully automated Smart Home", ar: "منزل ذكي مؤتمت بالكامل" },
-    { icon: Tv, en: '65" TV with 5.1 Sound Bar', ar: "تلفزيون ٦٥ بوصة مع ساوند بار ٥.١" },
+    { icon: Tv, en: '65" TV with 5.1 Sound Bar', ar: "تلفزيون 65 بوصة مع ساوند بار 5.1" },
     { icon: Radio, en: "Live TV Channels", ar: "قنوات تلفزيونية مباشرة" },
     { icon: Film, en: "Huge library of movies & TV shows", ar: "مكتبة ضخمة من الأفلام والمسلسلات" },
   ];

@@ -750,8 +750,10 @@ create trigger audit_bookings
 -- ============================================================================
 
 insert into public.chalets (id, slug, name_en, name_ar, sort_order) values
-  (1, 'bizarri-1', 'Bizarri Chalet 1', 'شاليه بيزاري ١', 1),
-  (2, 'bizarri-2', 'Bizarri Chalet 2', 'شاليه بيزاري ٢', 2)
+  -- Latin digits, like every other number on the Arabic site: see
+  -- 20260930120000_latin_digits_in_arabic_names.sql.
+  (1, 'bizarri-1', 'Bizarri Chalet 1', 'شاليه بيزاري 1', 1),
+  (2, 'bizarri-2', 'Bizarri Chalet 2', 'شاليه بيزاري 2', 2)
 on conflict (id) do nothing;
 
 insert into public.rates (id) values (true)
@@ -1985,4 +1987,28 @@ revoke all on function public.lookup_booking_by_phone(text)      from public;
 grant execute on function public.lookup_booking_by_ref(text)     to anon, authenticated;
 grant execute on function public.lookup_booking_by_email(text)   to anon, authenticated;
 grant execute on function public.lookup_booking_by_phone(text)   to anon, authenticated;
+
+-- ===== migrations/20260930120000_latin_digits_in_arabic_names.sql ==
+
+-- ============================================================================
+-- One digit set on the Arabic site.
+--
+-- The chalets were seeded "شاليه بيزاري ١" and "شاليه بيزاري ٢", in
+-- Arabic-Indic digits. Nothing else on the site is written that way: a price
+-- is "350 د.ك", a booking reference is BZR-4K2M9X, the phone number is
+-- +965 94040955, and the day cells of the booking calendar are a plain 1, 2,
+-- 3. A reference and a phone number cannot be anything but Latin, so Latin is
+-- the only digit set the whole site can agree on, and the front end now
+-- formats every date that way too.
+--
+-- Only rows still holding the seeded name are touched. An owner who has
+-- renamed a chalet from the admin panel keeps their name; for them this is a
+-- no-op, which is also what makes it safe to re-run.
+-- ============================================================================
+
+update public.chalets set name_ar = 'شاليه بيزاري 1'
+ where id = 1 and name_ar = 'شاليه بيزاري ١';
+
+update public.chalets set name_ar = 'شاليه بيزاري 2'
+ where id = 2 and name_ar = 'شاليه بيزاري ٢';
 

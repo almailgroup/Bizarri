@@ -1,4 +1,5 @@
 import { useI18n } from "@/lib/i18n";
+import { dateLocale } from "@/lib/locale";
 import { useAuditLog } from "@/lib/api";
 import type { AuditRow } from "@/integrations/supabase/types";
 
@@ -58,7 +59,7 @@ export function ActivityPanel() {
       <p className="mb-6 text-sm text-muted-foreground">
         {lang === "en"
           ? "The last 200 admin actions — booking decisions and edits, settings and chalet changes."
-          : "آخر ٢٠٠ إجراء إداري — قرارات وتعديلات الحجوزات، وتغييرات الإعدادات والشاليهات."}
+          : "آخر 200 إجراء إداري — قرارات وتعديلات الحجوزات، وتغييرات الإعدادات والشاليهات."}
       </p>
 
       {error && (
@@ -76,7 +77,7 @@ export function ActivityPanel() {
           <li key={entry.id} className="flex items-start justify-between gap-4 py-3 text-sm">
             <span>{describe(entry, lang)}</span>
             <span className="shrink-0 text-xs text-muted-foreground" dir="ltr">
-              {new Date(entry.created_at).toLocaleString(lang === "ar" ? "ar-EG" : "en-GB")}
+              {new Date(entry.created_at).toLocaleString(dateLocale(lang))}
             </span>
           </li>
         ))}
