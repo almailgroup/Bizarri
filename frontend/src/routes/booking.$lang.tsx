@@ -654,18 +654,6 @@ function Calendar({
         >
           {shapes.map((f) => {
             const on = filter === f;
-            const price =
-              f === "day"
-                ? // dailyWeekday, not the lower of the two: a single day can
-                  // only be Sun-Wed now, so there is nothing to compare it
-                  // against. "From", because a custom day price can differ.
-                  rates &&
-                  tr("filterFrom").replace("{price}", formatMoney(rates.dailyWeekday, lang))
-                : f === "weekday"
-                  ? rates && formatMoney(rates.weekday, lang)
-                  : f === "weekend"
-                    ? rates && formatMoney(rates.weekend, lang)
-                    : null;
             return (
               <button
                 key={f}
@@ -687,7 +675,6 @@ function Calendar({
                 <span className={`text-xs ${on ? "opacity-70" : "text-muted-foreground"}`}>
                   {tr(FILTER_NOTE[f])}
                 </span>
-                {price && <span className="text-sm font-medium">{price}</span>}
               </button>
             );
           })}

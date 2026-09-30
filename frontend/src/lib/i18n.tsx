@@ -183,7 +183,6 @@ export const t: Dict = {
   filterWeekdayNote: { en: "Sun – Wed · 4 days", ar: "الأحد – الأربعاء · 4 أيام" },
   filterWeekend: { en: "Weekend", ar: "نهاية الأسبوع" },
   filterWeekendNote: { en: "Thu – Sat · 3 days", ar: "الخميس – السبت · 3 أيام" },
-  filterFrom: { en: "from {price}", ar: "من {price}" },
   filterHint: {
     en: "Tap any highlighted day and the whole stay is selected for you.",
     ar: "اضغط على أي يوم مميّز وسيتم تحديد الإقامة كاملة تلقائياً.",

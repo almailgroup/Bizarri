@@ -202,10 +202,12 @@ const clickDay = (p, dow, nth = 0) =>
     cards.every((t) => /Sun|Thu/.test(t)),
     cards.find((t) => !/Sun|Thu/.test(t)) ?? "all do",
   );
+  // The cards carry no price: the rates strip above them does, and repeating
+  // it three times made the row of choices read as a price list.
   ck(
-    "…and what it costs",
-    cards.every((t) => /KD\s*\d/.test(t)),
-    cards.find((t) => !/KD\s*\d/.test(t)) ?? "all do",
+    "…and none of them quotes a price",
+    cards.every((t) => !/KD\s*\d|\d+\s*د\.ك/.test(t)),
+    cards.find((t) => /KD\s*\d/.test(t)) ?? "none do",
   );
 
   // And one tap on a highlighted day lands the whole stay it advertised.
@@ -243,20 +245,17 @@ const clickDay = (p, dow, nth = 0) =>
     );
   }
 
-  for (const [name, price] of [
-    ["By day", /KD\s*75/],
-    ["Weekday", /KD\s*300/],
-    ["Weekend", /KD\s*350/],
-  ]) {
-    const tab = p.getByRole("button", { name: new RegExp(`^${name}`, "i") }).first();
-    ck(`…and what "${name}" costs`, price.test((await tab.textContent()) ?? ""));
+  // The prices live in the rates strip above the shapes, once each, rather
+  // than on every card.
+  const strip = await p.evaluate(() => document.body.innerText);
+  for (const price of [/KD\s*300/, /KD\s*350/]) {
+    ck(`The page still quotes ${String(price)}`, price.test(strip));
   }
-  // Free-form dates are gone, so there is no shape without a price.
   ck(
-    "Every shape on offer quotes one",
+    "…but not on the shape cards themselves",
     (await p.evaluate(() =>
-      [...document.querySelectorAll('[role="group"] button[aria-pressed]')].every((b) =>
-        /KD|د\.ك/.test(b.innerText),
+      [...document.querySelectorAll('[role="group"] button[aria-pressed]')].every(
+        (b) => !/KD\s*\d/.test(b.innerText),
       ),
     )) === true,
   );
