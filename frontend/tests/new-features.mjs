@@ -749,6 +749,61 @@ async function adminPage(state, tab) {
     !SERIF.test([...homeEn, ...homeAr, ...bookingEn].join(" ")),
   );
 
+  // ===================================== the bar over the hero
+  //
+  // The homepage hero is a full-bleed dark image and the header sits on it
+  // transparently until you scroll. Every other page has no hero, so the bar
+  // is solid from the start. Measured as computed background rather than
+  // class names: a Tailwind class that stopped being emitted would still read
+  // correctly in className and render white.
+  {
+    const hctx = await b.newContext({ viewport: { width: 1440, height: 900 } });
+    await hctx.route(/^https?:\/\/(?!localhost)/, (r) => r.abort());
+    const hp = await hctx.newPage();
+    // The bar cross-fades over 500ms, and the tail of the easing is long
+    // enough that a fixed wait reads a colour that is still moving -- 2% alpha
+    // on the way to 0 is neither state. Poll until it stops changing.
+    const bar = async () => {
+      const read = () =>
+        hp.evaluate(() => {
+          const h = document.querySelector("header");
+          return h ? getComputedStyle(h).backgroundColor : null;
+        });
+      let last = await read();
+      for (let i = 0; i < 20; i++) {
+        await hp.waitForTimeout(100);
+        const now = await read();
+        if (now === last) return now;
+        last = now;
+      }
+      return last;
+    };
+    const clear = (c) => c === "rgba(0, 0, 0, 0)" || c === "transparent";
+
+    // Straight in at the bare domain, which redirects and plays the intro:
+    // the state a first-time visitor actually arrives in.
+    await hp.goto(B, { waitUntil: "load" });
+    await hp.waitForTimeout(3000);
+    ck("The homepage bar starts clear over the hero", clear(await bar()), await bar());
+
+    // behavior instant: the stylesheet sets scroll-behavior smooth, and during
+    // that animation the bar holds a colour long enough to read as settled
+    // while the page is still moving.
+    await hp.evaluate(() => window.scrollTo({ top: 400, behavior: "instant" }));
+    const scrolled = await bar();
+    ck("…and takes a background once you scroll", !clear(scrolled), scrolled);
+
+    await hp.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
+    ck("…and gives it back at the top", clear(await bar()), await bar());
+
+    // A page with no hero behind it has nothing to be transparent over.
+    await hp.goto(`${B}facilities/en`, { waitUntil: "load" });
+    await hp.waitForTimeout(1200);
+    const inner = await bar();
+    ck("A page without a hero is solid from the start", !clear(inner), inner);
+    await hctx.close();
+  }
+
   // The rules above prove the CSS asks for one family. This proves the file
   // behind it actually arrives and covers both scripts.
   //
