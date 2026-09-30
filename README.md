@@ -162,8 +162,8 @@ project — a fresh account, a new org, or the current project was deleted.
    **Supabase Edge Function**, function `notify-booking`.
 
 8. **Commit and deploy.** Push the updated `frontend/.env` — it's safe to
-   commit, see above — to the branch GitHub Pages builds from. The next
-   deploy picks up the new project automatically.
+   commit, see above — to `main`. The next deploy picks up the new project
+   automatically.
 
 9. **Verify.** Visit the live site: `/offers` and `/news` should load without
    errors, `/booking` should show an availability calendar, and `/admin`
