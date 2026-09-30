@@ -26,7 +26,8 @@ select 'migrations' as area, * from (values
   ('09 min stay 1 day',   ((select min_stay_days from public.rates where id) = 1)),
   ('10 three-way lookup', (to_regprocedure('public.lookup_booking_by_email(text)')       is not null)),
   ('11 latin digits',     ((select bool_and(name_ar !~ '[٠-٩]') from public.chalets))),
-  ('12 weekend rule',     (to_regprocedure('public.weekend_is_whole(date,date)')         is not null))
+  ('12 weekend rule',     (to_regprocedure('public.weekend_is_whole(date,date)')         is not null)),
+  ('13 function lockdown', (not has_function_privilege('anon','public.start_email_verification(text)','execute')))
 ) t(item, ok)
 union all
 select 'pricing', * from (values
@@ -51,6 +52,11 @@ select 'guest access', * from (values
   ('Guests cannot insert bookings', (not has_table_privilege('anon','public.bookings','insert'))),
   ('…and book through the RPC',     (has_function_privilege('anon','public.request_booking(smallint,date,date,text,text,text,smallint,text,text,boolean,text)','execute'))),
   ('Code minting is server-only',   (not has_function_privilege('anon','public.start_email_verification(text)','execute'))),
+  ('Verified-check is server-only', (not has_function_privilege('anon','public.is_email_verified(text)','execute'))),
+  ('The throttle is server-only',   (not has_function_privilege('anon','public.note_lookup(text,text,integer)','execute'))),
+  ('Deciding a booking is not anon',(not has_function_privilege('anon','public.set_booking_status(uuid,public.booking_status,text)','execute'))),
+  ('…but an admin still can',       (has_function_privilege('authenticated','public.set_booking_status(uuid,public.booking_status,text)','execute'))),
+  ('The code minter reaches service_role', (has_function_privilege('service_role','public.start_email_verification(text)','execute'))),
   ('…but a guest may verify one',   (has_function_privilege('anon','public.verify_email_code(text,text)','execute'))),
   ('Lookup by ref',                 (has_function_privilege('anon','public.lookup_booking_by_ref(text)','execute'))),
   ('Lookup by email',               (has_function_privilege('anon','public.lookup_booking_by_email(text)','execute'))),

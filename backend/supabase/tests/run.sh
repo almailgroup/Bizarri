@@ -29,11 +29,22 @@ create or replace function auth.uid() returns uuid language sql stable as
 $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
 do $$ begin create role anon nologin;          exception when duplicate_object then null; end $$;
 do $$ begin create role authenticated nologin; exception when duplicate_object then null; end $$;
+do $$ begin create role service_role nologin;  exception when duplicate_object then null; end $$;
 do $$ begin create role app_owner nosuperuser nologin; exception when duplicate_object then null; end $$;
-grant usage on schema public, auth to anon, authenticated, app_owner;
+grant usage on schema public, auth to anon, authenticated, service_role, app_owner;
 grant create on schema public to app_owner;
 grant all on auth.users to app_owner;
 grant select on auth.users to anon, authenticated;
+
+-- A real Supabase project ships this, and leaving it out made the harness
+-- lie. Without it, "revoke all on function <fn> from public" is enough to
+-- lock a function, so every grant assertion passed. With it, each new
+-- function carries an EXPLICIT grant to anon and authenticated that a revoke
+-- from PUBLIC does not touch -- which is how start_email_verification(), a
+-- function that returns a plaintext one-time code, stayed callable from the
+-- browser on the live site while the suite reported it locked.
+alter default privileges for role app_owner in schema public
+  grant all on functions to postgres, anon, authenticated, service_role;
 SQL
 
 for f in supabase/migrations/*.sql; do
