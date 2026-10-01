@@ -130,52 +130,31 @@ export function EmailVerify({
         {sent ? tr("codeSent").replace("{email}", email.trim()) : tr("verifyEmailHint")}
       </p>
 
-      {!sent ? (
-        <button
-          type="button"
-          onClick={request}
-          disabled={!usable || send.isPending}
-          className="mt-3 border border-foreground px-6 py-3 text-sm uppercase tracking-widest transition-colors hover:bg-foreground hover:text-background disabled:opacity-40"
-        >
-          {send.isPending ? tr("sendingCode") : tr("sendCode")}
-        </button>
-      ) : (
-        <div className="mt-3 flex flex-wrap items-start gap-3">
-          <input
-            ref={codeRef}
-            value={code}
-            // A numeric keypad on a phone, but type="text": type="number"
-            // strips leading zeros, and a code like 004821 must survive.
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            maxLength={6}
-            dir="ltr"
-            aria-label={tr("enterCode")}
-            aria-invalid={!!error}
-            onChange={(e) => {
-              setCode(e.target.value.replace(/\D/g, "").slice(0, 6));
-              setError("");
-            }}
-            placeholder="000000"
-            className="w-36 border border-border bg-secondary px-4 py-3 text-center font-mono text-lg tracking-[0.3em] outline-none focus:border-foreground"
-          />
-          <button
-            type="button"
-            onClick={confirm}
-            disabled={code.length !== 6 || check.isPending}
-            className="border border-foreground px-6 py-3 text-sm uppercase tracking-widest transition-colors hover:bg-foreground hover:text-background disabled:opacity-40"
-          >
-            {tr("verifyCode")}
-          </button>
-          <button
-            type="button"
-            onClick={request}
-            disabled={send.isPending}
-            className="-my-2 px-1 py-2 text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground disabled:opacity-40"
-          >
-            {tr("resendCode")}
-          </button>
-        </div>
+      {sent && (
+        <input
+          ref={codeRef}
+          value={code}
+          // A numeric keypad on a phone, but type="text": type="number"
+          // strips leading zeros, and a code like 004821 must survive.
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          maxLength={6}
+          dir="ltr"
+          aria-label={tr("enterCode")}
+          aria-invalid={!!error}
+          onChange={(e) => {
+            setCode(e.target.value.replace(/\D/g, "").slice(0, 6));
+            setError("");
+          }}
+          placeholder="000000"
+          className="mx-auto mt-4 block w-44 border border-border bg-secondary px-4 py-3 text-center font-mono text-lg tracking-[0.3em] outline-none focus:border-foreground"
+        />
+      )}
+
+      {error && (
+        <p role="alert" className="mt-3 text-sm text-destructive">
+          {error}
+        </p>
       )}
 
       {/* The commonest reason a code "never arrives" is that it did, into a
@@ -183,11 +162,31 @@ export function EmailVerify({
           not before, when it would only be noise. */}
       {sent && !error && <p className="mt-3 text-sm text-muted-foreground">{tr("checkSpam")}</p>}
 
-      {error && (
-        <p role="alert" className="mt-3 text-sm text-destructive">
-          {error}
-        </p>
+      {sent && (
+        <div className="mt-1 flex justify-center">
+          <button
+            type="button"
+            onClick={request}
+            disabled={send.isPending}
+            className="px-1 py-2 text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground disabled:opacity-40"
+          >
+            {tr("resendCode")}
+          </button>
+        </div>
       )}
+
+      {/* The one action, full width and last in the box, so the dialog's Cancel
+          sits directly beneath it and the pair reads as a pair. Everything that
+          explains the step -- the box to type in, the spam note, the retry --
+          comes above, in the order it is needed. */}
+      <button
+        type="button"
+        onClick={sent ? confirm : request}
+        disabled={sent ? code.length !== 6 || check.isPending : !usable || send.isPending}
+        className="mt-3 w-full border border-foreground px-6 py-3 text-sm uppercase tracking-widest transition-colors hover:bg-foreground hover:text-background disabled:opacity-40"
+      >
+        {sent ? tr("verifyCode") : send.isPending ? tr("sendingCode") : tr("sendCode")}
+      </button>
     </div>
   );
 }
@@ -257,10 +256,13 @@ export function CodeDialog({
             />
           </div>
 
+          {/* Directly under Confirm, and quieter than it: same width, border
+              only, so the pair at the foot of the dialog reads as go-ahead
+              first, back out second. */}
           <button
             type="button"
             onClick={onClose}
-            className="mt-4 w-full border border-border px-6 py-3 text-sm uppercase tracking-widest hover:bg-secondary"
+            className="mt-3 w-full border border-border px-6 py-3 text-sm uppercase tracking-widest hover:bg-secondary"
           >
             {tr("cancel")}
           </button>

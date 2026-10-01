@@ -442,6 +442,78 @@ async function openCodeDialog(p, email = "guest@example.com") {
     await codeBox.evaluate((el) => el === document.activeElement),
   );
 
+  // The shape of the dialog on a phone, which is where it is read.
+  //
+  // Confirm is the thing the guest came here to press, so it sits at the foot
+  // of the box with Cancel directly beneath it -- not beside the code box,
+  // where it was, with the spam note and the resend link between the two
+  // buttons. Measured at phone width, because that is the width that has no
+  // room to put them side by side.
+  await p.setViewportSize({ width: 390, height: 844 });
+  await p.waitForTimeout(300);
+  const geom = await p.evaluate(() => {
+    const r = (el) => {
+      const q = el.getBoundingClientRect();
+      return { t: q.top, b: q.bottom, l: q.left, r: q.right, w: q.width };
+    };
+    const dialog = document.querySelector('[role="dialog"]');
+    const box = dialog.querySelector("input");
+    const btns = [...dialog.querySelectorAll("button")];
+    const by = (re) => btns.find((el) => re.test((el.textContent || "").trim()));
+    const confirm = by(/^Confirm$/i);
+    const cancel = by(/^Cancel$/i);
+    // Anything laid out between the two buttons would break them as a pair.
+    const between = [...dialog.querySelectorAll("*")].filter((el) => {
+      if (el === confirm || el === cancel) return false;
+      if (el.contains(confirm) || el.contains(cancel)) return false;
+      const q = el.getBoundingClientRect();
+      if (!q.height) return false;
+      return (
+        q.top >= confirm.getBoundingClientRect().bottom &&
+        q.bottom <= cancel.getBoundingClientRect().top
+      );
+    });
+    return {
+      panel: r(box.closest(".max-w-md")),
+      box: r(box),
+      confirm: r(confirm),
+      cancel: r(cancel),
+      between: between.map((el) => (el.textContent || el.tagName).trim().slice(0, 20)),
+      vh: window.innerHeight,
+    };
+  });
+
+  ck(
+    "Confirm sits above Cancel",
+    geom.confirm.b <= geom.cancel.t + 1,
+    `confirm ${Math.round(geom.confirm.b)} / cancel ${Math.round(geom.cancel.t)}`,
+  );
+  ck(
+    "…directly above it, with nothing in between",
+    geom.cancel.t - geom.confirm.b < 20 && geom.between.length === 0,
+    `${Math.round(geom.cancel.t - geom.confirm.b)}px${geom.between.length ? " — " + geom.between.join(", ") : ""}`,
+  );
+  ck(
+    "…and the two are the same width, so they read as a pair",
+    Math.abs(geom.confirm.w - geom.cancel.w) <= 1 && Math.abs(geom.confirm.l - geom.cancel.l) <= 1,
+    `${Math.round(geom.confirm.w)} vs ${Math.round(geom.cancel.w)}`,
+  );
+  ck(
+    "The code box is centred in the dialog",
+    Math.abs(geom.box.l - geom.panel.l - (geom.panel.r - geom.box.r)) <= 2,
+    `${Math.round(geom.box.l - geom.panel.l)}px left, ${Math.round(geom.panel.r - geom.box.r)}px right`,
+  );
+  // The regression this dialog already had once: a transformed ancestor made
+  // it fixed to the form rather than the window, and everything above Confirm
+  // ended up off-screen.
+  ck(
+    "Nothing in the dialog is off-screen on a phone",
+    geom.panel.t >= -1 && geom.cancel.b <= geom.vh + 1,
+    `top ${Math.round(geom.panel.t)}, cancel bottom ${Math.round(geom.cancel.b)} of ${geom.vh}`,
+  );
+  await p.setViewportSize({ width: 1200, height: 900 });
+  await p.waitForTimeout(200);
+
   // Letters are not codes.
   await codeBox.fill("abc");
   ck("Letters are refused outright", (await codeBox.inputValue()) === "");
