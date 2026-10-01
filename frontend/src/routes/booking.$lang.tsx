@@ -1,5 +1,5 @@
 import { requireLang } from "@/lib/lang-route";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronLeft, ChevronRight, Paperclip, ShieldCheck } from "lucide-react";
 import { PageShell } from "@/components/PageShell";
@@ -35,9 +35,30 @@ import {
 import type { BookingRow } from "@/integrations/supabase/types";
 import { readGuest, rememberGuest } from "@/lib/guest";
 
+/**
+ * Which step of the flow is on screen, carried in the address.
+ *
+ * The three steps used to be component state at one URL, so they left no
+ * trace in the browser's history: Back from "Your details" skipped the dates
+ * entirely and left the booking page for whatever came before it -- usually
+ * the home page. Each step is now a history entry of its own, so Back and
+ * Forward move one step at a time like everywhere else on the site.
+ *
+ * No step means the dates. Anything else in the address is ignored rather
+ * than trusted: the steps after the first only make sense with a stay chosen
+ * in this visit, and a link or a reload that lands on one without it is sent
+ * back to the start (see Booking and Calendar).
+ */
+type Step = "details" | "done";
+interface BookingSearch {
+  step?: Step;
+}
+
 export const Route = createFileRoute("/booking/$lang")({
   component: Booking,
   beforeLoad: requireLang,
+  validateSearch: (s: Record<string, unknown>): BookingSearch =>
+    s.step === "details" || s.step === "done" ? { step: s.step } : {},
 });
 
 /**
@@ -105,9 +126,37 @@ function Booking() {
       : "تحقق من التوفر واطلب إقامتك في شاليه بيزاري.",
   );
 
-  const [stage, setStage] = useState<"calendar" | "done">("calendar");
+  const { step } = Route.useSearch();
+  const navigate = Route.useNavigate();
   const [chaletId, setChaletId] = useState(1);
   const [confirmed, setConfirmed] = useState<BookingRow | null>(null);
+
+  // A confirmation is only ever this visit's own: reloaded, or followed from
+  // a link, there is no booking in hand to show, so start again from the dates
+  // rather than an empty "Confirmed".
+  const done = step === "done" && !!confirmed;
+
+  // Every step starts at the top, however it was reached -- Continue, the
+  // page's Back, or the browser's Back and Forward. On a history move the
+  // router puts back the old offset instead, which on the dates is wherever
+  // Continue was pressed: halfway down the calendar, with the step's heading
+  // and the shapes off the top of the screen. It does that when it signals
+  // onRendered; subscribing to the same signal runs after it, so this has the
+  // last word rather than racing it. Only for a change of step on this page:
+  // moving between pages is left to the router, which already gets it right.
+  const router = useRouter();
+  useEffect(
+    () =>
+      router.subscribe("onRendered", ({ fromLocation, toLocation }) => {
+        if (!fromLocation || fromLocation.pathname !== toLocation.pathname) return;
+        const stepOf = (l: typeof toLocation) => (l.search as BookingSearch).step;
+        if (stepOf(fromLocation) !== stepOf(toLocation)) scrollToTop();
+      }),
+    [router],
+  );
+  useEffect(() => {
+    if (step === "done" && !confirmed) navigate({ search: {}, replace: true });
+  }, [step, confirmed, navigate]);
 
   return (
     <PageShell>
@@ -116,20 +165,25 @@ function Booking() {
           {tr("booking")}
         </p>
 
-        {stage === "calendar" && (
+        {!done && (
           <Calendar
             chaletId={chaletId}
             setChaletId={setChaletId}
+            showForm={step === "details"}
             onDone={(b) => {
               rememberBookingRef(b.ref);
               setConfirmed(b);
-              setStage("done");
+              // In place of the details entry, not on top of it: Back from
+              // the confirmation must not land on a form that has already
+              // been sent, inviting the same request a second time. It goes
+              // to the dates instead, fresh, for anyone booking another stay.
+              navigate({ search: { step: "done" }, replace: true });
               scrollToTop();
             }}
           />
         )}
 
-        {stage === "done" && confirmed && <Confirmation booking={confirmed} />}
+        {done && confirmed && <Confirmation booking={confirmed} />}
       </section>
     </PageShell>
   );
@@ -282,13 +336,18 @@ function ChaletPicker({
 function Calendar({
   chaletId,
   setChaletId,
+  showForm,
   onDone,
 }: {
   chaletId: number;
   setChaletId: (id: number) => void;
+  /** The details step is in the address; see BookingSearch. */
+  showForm: boolean;
   onDone: (b: BookingRow) => void;
 }) {
   const { tr, lang } = useI18n();
+  const navigate = Route.useNavigate();
+  const router = useRouter();
   const today = useMemo(startOfToday, []);
   const thisMonth = useMemo(() => startOfMonth(today), [today]);
 
@@ -299,7 +358,11 @@ function Calendar({
   // A day at a time is the least committing of the three, so it is where the
   // calendar opens.
   const [filter, setFilter] = useState<DateFilter>("day");
-  const [showForm, setShowForm] = useState(false);
+  // Whether this visit put the details step into history itself. When it did,
+  // the page's own Back button is the browser's Back -- the entry behind is
+  // the dates -- so the two can never disagree, and pressing one after the
+  // other does not leave a duplicate of the dates to walk back through.
+  const pushedForm = useRef(false);
   const [jumped, setJumped] = useState(false);
   // Roving focus for the date grid. Every day used to be its own tab stop,
   // so a keyboard user pressed Tab about thirty times to get past the
@@ -635,8 +698,21 @@ function Calendar({
       setError(tr("minStay").replace("{n}", String(minStay)));
       return;
     }
-    setShowForm(true);
+    pushedForm.current = true;
+    navigate({ search: { step: "details" } });
     scrollToTop();
+  };
+
+  // Details with no stay chosen -- a reload, a shared link, Forward into a
+  // page whose dates are gone -- has nothing to fill in, so it is the dates.
+  // Replaced, not pushed, so Back does not return to the empty step.
+  useEffect(() => {
+    if (showForm && (!start || !end)) navigate({ search: {}, replace: true });
+  }, [showForm, start, end, navigate]);
+
+  const backToDates = () => {
+    if (pushedForm.current) router.history.back();
+    else navigate({ search: {}, replace: true });
   };
 
   if (showForm && start && end && current) {
@@ -653,10 +729,7 @@ function Calendar({
         setCivilId={setCivilId}
         terms={terms}
         setTerms={setTerms}
-        onBack={() => {
-          setShowForm(false);
-          scrollToTop();
-        }}
+        onBack={backToDates}
         onDone={onDone}
       />
     );

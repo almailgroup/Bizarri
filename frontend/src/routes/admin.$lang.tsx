@@ -17,7 +17,31 @@ import { OccasionsPanel } from "@/components/admin/OccasionsPanel";
 import { ActivityPanel } from "@/components/admin/ActivityPanel";
 import { useChalets } from "@/lib/api";
 
-export const Route = createFileRoute("/admin/$lang")({ component: Admin, beforeLoad: requireLang });
+const TABS = [
+  "overview",
+  "requests",
+  "availability",
+  "rates",
+  "occasions",
+  "chalets",
+  "news",
+  "settings",
+  "activity",
+] as const;
+type Tab = (typeof TABS)[number];
+
+/**
+ * The open tab is in the address, so each tab is a history entry: Back from
+ * Requests returns to the Overview it was opened from rather than leaving the
+ * dashboard for whatever page came before it, and a reload stays where it
+ * was. The overview is the default and is left out of the address.
+ */
+export const Route = createFileRoute("/admin/$lang")({
+  component: Admin,
+  beforeLoad: requireLang,
+  validateSearch: (s: Record<string, unknown>): { tab?: Tab } =>
+    TABS.includes(s.tab as Tab) && s.tab !== "overview" ? { tab: s.tab as Tab } : {},
+});
 
 function Admin() {
   const { session, loading } = useAuth();
@@ -182,22 +206,15 @@ function NotAuthorised() {
   );
 }
 
-type Tab =
-  | "overview"
-  | "requests"
-  | "availability"
-  | "rates"
-  | "occasions"
-  | "chalets"
-  | "news"
-  | "settings"
-  | "activity";
-
 function Dashboard() {
   const { tr, lang } = useI18n();
   const { session, signOut } = useAuth();
   const { data: chalets } = useChalets();
-  const [tab, setTab] = useState<Tab>("overview");
+  const tab: Tab = Route.useSearch().tab ?? "overview";
+  const navigate = Route.useNavigate();
+  const setTab = (t: Tab) => {
+    if (t !== tab) navigate({ search: t === "overview" ? {} : { tab: t } });
+  };
   const [chaletId, setChaletId] = useState(1);
 
   const tabs: { key: Tab; label: string }[] = [

@@ -258,6 +258,48 @@ async function adminPage(state) {
   await ctx.close();
 }
 
+// ================================================ tabs are history entries
+// Back from a tab returns to the tab before it, not out of the dashboard, and
+// a reload stays on the tab it was on.
+{
+  const state = makeState();
+  const { p, ctx } = await adminPage(state);
+  const where = () => new URL(p.url()).pathname + new URL(p.url()).search;
+  const start = where();
+  await p.getByRole("button", { name: "Booking Requests" }).click();
+  await p.waitForTimeout(400);
+  ck("A tab has an address of its own", where() === "/admin/en?tab=requests", where());
+  await p.getByRole("button", { name: "Package Rates" }).click();
+  await p.waitForTimeout(400);
+  await p.goBack();
+  await p.waitForTimeout(500);
+  ck(
+    "Back returns to the previous tab",
+    where() === "/admin/en?tab=requests" &&
+      (await p.getByRole("button", { name: "Booking Requests" }).getAttribute("aria-current")) ===
+        "true",
+    where(),
+  );
+  await p.goBack();
+  await p.waitForTimeout(500);
+  ck(
+    "…and then to the overview, still in the dashboard",
+    where() === start && (await p.getByText("Pending Requests").isVisible()),
+    where(),
+  );
+  await p.goForward();
+  await p.waitForTimeout(500);
+  await p.reload({ waitUntil: "load" });
+  await p.waitForTimeout(1200);
+  ck(
+    "A reload stays on the tab",
+    (await p.getByRole("button", { name: "Booking Requests" }).getAttribute("aria-current")) ===
+      "true",
+    where(),
+  );
+  await ctx.close();
+}
+
 // ==================================================== Requests: search + edit
 {
   const state = makeState();

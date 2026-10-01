@@ -559,8 +559,15 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     }
     // Stay on the page, change its language. "." is the current route with
     // new params, so /ar/photos is reached from /en/photos without this
-    // having to know what the route was or how to spell it.
-    navigate({ to: ".", params: (prev: Record<string, string>) => ({ ...prev, lang: l }) });
+    // having to know what the route was or how to spell it. The query string
+    // comes too: it is where a page keeps its place -- the booking step, the
+    // admin tab -- and dropping it sent a guest halfway through the booking
+    // form back to the dates for asking to read it in Arabic.
+    navigate({
+      to: ".",
+      params: (prev: Record<string, string>) => ({ ...prev, lang: l }),
+      search: true,
+    });
   };
 
   const tr = (key: keyof typeof t) => t[key]?.[lang] ?? String(key);
