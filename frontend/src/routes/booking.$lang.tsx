@@ -3,12 +3,13 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronLeft, ChevronRight, Paperclip, ShieldCheck } from "lucide-react";
 import { PageShell } from "@/components/PageShell";
-import { EmailVerify } from "@/components/EmailVerify";
+import { CodeDialog } from "@/components/EmailVerify";
 import { rememberBookingRef } from "@/components/BookingLookup";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
 import { useI18n, type TrKey } from "@/lib/i18n";
 import { dateLocale } from "@/lib/locale";
 import { usePageMeta } from "@/hooks/use-page-meta";
+import { scrollToTop } from "@/lib/scroll";
 import {
   MIN_STAY_DAYS,
   addDays,
@@ -17,6 +18,7 @@ import {
   fmtDate,
   formatMoney,
   formatSpan,
+  parseDate,
   quote,
   weekendIsWhole,
   startOfMonth,
@@ -38,37 +40,46 @@ export const Route = createFileRoute("/booking/$lang")({
   beforeLoad: requireLang,
 });
 
-/** Which shape of stay the calendar is filtered to. */
 /**
- * Every stay is one of three shapes. There is no free-form option: a guest
+ * Every stay is one of four shapes. There is no free-form option: a guest
  * picks a shape and then a day inside it, and the calendar selects the whole
  * stay. Sun-Wed is also sold a day at a time, which is what "day" is.
  */
-type DateFilter = "day" | "weekday" | "weekend";
+type DateFilter = "day" | "weekday" | "weekend" | "holiday";
 
 /**
  * startDow null means any day of the week can begin a window, which is what
  * makes "by day" a filter rather than a special case: it is a package of one
  * that starts anywhere.
+ *
+ * "holiday" has no entry: its windows are not a weekday and a length but the
+ * special occasions an admin has entered, each with its own dates and its own
+ * flat price. It is the one shape whose stays come from the database rather
+ * than from a rule, which is why windowsIn() handles it separately.
  */
-const FILTER_SHAPE: Record<DateFilter, { startDow: number | null; length: number }> = {
+const FILTER_SHAPE: Record<
+  Exclude<DateFilter, "holiday">,
+  { startDow: number | null; length: number }
+> = {
   day: { startDow: null, length: 1 }, // any single day
   weekday: { startDow: 0, length: 4 }, // Sun–Wed
   weekend: { startDow: 4, length: 3 }, // Thu–Sat
 };
 
-const FILTERS: DateFilter[] = ["day", "weekday", "weekend"];
+const FILTERS: DateFilter[] = ["day", "weekday", "weekend", "holiday"];
 
 const FILTER_LABEL = {
   day: "filterByDay",
   weekday: "filterWeekday",
   weekend: "filterWeekend",
+  holiday: "filterHoliday",
 } as const;
 
 const FILTER_NOTE = {
   day: "filterByDayNote",
   weekday: "filterWeekdayNote",
   weekend: "filterWeekendNote",
+  holiday: "filterHolidayNote",
 } as const;
 
 const MAX_ID_BYTES = 5 * 1024 * 1024;
@@ -113,6 +124,7 @@ function Booking() {
               rememberBookingRef(b.ref);
               setConfirmed(b);
               setStage("done");
+              scrollToTop();
             }}
           />
         )}
@@ -193,8 +205,12 @@ function RatesStrip() {
         {items.map((it) => (
           <div key={it.label} className="flex items-baseline gap-1.5 md:block">
             <dt className="text-xs text-muted-foreground">{it.label}</dt>
+            {/* "From", because the number beside a package is what that stay
+                costs before a custom day price moves it, and because a single
+                weekday is less than any of them. A bare figure reads as the
+                price; this reads as the floor, which is what it is. */}
             <dd className="text-sm font-medium md:mt-0.5 md:text-lg">
-              {formatMoney(it.price, lang)}
+              {tr("priceFrom").replace("{price}", formatMoney(it.price, lang))}
             </dd>
           </div>
         ))}
@@ -361,11 +377,30 @@ function Calendar({
    * explains why.
    */
   const windowsIn = (m: Date, f: DateFilter) => {
-    const { startDow, length } = FILTER_SHAPE[f];
     const map = new Map<string, { start: Date; end: Date }>();
     // Pad either side so a window straddling a month boundary still resolves.
     const from = addDays(new Date(m.getFullYear(), m.getMonth(), 1), -7);
     const to = addDays(new Date(m.getFullYear(), m.getMonth() + 1, 0), 7);
+
+    // A holiday is whatever the admin entered: its own dates, its own price.
+    // The same two tests as every other shape still apply -- every day free,
+    // and no half a weekend -- so a holiday the server would refuse is not
+    // offered either.
+    if (f === "holiday") {
+      for (const o of occasions ?? []) {
+        const oStart = parseDate(o.start);
+        const oEnd = parseDate(o.end);
+        if (oEnd < from || oStart > to) continue;
+        if (oStart < today || oEnd > windowEnd) continue;
+        const span = eachDay(oStart, oEnd);
+        if (span.some((x) => dayBlocked(x))) continue;
+        if (!weekendIsWhole(oStart, oEnd)) continue;
+        for (const x of span) map.set(fmtDate(x), { start: oStart, end: oEnd });
+      }
+      return map;
+    }
+
+    const { startDow, length } = FILTER_SHAPE[f];
     for (let d = from; d <= to; d = addDays(d, 1)) {
       if (startDow !== null && d.getDay() !== startDow) continue;
       const last = addDays(d, length - 1);
@@ -378,6 +413,23 @@ function Calendar({
     }
     return map;
   };
+
+  /**
+   * The occasions still to come, nearest first.
+   *
+   * What the Holiday card is for: it appears only when there is one, and
+   * names the next, because "Holiday" on its own tells a guest nothing about
+   * when it is. Past occasions are left behind rather than offered and then
+   * refused, and anything beyond the booking horizon is not ours to sell yet.
+   */
+  const holidays = useMemo(() => {
+    const iso = fmtDate(today);
+    const horizon = fmtDate(windowEnd);
+    return (occasions ?? [])
+      .filter((o) => o.end >= iso && o.start <= horizon)
+      .sort((a, b) => a.start.localeCompare(b.start));
+  }, [occasions, today, windowEnd]);
+  const holidaysAhead = holidays.length > 0;
 
   /**
    * Whether this month has a day you can actually tap.
@@ -515,11 +567,17 @@ function Calendar({
    * a stay that is too short.
    */
   const shapes = useMemo(() => {
-    const fit = FILTERS.filter((f) => FILTER_SHAPE[f].length >= minStay);
+    const fit = FILTERS.filter((f) =>
+      // A holiday's length is whatever the occasion is, so it is offered when
+      // there is one to offer rather than by measuring it against the
+      // minimum; an occasion shorter than the minimum is a contradiction the
+      // admin has to resolve, and the server says so.
+      f === "holiday" ? holidaysAhead : FILTER_SHAPE[f].length >= minStay,
+    );
     // A minimum longer than every shape is a misconfiguration rather than a
     // reason to offer nothing; the server has the final say either way.
-    return fit.length ? fit : FILTERS;
-  }, [minStay]);
+    return fit.length ? fit : FILTERS.filter((f) => f !== "holiday");
+  }, [minStay, holidaysAhead]);
 
   useEffect(() => {
     if (shapes.includes(filter)) return;
@@ -578,6 +636,7 @@ function Calendar({
       return;
     }
     setShowForm(true);
+    scrollToTop();
   };
 
   if (showForm && start && end && current) {
@@ -594,7 +653,10 @@ function Calendar({
         setCivilId={setCivilId}
         terms={terms}
         setTerms={setTerms}
-        onBack={() => setShowForm(false)}
+        onBack={() => {
+          setShowForm(false);
+          scrollToTop();
+        }}
         onDone={onDone}
       />
     );
@@ -672,9 +734,22 @@ function Calendar({
                 }`}
               >
                 <span className="text-xs uppercase tracking-widest">{tr(FILTER_LABEL[f])}</span>
+                {/* Every other shape is a rule and says so. A holiday is a
+                    date, so it names the next one instead: "Holiday / Sun -
+                    Wed" would be true of a weekday break too, and tells a
+                    guest nothing about which holiday or when. */}
                 <span className={`text-xs ${on ? "opacity-70" : "text-muted-foreground"}`}>
-                  {tr(FILTER_NOTE[f])}
+                  {f === "holiday" && holidays[0]
+                    ? lang === "en"
+                      ? holidays[0].nameEn
+                      : holidays[0].nameAr || holidays[0].nameEn
+                    : tr(FILTER_NOTE[f])}
                 </span>
+                {f === "holiday" && holidays[0] && (
+                  <span className={`text-xs ${on ? "opacity-70" : "text-muted-foreground"}`}>
+                    {formatSpan(parseDate(holidays[0].start), parseDate(holidays[0].end), lang)}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -1084,16 +1159,22 @@ function BookingForm({
     if (!terms) {
       next.terms = tr("acceptTermsRequired");
     }
-    if (!emailVerified) {
-      next.email = tr("emailNeedsConfirming");
-    }
+    // Not the confirmation code: that is asked for after everything else is
+    // in order, in the dialog Submit opens. Checking it here would mark the
+    // address in error before the guest has been given any way to confirm it.
     setErrors(next);
     return Object.keys(next).length === 0;
   };
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!validate() || !civilId || !emailVerified) return;
+  /**
+   * Everything after the code: upload the ID, ask the server for the booking.
+   *
+   * Separate from submit() because it has two callers -- a guest who has
+   * already confirmed their address goes straight here, and one who has not
+   * arrives from the dialog the moment they do.
+   */
+  const sendRequest = async () => {
+    if (!civilId) return;
 
     let civilIdPath: string;
     setUploading(true);
@@ -1121,6 +1202,28 @@ function BookingForm({
     });
     rememberGuest({ name: details.name, phone: details.phone, email: details.email });
     onDone(booking);
+  };
+
+  const [codeOpen, setCodeOpen] = useState(false);
+
+  /**
+   * Submit asks for the code, rather than the form asking for it up front.
+   *
+   * It used to be a step in the middle of the form: send one, wait for the
+   * mail, type it, then carry on filling in the rest. That put a wait on the
+   * critical path of a form nobody had finished, and a guest who never came
+   * back to it had asked for a code for nothing. Now everything else is
+   * checked first and the code is the last thing between the guest and the
+   * request -- which is also the first moment it is worth sending one.
+   */
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validate() || !civilId) return;
+    if (!emailVerified) {
+      setCodeOpen(true);
+      return;
+    }
+    await sendRequest();
   };
 
   const set = (key: keyof GuestDetails, value: string) => {
@@ -1196,15 +1299,6 @@ function BookingForm({
           </label>
         ))}
       </div>
-
-      <EmailVerify
-        email={details.email}
-        verified={emailVerified}
-        onVerified={(e) => {
-          setVerifiedEmail(e);
-          setErrors((prev) => ({ ...prev, email: undefined }));
-        }}
-      />
 
       <div>
         <span className="text-xs uppercase tracking-widest text-muted-foreground">
@@ -1345,6 +1439,26 @@ function BookingForm({
         <p className="border border-destructive p-4 text-sm text-destructive">
           {(request.error as Error).message}
         </p>
+      )}
+
+      {/* Opened by Submit, never before. Everything else on the form has
+          already been checked by the time this appears, so the only thing
+          left between the guest and their request is the code. */}
+      {codeOpen && !emailVerified && (
+        <CodeDialog
+          email={details.email}
+          onClose={() => {
+            setCodeOpen(false);
+            // Say why nothing happened, for a guest who dismisses it.
+            setErrors((prev) => ({ ...prev, email: tr("emailNeedsConfirming") }));
+          }}
+          onVerified={(e) => {
+            setVerifiedEmail(e);
+            setErrors((prev) => ({ ...prev, email: undefined }));
+            setCodeOpen(false);
+            void sendRequest();
+          }}
+        />
       )}
 
       <div className="flex flex-wrap gap-3">

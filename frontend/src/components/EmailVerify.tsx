@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Check } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { useSendEmailCode, useVerifyEmailCode } from "@/lib/api";
@@ -17,10 +18,23 @@ export function EmailVerify({
   email,
   verified,
   onVerified,
+  autoSend = false,
+  heading = true,
 }: {
   email: string;
   verified: boolean;
   onVerified: (email: string) => void;
+  /**
+   * Ask for the code on mount instead of waiting for a tap.
+   *
+   * For the dialog that opens on Submit: the guest has already said they want
+   * to book, so a "Send code" button there is one more press between them and
+   * the thing they just asked for. Inline on the form it stays off, because
+   * there the code is requested before anyone has committed to anything.
+   */
+  autoSend?: boolean;
+  /** Off inside the dialog, which has its own and says the same thing. */
+  heading?: boolean;
 }) {
   const { tr } = useI18n();
   const { lang } = useI18n();
@@ -59,6 +73,17 @@ export function EmailVerify({
     }
   };
 
+  // Once per mount, and only when there is an address worth sending to. The
+  // ref rather than a dependency on `sent`: a failed send leaves sent false,
+  // and retrying it forever is how a down mail service becomes a loop.
+  const asked = useRef(false);
+  useEffect(() => {
+    if (!autoSend || verified || asked.current || !usable) return;
+    asked.current = true;
+    void request();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoSend, verified, usable]);
+
   const confirm = async () => {
     setError("");
     try {
@@ -95,9 +120,13 @@ export function EmailVerify({
   }
 
   return (
-    <div className="border border-border p-4">
-      <p className="text-xs uppercase tracking-widest text-muted-foreground">{tr("verifyEmail")}</p>
-      <p className="mt-2 text-sm text-muted-foreground">
+    <div className={heading ? "border border-border p-4" : ""}>
+      {heading && (
+        <p className="text-xs uppercase tracking-widest text-muted-foreground">
+          {tr("verifyEmail")}
+        </p>
+      )}
+      <p className={`text-sm text-muted-foreground ${heading ? "mt-2" : ""}`}>
         {sent ? tr("codeSent").replace("{email}", email.trim()) : tr("verifyEmailHint")}
       </p>
 
@@ -160,5 +189,84 @@ export function EmailVerify({
         </p>
       )}
     </div>
+  );
+}
+
+/**
+ * The confirmation code, asked for at the moment it is needed.
+ *
+ * A dialog rather than a step in the form: the guest has filled everything in
+ * and pressed Submit, so this is the last thing standing between them and
+ * their request, and it should read that way rather than as another field.
+ * It asks for the code as it opens -- see autoSend.
+ */
+export function CodeDialog({
+  email,
+  onClose,
+  onVerified,
+}: {
+  email: string;
+  onClose: () => void;
+  onVerified: (email: string) => void;
+}) {
+  const { tr } = useI18n();
+
+  // Escape closes it, and the page behind does not scroll while it is open.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [onClose]);
+
+  // Portalled to the body, not rendered where it is written.
+  //
+  // The booking page animates itself in, and a transform on an ancestor makes
+  // that ancestor the containing block for position: fixed -- so "inset-0"
+  // covered the whole 1,485px form rather than the screen. Centring in that
+  // put the dialog's heading and its code box 700px above the top of the
+  // window, reachable by no scroll: what was left on a phone was a Confirm
+  // button for a code with nowhere visible to type it.
+  //
+  // Inside: scrolling on the backdrop, centring on a wrapper at least as tall
+  // as the screen, so a dialog taller than the viewport scrolls from its top
+  // rather than being centred past it.
+  return createPortal(
+    <div
+      className="animate-fade-in fixed inset-0 z-[70] overflow-y-auto bg-black/60"
+      role="dialog"
+      aria-modal="true"
+      aria-label={tr("verifyEmail")}
+    >
+      <div className="flex min-h-full items-center justify-center p-4">
+        <div className="animate-scale-in w-full max-w-md border border-border bg-background p-5 sm:p-8">
+          <h3 className="font-display text-2xl">{tr("verifyEmail")}</h3>
+          <p className="mt-2 text-sm text-muted-foreground">{tr("codeBeforeSubmit")}</p>
+
+          <div className="mt-4">
+            <EmailVerify
+              email={email}
+              verified={false}
+              onVerified={onVerified}
+              autoSend
+              heading={false}
+            />
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="mt-4 w-full border border-border px-6 py-3 text-sm uppercase tracking-widest hover:bg-secondary"
+          >
+            {tr("cancel")}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 }

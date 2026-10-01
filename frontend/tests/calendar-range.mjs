@@ -30,7 +30,20 @@ const b = await chromium.launch(
     : {},
 );
 
-async function calendar(minStayDays, lang = LANG) {
+/**
+ * A special occasion the admin has entered, placed on a Thu-Sat so it does
+ * not fall foul of the weekend rule, and far enough out to be bookable.
+ */
+const eid = (() => {
+  const from = new Date(today);
+  while (from.getDay() !== 4) from.setDate(from.getDate() + 1);
+  from.setDate(from.getDate() + 14);
+  const to = new Date(from);
+  to.setDate(to.getDate() + 2);
+  return { from, to };
+})();
+
+async function calendar(minStayDays, lang = LANG, occasions = []) {
   const ctx = await b.newContext({ viewport: { width: 1100, height: 1000 } });
   await ctx.route(/^https?:\/\/(?!localhost)/, (r) => {
     const u = r.request().url();
@@ -68,6 +81,7 @@ async function calendar(minStayDays, lang = LANG) {
         updated_at: "",
         updated_by: null,
       });
+    if (path === "special_occasions") return send(occasions);
     if (path === "rpc/availability_calendar") {
       const out = [];
       const d = new Date(body.p_from + "T00:00:00");
@@ -576,6 +590,91 @@ for (const [name, days] of [
     "No one-day shortcut lands on a weekend",
     weekendish.length === 0,
     weekendish.join(" | ") || `${single.length} single-day picks, none on a weekend`,
+  );
+  await ctx.close();
+}
+
+// ============================== the holiday shape
+//
+// Unlike the other three, a holiday is not a rule about weekdays and a
+// length: it is whatever the admin entered under Special Occasions, with its
+// own dates and its own flat price. The card is only there when there is one.
+{
+  const { p, ctx } = await calendar(1, "en", []);
+  const names = await p.evaluate(() =>
+    [...document.querySelectorAll('[role="group"] button[aria-pressed]')].map((b) =>
+      b.innerText.split("\n")[0].trim(),
+    ),
+  );
+  ck(
+    "With nothing coming up there is no Holiday card",
+    !names.includes("HOLIDAY"),
+    names.join(", "),
+  );
+  await ctx.close();
+}
+
+{
+  const occ = [
+    {
+      id: "o1",
+      name_en: "Eid Al-Fitr",
+      name_ar: "عيد الفطر",
+      start_date: iso(eid.from),
+      end_date: iso(eid.to),
+      price: 900,
+      active: true,
+    },
+  ];
+  const { p, ctx } = await calendar(1, "en", occ);
+
+  const card = p.getByRole("button", { name: /^Holiday/i }).first();
+  ck("An occasion ahead puts a Holiday card on the page", await card.isVisible());
+  const text = (await card.innerText()).replace(/\n+/g, " | ");
+  // "Holiday" alone says nothing about which one or when.
+  ck("…which names the occasion", /Eid Al-Fitr/.test(text), text);
+  ck("…and when it is", /\d{1,2}\s+\w{3}/.test(text), text);
+
+  await card.click();
+  await p.waitForTimeout(500);
+  // The helper opens on next month; the occasion may be in another one.
+  const want = eid.from.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  for (let i = 0; i < 8; i++) {
+    const heading = (await p.locator('[role="grid"]').getAttribute("aria-label")) ?? "";
+    if (heading.includes(want)) break;
+    const shown = new Date(`${heading} 1`).getTime();
+    const dir = shown > eid.from.getTime() ? /Previous month/i : /Next month/i;
+    await p.getByRole("button", { name: dir }).click();
+    await p.waitForTimeout(300);
+  }
+  const offered = await p.evaluate(
+    () =>
+      [
+        ...document.querySelectorAll(
+          '[role="grid"] button:not([disabled]):not([aria-disabled="true"])',
+        ),
+      ].length,
+  );
+  ck("Choosing it leaves only the occasion selectable", offered === 3, `${offered} days`);
+
+  await p
+    .locator('[role="grid"] button:not([disabled]):not([aria-disabled="true"])')
+    .first()
+    .click();
+  await p.waitForTimeout(600);
+  ck("One tap takes the whole occasion", await p.getByText("3 days selected").isVisible());
+  // The occasion's own price, not the weekend rate those three days would
+  // otherwise carry -- the same precedence the server applies.
+  const total = await p.evaluate(() => {
+    const el = [...document.querySelectorAll("div,p")].find((d) =>
+      /^TOTAL/i.test((d.innerText || "").trim()),
+    );
+    return el ? el.innerText.replace(/\n/g, " ") : "";
+  });
+  ck("…priced as the occasion, not as a weekend", /900/.test(total), total);
+  ck(
+    "…and can be carried forward",
+    await p.getByRole("button", { name: /^Continue$/i }).isEnabled(),
   );
   await ctx.close();
 }

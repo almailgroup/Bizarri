@@ -77,12 +77,20 @@ const session = () => ({
  * submits the form has to go through this now, which is the point: the gate
  * is not something the checkout test alone has to remember.
  */
+/**
+ * Press Submit, then answer the code it asks for.
+ *
+ * There is no "Send code" button on the form any more: the dialog Submit
+ * opens mails the code as it appears, so the whole thing is one press and
+ * then the six digits. Everything else on the form has to be filled in
+ * first, because Submit checks that before it asks.
+ */
 async function confirmEmail(p, state) {
-  await p.getByRole("button", { name: /^Send code$/i }).click();
-  await p.waitForTimeout(400);
+  await p.getByRole("button", { name: /submit booking request/i }).click();
+  await p.waitForTimeout(800);
   await p.getByLabel(/6-digit code/i).fill(state.code);
   await p.getByRole("button", { name: /^Confirm$/i }).click();
-  await p.waitForTimeout(400);
+  await p.waitForTimeout(1000);
 }
 
 function makeState() {
@@ -552,10 +560,16 @@ const bg = (loc) => loc.evaluate((el) => getComputedStyle(el).backgroundColor);
   await p.getByRole("button", { name: /^Submit/i }).click();
   await p.waitForTimeout(300);
 
+  // The code is not among these: Submit checks the form first and only asks
+  // for it once there is nothing else wrong, so a guest is never told to
+  // confirm an address while a required field is still empty.
   ck(
-    "Submitting without a confirmed email is refused",
-    await p.getByText("Please confirm your email address before sending the request.").isVisible(),
+    "Submit does not ask for a code while the form is incomplete",
+    (await p.locator('[role="dialog"]').count()) === 0,
   );
+  // state.code is what the mocked mailer "delivered" -- null until one is
+  // actually sent, which is the only honest way to tell from out here.
+  ck("…and sends no code either", state.code === null, String(state.code));
   ck(
     "Submitting without a Civil ID is refused",
     await p.getByText("Please attach your Civil ID image.").isVisible(),
@@ -569,22 +583,34 @@ const bg = (loc) => loc.evaluate((el) => getComputedStyle(el).backgroundColor);
     !state.calls.some((c) => c.path === "rpc/request_booking"),
   );
 
-  // Now satisfy all three.
-  await confirmEmail(p, state);
-  ck(
-    "Entering the emailed code confirms the address",
-    await p.getByText("Email confirmed").isVisible(),
-  );
-
+  // Now satisfy the other two, and the code is the only thing left.
   await p.locator("input[type=file]").setInputFiles({
     name: "civil-id.png",
     mimeType: "image/png",
     buffer: Buffer.from("89504e470d0a1a0a", "hex"),
   });
   await p.locator("input[type=checkbox]").check();
-  await p.waitForTimeout(150);
-  await p.getByRole("button", { name: /^Submit/i }).click();
-  await p.waitForTimeout(900);
+  await p.waitForTimeout(300);
+
+  await p.getByRole("button", { name: /submit booking request/i }).click();
+  await p.waitForTimeout(800);
+  ck(
+    "With the form complete, Submit asks for the code",
+    (await p.locator('[role="dialog"]').count()) > 0,
+  );
+  ck(
+    "…and sends one, which is the first time it is worth sending",
+    state.code !== null && state.codeSentTo === "guest@example.com",
+    `${state.code} to ${state.codeSentTo}`,
+  );
+  ck(
+    "Nothing is booked while the code is outstanding",
+    !state.calls.some((c) => c.path === "rpc/request_booking"),
+  );
+
+  await p.getByLabel(/6-digit code/i).fill(state.code);
+  await p.getByRole("button", { name: /^Confirm$/i }).click();
+  await p.waitForTimeout(1200);
 
   ck(
     "The Civil ID is uploaded to the private bucket",
@@ -1193,15 +1219,16 @@ async function adminPage(state, tab) {
   await p.getByLabel("Full Name").fill("Next Steps");
   await p.getByLabel("Phone Number", { exact: true }).fill("+96599996666");
   await p.getByLabel("Email", { exact: true }).fill("next@example.com");
-  await confirmEmail(p, state);
+  // Attach and accept first: confirmEmail presses Submit, and Submit only
+  // asks for a code once the rest of the form is in order.
   await p.locator("input[type=file]").setInputFiles({
     name: "id.png",
     mimeType: "image/png",
     buffer: Buffer.from("89504e470d0a1a0a", "hex"),
   });
   await p.locator("input[type=checkbox]").check();
-  await p.getByRole("button", { name: /^Submit/i }).click();
-  await p.waitForTimeout(900);
+  await p.waitForTimeout(300);
+  await confirmEmail(p, state);
 
   ck(
     "The confirmation explains what happens next",
@@ -1410,15 +1437,16 @@ async function adminPage(state, tab) {
   await p.getByLabel("Full Name").fill("Repeat Guest");
   await p.getByLabel("Phone Number", { exact: true }).fill("+96599991111");
   await p.getByLabel("Email", { exact: true }).fill("repeat@example.com");
-  await confirmEmail(p, state);
+  // Attach and accept first: confirmEmail presses Submit, and Submit only
+  // asks for a code once the rest of the form is in order.
   await p.locator("input[type=file]").setInputFiles({
     name: "id.png",
     mimeType: "image/png",
     buffer: Buffer.from("89504e470d0a1a0a", "hex"),
   });
   await p.locator("input[type=checkbox]").check();
-  await p.getByRole("button", { name: /^Submit/i }).click();
-  await p.waitForTimeout(900);
+  await p.waitForTimeout(300);
+  await confirmEmail(p, state);
   ck("The booking went through", await p.getByText("BZR-NEW999").isVisible());
 
   // Same device, a second booking.

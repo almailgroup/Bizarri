@@ -104,6 +104,11 @@ export const t: Dict = {
   },
   // The three shapes a stay can be. There is no free-form option, so this is
   // a choice of product rather than a filter over a calendar.
+  codeBeforeSubmit: {
+    en: "One last step. We have emailed a six-digit code to confirm your address — enter it to send your request.",
+    ar: "خطوة أخيرة. أرسلنا رمزاً من 6 أرقام لتأكيد بريدك — أدخله لإرسال طلبك.",
+  },
+  priceFrom: { en: "From {price}", ar: "من {price}" },
   pickShape: { en: "Choose your stay", ar: "اختر نوع الإقامة" },
   pickChalet: { en: "Choose Chalet", ar: "اختر الشاليه" },
   // Nothing used to say that the choice does anything. The calendar, the
@@ -181,6 +186,10 @@ export const t: Dict = {
   filterByDayNote: { en: "Sun – Wed · one day", ar: "الأحد – الأربعاء · يوم واحد" },
   filterWeekday: { en: "Weekday", ar: "أيام الأسبوع" },
   filterWeekdayNote: { en: "Sun – Wed · 4 days", ar: "الأحد – الأربعاء · 4 أيام" },
+  // The card only appears when an occasion is coming up, and names it; the
+  // note is the fallback for the moment before the occasions have loaded.
+  filterHoliday: { en: "Holiday", ar: "العطلات" },
+  filterHolidayNote: { en: "Special occasion", ar: "مناسبة خاصة" },
   filterWeekend: { en: "Weekend", ar: "نهاية الأسبوع" },
   filterWeekendNote: { en: "Thu – Sat · 3 days", ar: "الخميس – السبت · 3 أيام" },
   filterHint: {

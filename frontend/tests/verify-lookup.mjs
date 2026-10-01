@@ -50,6 +50,7 @@ function makeState(over = {}) {
   return {
     code: null,
     codeSentTo: null,
+    booked: false,
     emailConfigured: true,
     sendCount: 0,
     verifyCalls: [],
@@ -86,6 +87,33 @@ async function page(state) {
       if (state.sendError) return send({ error: state.sendError }, 429);
       state.code = "246810";
       return send({ ok: true, emailConfigured: true });
+    }
+    // Confirming the code now submits the booking, so this mock has to carry
+    // the two calls that follow it. It never did before, because the code was
+    // a widget in the middle of a form nobody in this suite finished.
+    if (raw.startsWith("/storage/v1/object/civil-ids/")) {
+      return send({ Key: raw.replace("/storage/v1/object/", ""), Id: "obj-1" });
+    }
+    if (path === "rpc/request_booking") {
+      state.booked = true;
+      return send({
+        id: "b1",
+        ref: "BZR-VER001",
+        chalet_id: 1,
+        start_date: "2026-10-08",
+        end_date: "2026-10-10",
+        days: 3,
+        total: 350,
+        currency: "KWD",
+        package_key: "weekend",
+        guest_name: "Guest",
+        guest_phone: "+96599999999",
+        guest_email: "guest@example.com",
+        guests: 2,
+        status: "pending",
+        created_at: "",
+        updated_at: "",
+      });
     }
     if (path === "rpc/verify_email_code") {
       state.verifyCalls.push(body);
@@ -323,30 +351,76 @@ async function toCheckout(p) {
   await p.waitForTimeout(700);
 }
 
+/** Everything the form needs except the address, which each test sets. */
+async function fillForm(p) {
+  await p.getByLabel("Full Name").fill("Guest");
+  await p.getByLabel("Phone Number", { exact: true }).fill("+96599999999");
+  await p.locator("input[type=file]").setInputFiles({
+    name: "id.png",
+    mimeType: "image/png",
+    buffer: Buffer.from("89504e470d0a1a0a", "hex"),
+  });
+  await p.locator("input[type=checkbox]").first().check();
+  await p.waitForTimeout(300);
+}
+
+const submitBtn = (p) => p.getByRole("button", { name: /submit booking request/i });
+
+/**
+ * Get to the code dialog: fill the form, then press Submit.
+ *
+ * Submit is what asks for a code now, and it only asks once everything else
+ * is in order -- so a test about what the code box does has to fill the form
+ * first, where it used to be able to type an address and press Send.
+ */
+async function openCodeDialog(p, email = "guest@example.com") {
+  await fillForm(p);
+  await p.locator("input[type=email]").fill(email);
+  await p.waitForTimeout(200);
+  await submitBtn(p).click();
+  await p.waitForTimeout(800);
+}
+
+// The code is asked for by Submit, in a dialog, rather than sitting in the
+// middle of the form. These are the same guarantees as before, in the place
+// they now live.
 {
   const state = makeState();
   const { p, ctx } = await page(state);
   await toCheckout(p);
+  await fillForm(p);
 
-  const sendBtn = p.getByRole("button", { name: /^Send code$/i });
-  ck("The checkout asks to confirm the email", await sendBtn.isVisible());
   ck(
     "Nothing is said about spam before a code has been sent",
     (await p.getByText(/spam or junk/i).count()) === 0,
   );
-  ck("…and will not send before there is an address to send to", await sendBtn.isDisabled());
 
-  await p.getByLabel("Email", { exact: true }).fill("not-an-address");
+  // An address that is not one never gets a code sent to it: Submit checks
+  // the form before it asks, so the dialog does not even open.
+  // By input rather than by label: once a field is flagged, the error text
+  // joins its <label>, and an exact match on "Email" stops finding it.
+  const emailBox = p.locator("input[type=email]");
+  await emailBox.fill("not-an-address");
+  await submitBtn(p).click();
+  await p.waitForTimeout(600);
+  ck("A malformed address is refused before any code is sent", state.code === null);
+  ck("…and no dialog opens for it", (await p.locator('[role="dialog"]').count()) === 0);
+  ck(
+    "…and the address is the thing flagged",
+    await p
+      .getByText(/valid email address/i)
+      .first()
+      .isVisible(),
+  );
+
+  await emailBox.fill("guest@example.com");
   await p.waitForTimeout(200);
-  ck("…nor to something that is not an address", await sendBtn.isDisabled());
+  await submitBtn(p).click();
+  await p.waitForTimeout(800);
 
-  await p.getByLabel("Email", { exact: true }).fill("guest@example.com");
-  await p.waitForTimeout(200);
-  ck("…but does once the address looks real", await sendBtn.isEnabled());
-
-  await sendBtn.click();
-  await p.waitForTimeout(500);
-  ck("The code goes to the address on the form", state.codeSentTo === "guest@example.com");
+  ck("A real address opens the dialog", (await p.locator('[role="dialog"]').count()) > 0);
+  ck("…and the code goes to the address on the form", state.codeSentTo === "guest@example.com");
+  ck("…without being asked for twice", state.sendCount === 1, String(state.sendCount));
   ck(
     "The address is echoed back so a typo is visible",
     await p
@@ -354,12 +428,12 @@ async function toCheckout(p) {
       .first()
       .isVisible(),
   );
-
   // The commonest "it never arrived" is a code sitting in a spam folder.
   ck(
-    "…and the box says where to look if it does not arrive",
+    "…and the dialog says where to look if it does not arrive",
     await p.getByText(/spam or junk/i).isVisible(),
   );
+  ck("Nothing is booked while the code is outstanding", state.booked === false);
 
   const codeBox = p.getByLabel(/6-digit code/i);
   ck("A box appears for the code", await codeBox.isVisible());
@@ -374,23 +448,30 @@ async function toCheckout(p) {
 
   await codeBox.fill("111111");
   await p.getByRole("button", { name: /^Confirm$/i }).click();
-  await p.waitForTimeout(500);
+  await p.waitForTimeout(600);
   ck("A wrong code says so", await p.getByText("That code is not correct.").isVisible());
-  ck("…and does not confirm the address", (await p.getByText("Email confirmed").count()) === 0);
+  ck("…and books nothing", state.booked === false);
 
-  await codeBox.fill(state.code);
-  await p.getByRole("button", { name: /^Confirm$/i }).click();
-  await p.waitForTimeout(500);
-  ck("The right code confirms it", await p.getByText("Email confirmed").isVisible());
-
-  // The confirmation belongs to one address, not to the form.
-  await p.getByLabel("Email", { exact: true }).fill("someone.else@example.com");
-  await p.waitForTimeout(300);
+  // Dismissing it is not a way past the gate.
+  await p.getByRole("button", { name: /^Cancel$/i }).click();
+  await p.waitForTimeout(400);
+  ck("Dismissing the dialog closes it", (await p.locator('[role="dialog"]').count()) === 0);
+  ck("…and still books nothing", state.booked === false);
   ck(
-    "Editing the address drops the confirmation",
-    (await p.getByText("Email confirmed").count()) === 0 &&
-      (await p.getByRole("button", { name: /^Send code$/i }).isVisible()),
+    "…and says why the request did not go",
+    await p
+      .getByText(/confirm your email address/i)
+      .first()
+      .isVisible(),
   );
+
+  await submitBtn(p).click();
+  await p.waitForTimeout(800);
+  await p.getByLabel(/6-digit code/i).fill(state.code);
+  await p.getByRole("button", { name: /^Confirm$/i }).click();
+  await p.waitForTimeout(1400);
+  ck("The right code sends the request", state.booked === true);
+  ck("…and lands on the confirmation", await p.getByText("BZR-VER001").isVisible());
   await ctx.close();
 }
 
@@ -400,9 +481,7 @@ async function toCheckout(p) {
   const state = makeState({ verifyThrows: "That code has expired. Please request a new one." });
   const { p, ctx } = await page(state);
   await toCheckout(p);
-  await p.getByLabel("Email", { exact: true }).fill("guest@example.com");
-  await p.getByRole("button", { name: /^Send code$/i }).click();
-  await p.waitForTimeout(500);
+  await openCodeDialog(p);
   await p.getByLabel(/6-digit code/i).fill("246810");
   await p.getByRole("button", { name: /^Confirm$/i }).click();
   await p.waitForTimeout(500);
@@ -419,8 +498,7 @@ async function toCheckout(p) {
   const state = makeState({ emailConfigured: false });
   const { p, ctx } = await page(state);
   await toCheckout(p);
-  await p.getByLabel("Email", { exact: true }).fill("guest@example.com");
-  await p.getByRole("button", { name: /^Send code$/i }).click();
+  await openCodeDialog(p);
   await p.waitForTimeout(600);
   ck(
     "A site that cannot send mail says so",
@@ -445,8 +523,7 @@ async function toCheckout(p) {
   const state = makeState({ sendError: "Too many codes requested. Please try again later." });
   const { p, ctx } = await page(state);
   await toCheckout(p);
-  await p.getByLabel("Email", { exact: true }).fill("guest@example.com");
-  await p.getByRole("button", { name: /^Send code$/i }).click();
+  await openCodeDialog(p);
   await p.waitForTimeout(600);
   ck(
     "The server's rate limit reaches the guest",

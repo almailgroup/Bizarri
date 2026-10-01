@@ -499,6 +499,54 @@ for (const [name, vp] of [
   await ctx.close();
 }
 
+// ============== each step of the booking starts at the top of the screen
+//
+// Dates, details and confirmation are three steps at one URL, so nothing
+// navigates between them and the page keeps whatever scroll the last one left
+// behind. Tapping Continue at the foot of a long calendar used to drop the
+// guest into the middle of a form whose first field was off the top.
+{
+  const ctx = await phone({ width: 390, height: 844 });
+  const p = await ctx.newPage();
+  await p.goto(pageUrl("booking"), { waitUntil: "load" });
+  await p.waitForTimeout(1400);
+  const y = () => p.evaluate(() => Math.round(window.scrollY));
+
+  await p
+    .getByRole("button", { name: /^Weekend/i })
+    .first()
+    .click();
+  await p.waitForTimeout(400);
+  await p
+    .locator('[role="grid"] button:not([disabled]):not([aria-disabled="true"])')
+    .first()
+    .click();
+  await p.waitForTimeout(500);
+
+  await p.evaluate(() => window.scrollTo({ top: 1200, behavior: "instant" }));
+  await p.waitForTimeout(300);
+  const before = await y();
+  ck("The calendar is long enough to scroll away from", before > 600, `${before}px`);
+
+  await p
+    .getByRole("button", { name: /^Continue$/i })
+    .first()
+    .click();
+  await p.waitForTimeout(700);
+  ck("Continue lands the details form at the top", (await y()) === 0, `${await y()}px`);
+
+  // And going back does the same, rather than returning to the old offset.
+  await p.evaluate(() => window.scrollTo({ top: 500, behavior: "instant" }));
+  await p.waitForTimeout(300);
+  await p
+    .getByRole("button", { name: /^Back$/i })
+    .first()
+    .click();
+  await p.waitForTimeout(700);
+  ck("…and so does Back", (await y()) === 0, `${await y()}px`);
+  await ctx.close();
+}
+
 await b.close();
 console.log(`\n${fails} failing`);
 process.exit(fails ? 1 : 0);

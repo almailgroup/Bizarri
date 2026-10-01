@@ -246,12 +246,6 @@ await p.waitForTimeout(400);
 await p.locator("input[type=text]").first().fill("Aisha Al-Sabah");
 await p.locator("input[type=tel]").fill("+96594040955");
 await p.locator("input[type=email]").fill("aisha@example.com");
-// The address has to be confirmed before the form will submit.
-await p.getByRole("button", { name: /^Send code$/i }).click();
-await p.waitForTimeout(400);
-await p.getByLabel(/6-digit code/i).fill(st.code);
-await p.getByRole("button", { name: /^Confirm$/i }).click();
-await p.waitForTimeout(400);
 await p.locator("input[type=number]").fill("6");
 // Checkout now requires a Civil ID image and an explicit terms acceptance.
 await p.locator("input[type=file]").setInputFiles({
@@ -260,8 +254,19 @@ await p.locator("input[type=file]").setInputFiles({
   buffer: Buffer.from("89504e470d0a1a0a", "hex"),
 });
 await p.locator("input[type=checkbox]").check();
+// The address still has to be confirmed before anything is sent, but Submit
+// is what asks: it opens a dialog and mails the code as it opens, so nothing
+// goes out while a form is still being filled in.
+ck(
+  "No code is sent before Submit",
+  st.calls.every((c) => c.path !== "functions/send-email-code"),
+);
 await p.getByRole("button", { name: /submit booking request/i }).click();
-await p.waitForTimeout(900);
+await p.waitForTimeout(800);
+ck("Submit asks for the code in a dialog", (await p.locator('[role="dialog"]').count()) > 0);
+await p.getByLabel(/6-digit code/i).fill(st.code);
+await p.getByRole("button", { name: /^Confirm$/i }).click();
+await p.waitForTimeout(1200);
 const rb = st.calls.find((c) => c.path === "rpc/request_booking");
 ck("Submit calls request_booking RPC", !!rb);
 ck(

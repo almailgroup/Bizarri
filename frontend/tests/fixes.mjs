@@ -157,11 +157,6 @@ await p.waitForTimeout(400);
 await p.locator("input[type=text]").first().fill("Test Guest");
 await p.locator("input[type=tel]").fill("+96594040955");
 await p.locator("input[type=email]").fill("t@e.com");
-await p.getByRole("button", { name: /^Send code$/i }).click();
-await p.waitForTimeout(400);
-await p.getByLabel(/6-digit code/i).fill(state.code);
-await p.getByRole("button", { name: /^Confirm$/i }).click();
-await p.waitForTimeout(400);
 await p.locator("input[type=number]").fill("2");
 await p.locator("input[type=file]").setInputFiles({
   name: "civil-id.png",
@@ -170,8 +165,13 @@ await p.locator("input[type=file]").setInputFiles({
 });
 await p.waitForTimeout(500);
 await p.locator('input[type="checkbox"]').first().check();
+// The code is asked for by Submit now, in a dialog, and sent as it opens --
+// there is no "Send code" button on the form to press first.
 await p.getByRole("button", { name: /submit booking request/i }).click();
-await p.waitForTimeout(1200);
+await p.waitForTimeout(800);
+await p.getByLabel(/6-digit code/i).fill(state.code);
+await p.getByRole("button", { name: /^Confirm$/i }).click();
+await p.waitForTimeout(1400);
 // Assert we are actually on the confirmation. The dates live beside the
 // reference there; anywhere else on the page they are the browser's own.
 ck("The request goes through to a confirmation", (await p.getByText("BZR-TZ0001").count()) > 0);
