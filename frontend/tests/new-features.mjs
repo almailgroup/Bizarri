@@ -490,7 +490,25 @@ const bg = (loc) => loc.evaluate((el) => getComputedStyle(el).backgroundColor);
   const checkIn = await p.locator("text=Check-in").locator("..").innerText();
   const checkOut = await p.locator("text=Check-out").locator("..").innerText();
   ck("Tapping a Thursday selects the whole weekend", checkIn.includes(iso(thuA)), checkIn.trim());
-  ck("…through the Saturday", checkOut.includes(iso(addDays(thuA, 2))), checkOut.trim());
+  // Three booked days, Thu-Sat, so check-out is the Sunday morning after.
+  ck("…checking in on the Thursday at 2 PM", checkIn.includes("2:00 PM"), checkIn.trim());
+  ck(
+    "…and out on the Sunday at noon, the morning after the Saturday",
+    checkOut.includes(iso(addDays(thuA, 3))) && checkOut.includes("12:00 PM"),
+    checkOut.trim(),
+  );
+  // Every cell is a circle, whatever it means: reserved, chosen, or between.
+  const radii = await p.evaluate(() =>
+    [...document.querySelectorAll('[role="grid"] button')].map((el) => {
+      const cs = getComputedStyle(el);
+      return parseFloat(cs.borderTopLeftRadius) >= el.getBoundingClientRect().width / 2 - 1;
+    }),
+  );
+  ck(
+    "Every day in the calendar is round",
+    radii.length > 27 && radii.every(Boolean),
+    `${radii.filter(Boolean).length}/${radii.length}`,
+  );
   ck(
     "Weekend package is priced at 350",
     (await p.locator("text=Total").locator("..").innerText()).includes("350"),
@@ -502,7 +520,9 @@ const bg = (loc) => loc.evaluate((el) => getComputedStyle(el).backgroundColor);
   await dayCell(p, sunA).click();
   await p.waitForTimeout(250);
   const co2 = await p.locator("text=Check-out").locator("..").innerText();
-  ck("Weekday filter selects Sun-Wed", co2.includes(iso(addDays(sunA, 3))), co2.trim());
+  // Sun-Wed, checking out Thursday at noon: two hours before the weekend's
+  // guests arrive, which is the point of the two times.
+  ck("Weekday filter selects Sun-Wed", co2.includes(iso(addDays(sunA, 4))), co2.trim());
   ck(
     "Weekday package is priced at 300",
     (await p.locator("text=Total").locator("..").innerText()).includes("300"),
@@ -1383,8 +1403,8 @@ async function adminPage(state, tab) {
   );
   ck(
     "…as a Thursday to Saturday stay",
-    new Date(checkIn.split("\n").pop().trim()).getDay() === 4,
-    checkIn.split("\n").pop().trim(),
+    new Date(checkIn.match(/\d{4}-\d{2}-\d{2}/)?.[0] ?? "").getDay() === 4,
+    checkIn.match(/\d{4}-\d{2}-\d{2}/)?.[0],
   );
   ck(
     "…and it is immediately bookable",

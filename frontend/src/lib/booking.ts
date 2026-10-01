@@ -324,3 +324,30 @@ export function formatMoney(amount: number, lang: "en" | "ar"): string {
   const n = Number.isInteger(amount) ? amount : Number(amount.toFixed(2));
   return lang === "ar" ? `${n} د.ك` : `KD ${n}`;
 }
+
+/**
+ * Arrival and departure times.
+ *
+ * A booked day is a night at the chalet, and its stay ends the morning after
+ * the last one: a single Monday is Monday 2 PM to Tuesday 12 PM, the Thu–Sat
+ * weekend is Thursday 2 PM to Sunday 12 PM. That is what makes the week fit
+ * together -- the weekend's guests leave Sunday at noon and the weekday's
+ * arrive at two, and the same again on Thursday -- with two hours between
+ * them to turn the chalet round. Showing the last booked day as the check-out
+ * day would have put check-out at noon on the day of a 2 PM check-in.
+ */
+export const CHECK_IN_HOUR = 14;
+export const CHECK_OUT_HOUR = 12;
+
+/** The day a stay is left: the morning after its last booked day. */
+export function checkOutDay(end: Date): Date {
+  return addDays(end, 1);
+}
+
+/** "2:00 PM" / "2:00 م", in Latin digits like every other number on the site. */
+export function formatHour(hour: number, lang: "en" | "ar"): string {
+  return new Date(2000, 0, 1, hour).toLocaleTimeString(dateLocale(lang, "en-US"), {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}

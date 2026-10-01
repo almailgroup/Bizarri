@@ -149,6 +149,21 @@ async function chooseWeekend(p) {
   await p.waitForTimeout(350);
 }
 
+/** On the details: everything Submit checks before it asks for the code. */
+async function fillForm(p) {
+  await p.getByLabel("Full Name").fill("Guest");
+  await p.getByLabel("Phone Number", { exact: true }).fill("+96599999999");
+  await p.locator("input[type=email]").fill("guest@example.com");
+  await p.locator("input[type=file]").setInputFiles({
+    name: "id.png",
+    mimeType: "image/png",
+    buffer: Buffer.from("89504e470d0a1a0a", "hex"),
+  });
+  await p.locator("input[type=checkbox]").first().check();
+}
+const submitBtn = (p) => p.getByRole("button", { name: /submit booking request/i });
+const dialogOpen = async (p) => (await p.locator('[role="dialog"]').count()) > 0;
+
 const continueBtn = (p) => p.getByRole("button", { name: /^Continue$/i });
 const onDates = async (p) =>
   (await p.getByRole("heading", { name: /Select your dates/i }).count()) > 0;
@@ -225,16 +240,17 @@ const forward = async (p) => {
   await chooseWeekend(p);
   await continueBtn(p).click();
   await p.waitForTimeout(700);
-  await p.getByLabel("Full Name").fill("Guest");
-  await p.getByLabel("Phone Number", { exact: true }).fill("+96599999999");
-  await p.locator("input[type=email]").fill("guest@example.com");
-  await p.locator("input[type=file]").setInputFiles({
-    name: "id.png",
-    mimeType: "image/png",
-    buffer: Buffer.from("89504e470d0a1a0a", "hex"),
-  });
-  await p.locator("input[type=checkbox]").first().check();
-  await p.getByRole("button", { name: /submit booking request/i }).click();
+  await fillForm(p);
+  ck(
+    "The details say when to arrive and when to leave",
+    (await p.getByText(`Check-in: ${iso(thu)} · 2:00 PM`).count()) > 0 &&
+      (await p
+        .getByText(
+          `Check-out: ${iso(new Date(thu.getFullYear(), thu.getMonth(), thu.getDate() + 3))} · 12:00 PM`,
+        )
+        .count()) > 0,
+  );
+  await submitBtn(p).click();
   await p.waitForTimeout(900);
   await p.getByLabel(/6-digit code/i).fill(state.code ?? "");
   await p.getByRole("button", { name: /^Confirm$/i }).click();
@@ -242,6 +258,11 @@ const forward = async (p) => {
 
   ck("The request is confirmed", await p.getByText("BZR-HIST01").isVisible());
   ck("…at an address of its own", path(p) === "/booking/en?step=done", path(p));
+  ck(
+    "The confirmation says when to arrive and when to leave",
+    (await p.getByText(`Check-in: ${iso(thu)} · 2:00 PM`).isVisible()) &&
+      (await p.getByText(/Check-out: \d{4}-\d{2}-\d{2} · 12:00 PM/).isVisible()),
+  );
 
   await back(p);
   ck(
@@ -252,6 +273,73 @@ const forward = async (p) => {
   ck("…and sends nothing a second time", state.booked === 1, String(state.booked));
   await back(p);
   ck("…and the next Back leaves for the page before", path(p) === "/en", path(p));
+  await ctx.close();
+}
+
+// ================================ Back closes the code dialog, nothing more
+// On a phone Back is how a popup is dismissed. It used to close the whole
+// form instead and drop the guest on the dates.
+{
+  const state = makeState();
+  const { p, ctx } = await page(state, { width: 390, height: 844 });
+  await p.goto(pageUrl(""), { waitUntil: "load" });
+  await p.waitForTimeout(900);
+  await p.goto(pageUrl("booking"), { waitUntil: "load" });
+  await p.waitForTimeout(1000);
+  await chooseWeekend(p);
+  await continueBtn(p).first().click();
+  await p.waitForTimeout(700);
+  await fillForm(p);
+  const y = () => p.evaluate(() => Math.round(window.scrollY));
+  // Measured with Submit already on screen: clicking scrolls it into view
+  // first, and that is Playwright moving the page, not the dialog.
+  await submitBtn(p).scrollIntoViewIfNeeded();
+  await p.waitForTimeout(300);
+  const before = await y();
+
+  await submitBtn(p).click();
+  await p.waitForTimeout(900);
+  ck("Submit opens the code dialog", await dialogOpen(p));
+  ck("…as an entry of its own", path(p) === "/booking/en?step=details&verify=true", path(p));
+  ck("…without moving the form behind it", (await y()) === before, `${before} → ${await y()}`);
+
+  await back(p);
+  ck("Back closes the dialog", !(await dialogOpen(p)));
+  ck(
+    "…and stays on the details",
+    (await onDetails(p)) && path(p) === "/booking/en?step=details",
+    path(p),
+  );
+  ck(
+    "…with the form as it was",
+    (await p.getByLabel("Full Name").inputValue()) === "Guest" &&
+      (await p.locator("input[type=checkbox]").first().isChecked()),
+  );
+  ck(
+    "…and says why nothing was sent",
+    await p
+      .getByText(/confirm your email address/i)
+      .first()
+      .isVisible(),
+  );
+  ck("Nothing was booked", state.booked === 0);
+
+  // Cancel and Escape are the same step back, so neither leaves a stray
+  // dialog entry behind: the next Back is the dates.
+  await submitBtn(p).click();
+  await p.waitForTimeout(900);
+  await p.getByRole("button", { name: /^Cancel$/i }).click();
+  await p.waitForTimeout(600);
+  ck("Cancel closes it", !(await dialogOpen(p)) && path(p) === "/booking/en?step=details", path(p));
+  await submitBtn(p).click();
+  await p.waitForTimeout(900);
+  await p.keyboard.press("Escape");
+  await p.waitForTimeout(600);
+  ck("Escape closes it", !(await dialogOpen(p)) && path(p) === "/booking/en?step=details", path(p));
+  await back(p);
+  ck("…and the next Back is the dates, not the dialog again", await onDates(p), path(p));
+  await back(p);
+  ck("…and then the page before", path(p) === "/en", path(p));
   await ctx.close();
 }
 

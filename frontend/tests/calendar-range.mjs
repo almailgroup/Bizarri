@@ -408,11 +408,12 @@ for (const [name, days] of [
     `cell ${shapes.chosen[0]?.bg} vs page ${shapes.page}`,
   );
 
-  // The days between stay square, or the run reads as separate marks rather
-  // than one stay.
+  // Every cell is a circle now, the days between included: the owner asked
+  // for one shape across the grid, with fill alone telling them apart --
+  // ring for the two ends, grey for the days between.
   ck(
-    "The days between are not",
-    !!shapes.between && shapes.between.radius < 4,
+    "The days between are round too",
+    !!shapes.between && shapes.between.radius >= shapes.between.w / 2 - 0.5,
     shapes.between
       ? `corners ${shapes.between.corners.map((x) => x.toFixed(0)).join("/")}`
       : "no day between",

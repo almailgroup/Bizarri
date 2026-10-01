@@ -11,8 +11,12 @@ import { dateLocale } from "@/lib/locale";
 import { usePageMeta } from "@/hooks/use-page-meta";
 import { scrollToTop } from "@/lib/scroll";
 import {
+  CHECK_IN_HOUR,
+  CHECK_OUT_HOUR,
   MIN_STAY_DAYS,
   addDays,
+  checkOutDay,
+  formatHour,
   daysBetween,
   eachDay,
   fmtDate,
@@ -52,13 +56,25 @@ import { readGuest, rememberGuest } from "@/lib/guest";
 type Step = "details" | "done";
 interface BookingSearch {
   step?: Step;
+  /**
+   * The code dialog is open. An entry of its own for the same reason the
+   * steps are: on a phone, Back is how a popup is dismissed, and it used to
+   * close the whole form instead, dropping the guest on the dates.
+   */
+  verify?: true;
 }
 
 export const Route = createFileRoute("/booking/$lang")({
   component: Booking,
   beforeLoad: requireLang,
   validateSearch: (s: Record<string, unknown>): BookingSearch =>
-    s.step === "details" || s.step === "done" ? { step: s.step } : {},
+    s.step === "details"
+      ? s.verify === true || s.verify === "true"
+        ? { step: "details", verify: true }
+        : { step: "details" }
+      : s.step === "done"
+        ? { step: "done" }
+        : {},
 });
 
 /**
@@ -186,6 +202,25 @@ function Booking() {
         {done && confirmed && <Confirmation booking={confirmed} />}
       </section>
     </PageShell>
+  );
+}
+
+/**
+ * When to arrive and when to leave, in words a guest can plan around. The
+ * date range above it is the booked days; this is the part they act on.
+ */
+function StayTimes({ start, end }: { start: Date; end: Date }) {
+  const { tr, lang } = useI18n();
+  const line = (label: string, day: Date, hour: number) => (
+    <p>
+      {label}: <span dir="ltr">{fmtDate(day)}</span> · {formatHour(hour, lang)}
+    </p>
+  );
+  return (
+    <>
+      {line(tr("checkIn"), start, CHECK_IN_HOUR)}
+      {line(tr("checkOut"), checkOutDay(end), CHECK_OUT_HOUR)}
+    </>
   );
 }
 
@@ -942,13 +977,12 @@ function Calendar({
                   aria-pressed={!!selected}
                   data-day={iso}
                   tabIndex={fmtDate(activeDay) === iso ? 0 : -1}
-                  // The cell is square, so a full radius is a circle. Only
-                  // the two chosen days get one; the days between stay
-                  // rectangular so the run still reads as one stay rather
-                  // than a row of separate marks.
-                  className={`relative flex aspect-square flex-col items-center justify-center text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-current ${tone} ${
-                    selected ? "rounded-full" : ""
-                  }`}
+                  // The cell is square, so a full radius is a circle -- every
+                  // cell, so reserved, chosen and in-between days are all the
+                  // same shape and differ only in fill: black for taken, a
+                  // ring for the two ends of the stay, grey for the days
+                  // between. The focus outline follows the radius.
+                  className={`relative flex aspect-square flex-col items-center justify-center rounded-full text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-current ${tone}`}
                 >
                   {d.getDate()}
                   {priced && !reserved && !past && (
@@ -992,17 +1026,19 @@ function Calendar({
 
           <div className="mt-6 flex flex-wrap gap-4 text-xs text-muted-foreground">
             <span className="flex items-center gap-2">
-              <span className="h-3 w-3 bg-black" /> {tr("reservedLabel")}
+              <span className="h-3 w-3 rounded-full bg-black" /> {tr("reservedLabel")}
             </span>
             <span className="flex items-center gap-2">
-              <span className="h-3 w-3 ring-2 ring-inset ring-foreground" /> {tr("selectedLabel")}
+              <span className="h-3 w-3 rounded-full ring-2 ring-inset ring-foreground" />{" "}
+              {tr("selectedLabel")}
             </span>
             <span className="flex items-center gap-2">
-              <span className="h-3 w-3 border border-border bg-secondary" />{" "}
+              <span className="h-3 w-3 rounded-full border border-border bg-secondary" />{" "}
               {lang === "en" ? "In stay" : "ضمن الإقامة"}
             </span>
             <span className="flex items-center gap-2">
-              <span className="h-3 w-3 ring-1 ring-inset ring-foreground/25" /> {tr("specialPkg")}
+              <span className="h-3 w-3 rounded-full ring-1 ring-inset ring-foreground/25" />{" "}
+              {tr("specialPkg")}
             </span>
             <span className="flex items-center gap-2">
               <span className="h-1 w-1 rounded-full bg-foreground/50" /> {tr("customPricing")}
@@ -1021,14 +1057,25 @@ function Calendar({
             <p className="mt-1 font-display text-xl" dir="ltr">
               {start ? fmtDate(start) : "—"}
             </p>
+            {start && (
+              <p className="mt-0.5 text-sm text-muted-foreground">
+                {formatHour(CHECK_IN_HOUR, lang)}
+              </p>
+            )}
           </div>
           <div className="border border-border p-4">
             <p className="text-xs uppercase tracking-widest text-muted-foreground">
               {tr("checkOut")}
             </p>
+            {/* The morning after the last booked day -- see checkOutDay. */}
             <p className="mt-1 font-display text-xl" dir="ltr">
-              {end ? fmtDate(end) : "—"}
+              {end ? fmtDate(checkOutDay(end)) : "—"}
             </p>
+            {end && (
+              <p className="mt-0.5 text-sm text-muted-foreground">
+                {formatHour(CHECK_OUT_HOUR, lang)}
+              </p>
+            )}
           </div>
           <div
             className={`border p-4 ${
@@ -1184,6 +1231,9 @@ function BookingForm({
 }) {
   const { tr, lang } = useI18n();
   const request = useRequestBooking();
+  const navigate = Route.useNavigate();
+  const router = useRouter();
+  const { verify } = Route.useSearch();
   // The address that was actually proved, not a boolean: editing the field
   // after confirming has to drop the confirmation, and comparing the two is
   // the only way to notice.
@@ -1277,7 +1327,37 @@ function BookingForm({
     onDone(booking);
   };
 
-  const [codeOpen, setCodeOpen] = useState(false);
+  // The dialog is open exactly when the address says so, so the browser's
+  // Back closes it like any other popup and leaves the guest on the form
+  // they filled in. Opening pushes the entry without moving the page behind.
+  const openCode = () =>
+    navigate({ search: { step: "details", verify: true }, resetScroll: false });
+
+  // Closing is always a step back: the entry behind the dialog is the form
+  // it was opened from. (A dialog entry with no form behind it cannot be
+  // reached -- reloaded or linked to, there is no stay chosen, and the page
+  // starts from the dates.) Cancel, Escape and the browser's Back therefore
+  // all do the same thing and leave no stray entry to walk back through.
+  // `then` runs once the step back has landed.
+  const closeCode = (then?: () => void) => {
+    if (then) {
+      const unsubscribe = router.history.subscribe(() => {
+        unsubscribe();
+        then();
+      });
+    }
+    router.history.back();
+  };
+
+  // However it was closed, a dialog dismissed without a confirmed address
+  // says why nothing was sent.
+  const wasOpen = useRef(false);
+  useEffect(() => {
+    if (wasOpen.current && !verify && !emailVerified)
+      setErrors((prev) => ({ ...prev, email: tr("emailNeedsConfirming") }));
+    wasOpen.current = !!verify;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [verify]);
 
   /**
    * Submit asks for the code, rather than the form asking for it up front.
@@ -1293,7 +1373,7 @@ function BookingForm({
     e.preventDefault();
     if (!validate() || !civilId) return;
     if (!emailVerified) {
-      setCodeOpen(true);
+      openCode();
       return;
     }
     await sendRequest();
@@ -1338,6 +1418,7 @@ function BookingForm({
         <p dir="ltr">
           {fmtDate(start)} → {fmtDate(end)} ({daysBetween(start, end)} {tr("nightsLabel")})
         </p>
+        <StayTimes start={start} end={end} />
         <p className="pt-1 text-base font-semibold">{formatMoney(total, lang)}</p>
       </div>
 
@@ -1517,19 +1598,18 @@ function BookingForm({
       {/* Opened by Submit, never before. Everything else on the form has
           already been checked by the time this appears, so the only thing
           left between the guest and their request is the code. */}
-      {codeOpen && !emailVerified && (
+      {verify && !emailVerified && (
         <CodeDialog
           email={details.email}
-          onClose={() => {
-            setCodeOpen(false);
-            // Say why nothing happened, for a guest who dismisses it.
-            setErrors((prev) => ({ ...prev, email: tr("emailNeedsConfirming") }));
-          }}
+          onClose={() => closeCode()}
           onVerified={(e) => {
             setVerifiedEmail(e);
             setErrors((prev) => ({ ...prev, email: undefined }));
-            setCodeOpen(false);
-            void sendRequest();
+            // Off the dialog's entry before the request goes, so that the
+            // confirmation replaces the form's entry rather than the
+            // dialog's: Back from "Confirmed" must not reach a form that has
+            // already been sent.
+            closeCode(() => void sendRequest());
           }}
         />
       )}
@@ -1583,6 +1663,9 @@ function Confirmation({ booking }: { booking: BookingRow }) {
         </span>{" "}
         · {formatMoney(Number(booking.total), lang)}
       </p>
+      <div className="mt-3 text-sm text-muted-foreground">
+        <StayTimes start={parseDate(booking.start_date)} end={parseDate(booking.end_date)} />
+      </div>
 
       <div className="mx-auto mt-10 max-w-md border border-border p-6 text-start">
         <p className="mb-4 text-xs uppercase tracking-widest text-muted-foreground">

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Download, IdCard, Pencil, Search, Trash2, X } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
-import { fmtDate, formatMoney } from "@/lib/booking";
+import { checkOutDay, fmtDate, formatMoney, parseDate } from "@/lib/booking";
 import { civilIdUrl, useBookings, useDeleteBooking, useSetBookingStatus } from "@/lib/api";
 import type { BookingRow, BookingStatus } from "@/integrations/supabase/types";
 import { DeleteConfirm } from "./DeleteConfirm";
@@ -63,8 +63,10 @@ export function RequestsPanel() {
         "Booking ID": b.ref,
         Status: statusLabel(b.status),
         Chalet: b.chalet_id,
-        "Check-in": b.start_date,
-        "Check-out": b.end_date,
+        // The same check-in and check-out the guest is shown: arrival on the
+        // first booked day, departure the morning after the last.
+        "Check-in": `${b.start_date} 14:00`,
+        "Check-out": `${fmtDate(checkOutDay(parseDate(b.end_date)))} 12:00`,
         Days: b.days,
         [`Total (${b.currency})`]: Number(b.total),
         Package: packageName(b.package_key),
