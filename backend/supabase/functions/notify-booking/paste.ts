@@ -127,7 +127,8 @@ export function classify(payload: WebhookPayload | null): {
   reason?: string;
 } {
   const record = payload?.record;
-  if (!record?.ref) return { action: "ignore", reason: "no booking in payload" };
+  if (!record?.ref)
+    return { action: "ignore", reason: "no booking in payload" };
 
   // A direct call (no webhook envelope) is treated as a new request, which is
   // how this function was invoked before there was anything else to do.
@@ -136,12 +137,17 @@ export function classify(payload: WebhookPayload | null): {
   if (payload.type === "UPDATE") {
     // Without the previous row there is no evidence anything changed, and
     // "probably a decision" is not good enough to mail a guest about.
-    if (!payload.old_record) return { action: "ignore", reason: "no previous row" };
+    if (!payload.old_record)
+      return { action: "ignore", reason: "no previous row" };
     const before = payload.old_record.status ?? null;
     const after = record.status ?? null;
-    if (before === after) return { action: "ignore", reason: "status unchanged" };
+    if (before === after)
+      return { action: "ignore", reason: "status unchanged" };
     if (!after || !NOTIFIED_STATUSES.includes(after)) {
-      return { action: "ignore", reason: `status ${after} is not worth an email` };
+      return {
+        action: "ignore",
+        reason: `status ${after} is not worth an email`,
+      };
     }
     return { action: "decision" };
   }
@@ -157,9 +163,12 @@ async function readSetting(key: string): Promise<unknown> {
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!url || !serviceKey) return null;
   try {
-    const res = await fetch(`${url}/rest/v1/settings?key=eq.${key}&select=value`, {
-      headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
-    });
+    const res = await fetch(
+      `${url}/rest/v1/settings?key=eq.${key}&select=value`,
+      {
+        headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
+      },
+    );
     if (!res.ok) return null;
     const rows = (await res.json()) as { value: unknown }[];
     return rows[0]?.value ?? null;
@@ -201,14 +210,18 @@ function whatsAppButton(number: string, label: string): string {
 async function notifyEmailsFromSettings(): Promise<string[] | null> {
   const value = await readSetting("notify_emails");
   if (!Array.isArray(value)) return null;
-  const emails = value.filter((v): v is string => typeof v === "string" && v.length > 0);
+  const emails = value.filter(
+    (v): v is string => typeof v === "string" && v.length > 0,
+  );
   return emails.length > 0 ? emails : null;
 }
 
 /** Same idea, for WhatsApp: each recipient needs their own CallMeBot API key
  *  (it's issued per phone number, not per account), so this is a list of
  *  {phone, apikey} pairs rather than a plain list of numbers. */
-async function notifyWhatsAppFromSettings(): Promise<WhatsAppRecipient[] | null> {
+async function notifyWhatsAppFromSettings(): Promise<
+  WhatsAppRecipient[] | null
+> {
   const value = await readSetting("notify_whatsapp");
   if (!Array.isArray(value)) return null;
   const recipients = value.filter(
@@ -226,11 +239,55 @@ async function notifyWhatsAppFromSettings(): Promise<WhatsAppRecipient[] | null>
 function esc(s: string): string {
   return s.replace(
     /[<>&"]/g,
-    (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" })[c] as string,
+    (c) =>
+      ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" })[c] as string,
   );
 }
 
-function render(b: BookingRecord): string {
+/**
+ * When to arrive and when to leave. The same rule the site shows (see
+ * checkOutDay in frontend/src/lib/booking.ts): in at 2 PM on the first booked
+ * day, out at noon the morning after the last -- so a single Monday is Monday
+ * 2 PM to Tuesday 12 PM, and the Thu-Sat weekend ends Sunday at noon, two
+ * hours before the weekday's guests arrive.
+ */
+const CHECK_IN_HOUR = 14;
+const CHECK_OUT_HOUR = 12;
+
+/** The morning after the last booked day. Dates stay strings, in UTC, so no
+ *  timezone can move them: "2026-10-18" is the 18th wherever this runs. */
+export function checkOutDate(end: string): string {
+  const d = new Date(`${end}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
+/** "2:00 PM" / "2:00 م": the site's own formatting, Latin digits in both. */
+export function formatHour(hour: number, lang: "en" | "ar"): string {
+  return new Date(Date.UTC(2000, 0, 1, hour)).toLocaleTimeString(
+    lang === "ar" ? "ar-EG-u-nu-latn" : "en-US",
+    { hour: "numeric", minute: "2-digit", timeZone: "UTC" },
+  );
+}
+
+/** Check-in and check-out as two email rows. The date is isolated
+ *  left-to-right so an Arabic email does not reorder its digits. */
+function stayRows(b: BookingRecord, lang: "en" | "ar"): string {
+  const label =
+    lang === "ar"
+      ? { in: "الوصول", out: "المغادرة" }
+      : { in: "Check-in", out: "Check-out" };
+  const row = (l: string, date: string, hour: number) =>
+    `<tr><td style="padding:6px 16px 6px 0;color:#666">${esc(l)}</td>` +
+    `<td style="padding:6px 0;font-weight:500"><span dir="ltr">${esc(date)}</span>` +
+    ` · ${esc(formatHour(hour, lang))}</td></tr>`;
+  return (
+    row(label.in, b.start_date, CHECK_IN_HOUR) +
+    row(label.out, checkOutDate(b.end_date), CHECK_OUT_HOUR)
+  );
+}
+
+export function render(b: BookingRecord): string {
   const row = (label: string, value: string) =>
     `<tr><td style="padding:6px 16px 6px 0;color:#666">${label}</td>` +
     `<td style="padding:6px 0;font-weight:500">${esc(value)}</td></tr>`;
@@ -243,6 +300,7 @@ function render(b: BookingRecord): string {
       <table style="border-collapse:collapse;font-size:14px">
         ${row("Chalet", `Bizarri Chalet ${b.chalet_id}`)}
         ${row("Dates", `${b.start_date} → ${b.end_date} (${b.days} days)`)}
+        ${stayRows(b, "en")}
         ${row("Total", `${b.currency} ${b.total}`)}
         ${row("Guest", b.guest_name)}
         ${row("Phone", b.guest_phone)}
@@ -261,7 +319,11 @@ function render(b: BookingRecord): string {
  * and it says the request is not yet confirmed so nobody turns up on the
  * strength of this email alone.
  */
-function renderGuest(b: BookingRecord, lang: "en" | "ar", whatsapp = ""): string {
+export function renderGuest(
+  b: BookingRecord,
+  lang: "en" | "ar",
+  whatsapp = "",
+): string {
   const ar = lang === "ar";
   const t = ar
     ? {
@@ -282,7 +344,8 @@ function renderGuest(b: BookingRecord, lang: "en" | "ar", whatsapp = ""): string
         dates: "Dates",
         total: "Total",
         guests: "Guests",
-        pending: "Your request is being reviewed. We will contact you shortly to confirm.",
+        pending:
+          "Your request is being reviewed. We will contact you shortly to confirm.",
         keep: "Keep this reference to check the status of your booking at any time.",
         chat: "Message us on WhatsApp",
       };
@@ -301,6 +364,7 @@ function renderGuest(b: BookingRecord, lang: "en" | "ar", whatsapp = ""): string
       <table style="border-collapse:collapse;font-size:14px">
         ${row(t.chalet, `Bizarri Chalet ${b.chalet_id}`)}
         ${row(t.dates, `${b.start_date} \u2192 ${b.end_date} (${b.days})`)}
+        ${stayRows(b, lang)}
         ${row(t.total, `${b.currency} ${b.total}`)}
         ${row(t.guests, String(b.guests))}
       </table>
@@ -317,7 +381,11 @@ function renderGuest(b: BookingRecord, lang: "en" | "ar", whatsapp = ""): string
  * deliberately not included: the admin panel labels it internal and an admin
  * writing "haggled, gave discount" there does not expect the guest to read it.
  */
-export function renderDecision(b: BookingRecord, lang: "en" | "ar", whatsapp = ""): string {
+export function renderDecision(
+  b: BookingRecord,
+  lang: "en" | "ar",
+  whatsapp = "",
+): string {
   const ar = lang === "ar";
   const status = b.status ?? "";
   const copy = ar
@@ -330,7 +398,10 @@ export function renderDecision(b: BookingRecord, lang: "en" | "ar", whatsapp = "
           title: "لم نتمكن من تأكيد حجزك",
           body: "نأسف، هذه التواريخ غير متاحة. تواصل معنا عبر واتساب وسنساعدك في إيجاد موعد آخر.",
         },
-        cancelled: { title: "تم إلغاء حجزك", body: "تم إلغاء هذا الحجز. إذا لم تطلب ذلك، يرجى التواصل معنا." },
+        cancelled: {
+          title: "تم إلغاء حجزك",
+          body: "تم إلغاء هذا الحجز. إذا لم تطلب ذلك، يرجى التواصل معنا.",
+        },
         pending: {
           title: "حجزك قيد المراجعة",
           body: "أعدنا طلبك إلى قائمة الانتظار بينما نراجع التفاصيل. سنتواصل معك قريباً بالتأكيد النهائي.",
@@ -368,7 +439,9 @@ export function renderDecision(b: BookingRecord, lang: "en" | "ar", whatsapp = "
         contact: "Any questions, just get in touch.",
         chat: "Message us on WhatsApp",
       };
-  const t = (copy as Record<string, { title: string; body: string }>)[status] ?? copy.accepted;
+  const t =
+    (copy as Record<string, { title: string; body: string }>)[status] ??
+    copy.accepted;
 
   const row = (label: string, value: string) =>
     `<tr><td style="padding:6px 16px 6px 0;color:#666">${esc(label)}</td>` +
@@ -381,6 +454,7 @@ export function renderDecision(b: BookingRecord, lang: "en" | "ar", whatsapp = "
       ? `<table style="border-collapse:collapse;font-size:14px">
         ${row(copy.chalet, `Bizarri Chalet ${b.chalet_id}`)}
         ${row(copy.dates, `${b.start_date} \u2192 ${b.end_date} (${b.days})`)}
+        ${stayRows(b, lang)}
         ${row(copy.total, `${b.currency} ${b.total}`)}
         ${row(copy.guests, String(b.guests))}
       </table>`
@@ -403,12 +477,14 @@ export function renderDecision(b: BookingRecord, lang: "en" | "ar", whatsapp = "
 }
 
 /** Plain-text with WhatsApp's own emphasis markup (*bold*), not HTML. */
-function renderWhatsApp(b: BookingRecord): string {
+export function renderWhatsApp(b: BookingRecord): string {
   const lines = [
     `*New booking request*`,
     `Ref: ${b.ref}`,
     `Chalet: Bizarri Chalet ${b.chalet_id}`,
     `Dates: ${b.start_date} → ${b.end_date} (${b.days} days)`,
+    `Check-in: ${b.start_date} ${formatHour(CHECK_IN_HOUR, "en")}`,
+    `Check-out: ${checkOutDate(b.end_date)} ${formatHour(CHECK_OUT_HOUR, "en")}`,
     `Total: ${b.currency} ${b.total}`,
     `Guest: ${b.guest_name}`,
     `Phone: ${b.guest_phone}`,
@@ -425,7 +501,10 @@ function renderWhatsApp(b: BookingRecord): string {
  * number with one shared key, which is why recipients are {phone, apikey}
  * pairs rather than a plain phone list.
  */
-async function sendWhatsApp(recipient: WhatsAppRecipient, text: string): Promise<boolean> {
+async function sendWhatsApp(
+  recipient: WhatsAppRecipient,
+  text: string,
+): Promise<boolean> {
   try {
     const url =
       `https://api.callmebot.com/whatsapp.php` +
@@ -434,7 +513,12 @@ async function sendWhatsApp(recipient: WhatsAppRecipient, text: string): Promise
       `&apikey=${encodeURIComponent(recipient.apikey)}`;
     const res = await fetch(url);
     if (!res.ok) {
-      console.error("notify-booking: callmebot failed", recipient.phone, res.status, await res.text());
+      console.error(
+        "notify-booking: callmebot failed",
+        recipient.phone,
+        res.status,
+        await res.text(),
+      );
       return false;
     }
     return true;
@@ -453,7 +537,10 @@ interface DeliveryResult {
 async function sendEmail(booking: BookingRecord): Promise<DeliveryResult> {
   const key = Deno.env.get("RESEND_API_KEY");
   if (!key) {
-    console.log("notify-booking: RESEND_API_KEY unset, skipping email", booking.ref);
+    console.log(
+      "notify-booking: RESEND_API_KEY unset, skipping email",
+      booking.ref,
+    );
     return { attempted: false, delivered: false, reason: "no api key" };
   }
 
@@ -463,11 +550,15 @@ async function sendEmail(booking: BookingRecord): Promise<DeliveryResult> {
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean);
-  const from = Deno.env.get("NOTIFY_FROM") ?? "Bizarri Chalet <onboarding@resend.dev>";
+  const from =
+    Deno.env.get("NOTIFY_FROM") ?? "Bizarri Chalet <onboarding@resend.dev>";
 
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
-    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    headers: {
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify({
       from,
       to,
@@ -478,7 +569,11 @@ async function sendEmail(booking: BookingRecord): Promise<DeliveryResult> {
   });
 
   if (!res.ok) {
-    console.error("notify-booking: resend failed", res.status, await res.text());
+    console.error(
+      "notify-booking: resend failed",
+      res.status,
+      await res.text(),
+    );
     return { attempted: true, delivered: false };
   }
   return { attempted: true, delivered: true };
@@ -492,17 +587,23 @@ async function sendEmail(booking: BookingRecord): Promise<DeliveryResult> {
 async function sendGuestEmail(booking: BookingRecord): Promise<DeliveryResult> {
   const key = Deno.env.get("RESEND_API_KEY");
   if (!key) return { attempted: false, delivered: false, reason: "no api key" };
-  if (!booking.guest_email) return { attempted: false, delivered: false, reason: "no address" };
+  if (!booking.guest_email)
+    return { attempted: false, delivered: false, reason: "no address" };
 
   const lang: "en" | "ar" = booking.lang === "ar" ? "ar" : "en";
-  const from = Deno.env.get("NOTIFY_FROM") ?? "Bizarri Chalet <onboarding@resend.dev>";
-  const replyTo = (await notifyEmailsFromSettings())?.[0] ?? Deno.env.get("NOTIFY_EMAILS");
+  const from =
+    Deno.env.get("NOTIFY_FROM") ?? "Bizarri Chalet <onboarding@resend.dev>";
+  const replyTo =
+    (await notifyEmailsFromSettings())?.[0] ?? Deno.env.get("NOTIFY_EMAILS");
   const whatsapp = await guestWhatsAppNumber();
 
   try {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      headers: {
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({
         from,
         to: [booking.guest_email],
@@ -515,7 +616,11 @@ async function sendGuestEmail(booking: BookingRecord): Promise<DeliveryResult> {
       }),
     });
     if (!res.ok) {
-      console.error("notify-booking: guest email failed", res.status, await res.text());
+      console.error(
+        "notify-booking: guest email failed",
+        res.status,
+        await res.text(),
+      );
       return { attempted: true, delivered: false };
     }
     return { attempted: true, delivered: true };
@@ -526,21 +631,29 @@ async function sendGuestEmail(booking: BookingRecord): Promise<DeliveryResult> {
 }
 
 /** The decision, to the guest. Never throws, for the same reason as above. */
-async function sendDecisionEmail(booking: BookingRecord): Promise<DeliveryResult> {
+async function sendDecisionEmail(
+  booking: BookingRecord,
+): Promise<DeliveryResult> {
   const key = Deno.env.get("RESEND_API_KEY");
   if (!key) return { attempted: false, delivered: false, reason: "no api key" };
-  if (!booking.guest_email) return { attempted: false, delivered: false, reason: "no address" };
+  if (!booking.guest_email)
+    return { attempted: false, delivered: false, reason: "no address" };
 
   const lang: "en" | "ar" = booking.lang === "ar" ? "ar" : "en";
-  const from = Deno.env.get("NOTIFY_FROM") ?? "Bizarri Chalet <onboarding@resend.dev>";
-  const replyTo = (await notifyEmailsFromSettings())?.[0] ?? Deno.env.get("NOTIFY_EMAILS");
+  const from =
+    Deno.env.get("NOTIFY_FROM") ?? "Bizarri Chalet <onboarding@resend.dev>";
+  const replyTo =
+    (await notifyEmailsFromSettings())?.[0] ?? Deno.env.get("NOTIFY_EMAILS");
   const confirmed = booking.status === "accepted";
   const whatsapp = await guestWhatsAppNumber();
 
   try {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      headers: {
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({
         from,
         to: [booking.guest_email],
@@ -553,7 +666,11 @@ async function sendDecisionEmail(booking: BookingRecord): Promise<DeliveryResult
       }),
     });
     if (!res.ok) {
-      console.error("notify-booking: decision email failed", res.status, await res.text());
+      console.error(
+        "notify-booking: decision email failed",
+        res.status,
+        await res.text(),
+      );
       return { attempted: true, delivered: false };
     }
     return { attempted: true, delivered: true };
@@ -563,26 +680,37 @@ async function sendDecisionEmail(booking: BookingRecord): Promise<DeliveryResult
   }
 }
 
-async function sendAllWhatsApp(booking: BookingRecord): Promise<DeliveryResult> {
+async function sendAllWhatsApp(
+  booking: BookingRecord,
+): Promise<DeliveryResult> {
   const configured = await notifyWhatsAppFromSettings();
   const envPhone = Deno.env.get("CALLMEBOT_PHONE");
   const envKey = Deno.env.get("CALLMEBOT_APIKEY");
-  const recipients = configured ?? (envPhone && envKey ? [{ phone: envPhone, apikey: envKey }] : null);
+  const recipients =
+    configured ??
+    (envPhone && envKey ? [{ phone: envPhone, apikey: envKey }] : null);
 
   if (!recipients) {
-    console.log("notify-booking: no WhatsApp recipients configured, skipping", booking.ref);
+    console.log(
+      "notify-booking: no WhatsApp recipients configured, skipping",
+      booking.ref,
+    );
     return { attempted: false, delivered: false, reason: "no recipients" };
   }
 
   const text = renderWhatsApp(booking);
-  const results = await Promise.all(recipients.map((r) => sendWhatsApp(r, text)));
+  const results = await Promise.all(
+    recipients.map((r) => sendWhatsApp(r, text)),
+  );
   return { attempted: true, delivered: results.some(Boolean) };
 }
 
 Deno.serve(async (req: Request) => {
   const origin = req.headers.get("origin");
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders(origin) });
-  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405, origin);
+  if (req.method === "OPTIONS")
+    return new Response(null, { headers: corsHeaders(origin) });
+  if (req.method !== "POST")
+    return json({ error: "Method not allowed" }, 405, origin);
 
   try {
     const raw = await req.json().catch(() => null);

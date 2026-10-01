@@ -38,9 +38,10 @@ const built = await build({
 // server unless Deno is stubbed. Nothing here needs a real one.
 globalThis.Deno = { serve: () => {}, env: { get: () => undefined } };
 
-const { classify, renderDecision } = await import(
-  "data:text/javascript;base64," + Buffer.from(built.outputFiles[0].text).toString("base64")
-);
+const { classify, renderDecision, renderGuest, render, renderWhatsApp, checkOutDate } =
+  await import(
+    "data:text/javascript;base64," + Buffer.from(built.outputFiles[0].text).toString("base64")
+  );
 
 ck("The real classify() was imported, not a copy", typeof classify === "function");
 
@@ -203,6 +204,64 @@ ck(
   const ar = renderDecision(booking({ status: "accepted", lang: "ar" }), "ar");
   ck("The Arabic email is laid out right to left", ar.includes('dir="rtl"'));
   ck("…and is actually in Arabic", /[\u0600-\u06FF]/.test(ar));
+}
+
+// ============================================= check-in and check-out times
+// The site and every message say the same thing: in at 2 PM on the first
+// booked day, out at noon the morning after the last.
+{
+  ck(
+    "Check-out is the morning after the last booked day",
+    checkOutDate("2027-01-09") === "2027-01-10",
+  );
+  ck("…across a month end", checkOutDate("2027-01-31") === "2027-02-01");
+  ck("…and a year end", checkOutDate("2026-12-31") === "2027-01-01");
+
+  // Thu 7 Jan to Sat 9 Jan: in Thursday 2 PM, out Sunday noon.
+  const b = booking({ status: "accepted" });
+  const text = (html) =>
+    html
+      .replace(/<\/td>/g, " ")
+      .replace(/<[^>]+>/g, "")
+      .replace(/\s+/g, " ");
+  const inEn = "Check-in 2027-01-07 · 2:00 PM";
+  const outEn = "Check-out 2027-01-10 · 12:00 PM";
+  for (const [name, html] of [
+    ["The team's email", render(b)],
+    ["The guest's request email", renderGuest(b, "en")],
+    ["The confirmation email", renderDecision(b, "en")],
+    ["The under-review email", renderDecision({ ...b, status: "pending" }, "en")],
+  ]) {
+    ck(`${name} gives the check-in time`, text(html).includes(inEn));
+    ck(`…and the check-out time`, text(html).includes(outEn));
+  }
+
+  const ar = text(renderGuest(b, "ar"));
+  ck(
+    "The Arabic email says it in Arabic, digits Latin like the site",
+    ar.includes("الوصول 2027-01-07 · 2:00 م") && ar.includes("المغادرة 2027-01-10 · 12:00 م"),
+    ar.match(/الوصول[^م]*م/)?.[0],
+  );
+  ck(
+    "…and the dates cannot be reordered right to left",
+    renderGuest(b, "ar").includes('<span dir="ltr">2027-01-07</span>'),
+  );
+
+  // A refusal or a cancellation is not a stay to turn up for.
+  ck(
+    "A rejection gives no arrival time",
+    !text(renderDecision({ ...b, status: "rejected" }, "en")).includes("Check-in"),
+  );
+
+  const wa = renderWhatsApp(b);
+  ck(
+    "The team's WhatsApp gives both times",
+    wa.includes("Check-in: 2027-01-07 2:00 PM") && wa.includes("Check-out: 2027-01-10 12:00 PM"),
+    wa
+      .split("\n")
+      .filter((l) => l.startsWith("Check"))
+      .join(" | "),
+  );
 }
 
 console.log(`\n${fails} failing`);
