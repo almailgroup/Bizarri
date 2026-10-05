@@ -5,11 +5,7 @@ import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { PageShell } from "@/components/PageShell";
 import { useI18n, type Lang } from "@/lib/i18n";
 import { usePageMeta } from "@/hooks/use-page-meta";
-import room1 from "@/assets/room-1.webp";
-import room2 from "@/assets/room-2.webp";
-import room3 from "@/assets/room-3.webp";
-import room4 from "@/assets/room-4.webp";
-import room5 from "@/assets/room-5.webp";
+import { photosFor, type Photo } from "@/lib/gallery";
 
 export const Route = createFileRoute("/photos/$lang")({
   component: Photos,
@@ -19,7 +15,7 @@ export const Route = createFileRoute("/photos/$lang")({
 interface Category {
   en: string;
   ar: string;
-  photos: string[];
+  photos: Photo[];
 }
 
 /**
@@ -28,20 +24,23 @@ interface Category {
  * tiles; add images here and the category appears.
  */
 const CATEGORIES: Category[] = [
-  { en: "Rooms", ar: "الغرف", photos: [room1, room3, room4, room5, room2] },
-  { en: "Bathrooms", ar: "الحمامات", photos: [] },
-  { en: "Living Area", ar: "غرفة المعيشة", photos: [] },
-  { en: "Kitchen", ar: "المطبخ", photos: [] },
-  { en: "Pool", ar: "المسبح", photos: [] },
-  { en: "Outdoor Area", ar: "المنطقة الخارجية", photos: [] },
-  { en: "Seating Area", ar: "منطقة الجلوس", photos: [] },
+  // The building first: it is what a guest is deciding about, and the dusk
+  // and night shots are the strongest of the set.
+  { en: "Exterior", ar: "الواجهة الخارجية", photos: photosFor("exterior") },
+  { en: "Pool", ar: "المسبح", photos: photosFor("pool") },
+  { en: "Outdoor Area", ar: "المنطقة الخارجية", photos: photosFor("outdoor") },
+  { en: "Living Area", ar: "غرفة المعيشة", photos: photosFor("living") },
+  { en: "Dining Area", ar: "منطقة الطعام", photos: photosFor("dining") },
+  { en: "Kitchen", ar: "المطبخ", photos: photosFor("kitchen") },
+  { en: "Rooms", ar: "الغرف", photos: photosFor("rooms") },
+  { en: "Bathrooms", ar: "الحمامات", photos: photosFor("bathrooms") },
+  { en: "Seating Area", ar: "منطقة الجلوس", photos: photosFor("seating") },
+  { en: "Entrance", ar: "المدخل", photos: photosFor("entrance") },
+  { en: "Beach Access", ar: "إطلالة الشاطئ", photos: photosFor("beach") },
   { en: "Smart Home Features", ar: "ميزات المنزل الذكي", photos: [] },
   { en: "Entertainment", ar: "الترفيه", photos: [] },
   { en: "Views", ar: "الإطلالات", photos: [] },
   { en: "Parking", ar: "موقف السيارات", photos: [] },
-  { en: "Entrance", ar: "المدخل", photos: [] },
-  { en: "Dining Area", ar: "منطقة الطعام", photos: [] },
-  { en: "Beach Access", ar: "إطلالة الشاطئ", photos: [] },
   { en: "Other Areas", ar: "مناطق أخرى", photos: [] },
 ];
 
@@ -61,7 +60,12 @@ function Photos() {
   const flat = useMemo(
     () =>
       CATEGORIES.flatMap((c) =>
-        c.photos.map((src) => ({ src, category: c, alt: `${c[lang]} — Bizarri Chalet` })),
+        c.photos.map((p) => ({
+          src: p.full,
+          thumb: p.thumb,
+          category: c,
+          alt: `${c[lang]} — Bizarri Chalet`,
+        })),
       ),
     [lang],
   );
@@ -83,7 +87,7 @@ function Photos() {
           <div key={cat.en} className="mb-16">
             <h2 className="mb-6 font-display text-2xl">{cat[lang]}</h2>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {cat.photos.map((src) => {
+              {cat.photos.map(({ full: src, thumb }) => {
                 const index = flat.findIndex((f) => f.src === src);
                 return (
                   <button
@@ -93,11 +97,12 @@ function Photos() {
                     aria-label={`${cat[lang]} — ${lang === "en" ? "open photo" : "فتح الصورة"}`}
                   >
                     <img
-                      src={src}
+                      src={thumb}
                       alt={`${cat[lang]} — Bizarri Chalet`}
                       loading="lazy"
-                      width={1206}
-                      height={800}
+                      decoding="async"
+                      width={800}
+                      height={600}
                       className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
                     />
                   </button>
@@ -141,7 +146,7 @@ function Lightbox({
   onIndex,
   onClose,
 }: {
-  photos: { src: string; category: Category; alt: string }[];
+  photos: { src: string; thumb: string; category: Category; alt: string }[];
   index: number;
   lang: Lang;
   onIndex: (i: number) => void;
@@ -151,6 +156,22 @@ function Lightbox({
   const panelRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const touchX = useRef<number | null>(null);
+  const currentThumbRef = useRef<HTMLButtonElement>(null);
+
+  // The filmstrip follows the photo on screen, which with fifty-odd of them
+  // is usually somewhere off to one side.
+  useEffect(() => {
+    currentThumbRef.current?.scrollIntoView({ block: "nearest", inline: "center" });
+  }, [index]);
+
+  // Fetch the neighbours while this one is looked at, so the next arrow or
+  // swipe shows a photo rather than a blank while 300 KB arrives.
+  useEffect(() => {
+    for (const d of [1, -1]) {
+      const p = photos[(index + d + photos.length) % photos.length];
+      if (p) new Image().src = p.src;
+    }
+  }, [index, photos]);
 
   const go = useCallback(
     (delta: number) => onIndex((index + delta + photos.length) % photos.length),
@@ -256,10 +277,14 @@ function Lightbox({
       </div>
 
       {photos.length > 1 && (
-        <div className="flex justify-center gap-2 overflow-x-auto px-6 pb-8">
+        // justify-center-safe, not justify-center: with fifty-odd photos the
+        // strip is wider than the screen, and plain centring pushes its
+        // first thumbnails off the start edge, out of reach of any scroll.
+        <div className="flex justify-center-safe gap-2 overflow-x-auto px-6 pb-8">
           {photos.map((p, i) => (
             <button
               key={p.src}
+              ref={i === index ? currentThumbRef : undefined}
               onClick={() => onIndex(i)}
               aria-label={`${lang === "en" ? "Photo" : "صورة"} ${i + 1}`}
               aria-current={i === index}
@@ -267,7 +292,7 @@ function Lightbox({
                 i === index ? "ring-2 ring-white" : "opacity-50 hover:opacity-80"
               }`}
             >
-              <img src={p.src} alt="" loading="lazy" className="h-full w-full object-cover" />
+              <img src={p.thumb} alt="" loading="lazy" className="h-full w-full object-cover" />
             </button>
           ))}
         </div>

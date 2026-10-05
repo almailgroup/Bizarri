@@ -6,9 +6,13 @@ import { usePageMeta } from "@/hooks/use-page-meta";
 import logoWhite from "@/assets/bizarri-logo-white.png";
 import heroImg from "@/assets/banner.webp";
 import heroImgPortrait from "@/assets/banner-portrait.webp";
-import room1 from "@/assets/room-1.webp";
-import room4 from "@/assets/room-4.webp";
-import room5 from "@/assets/room-5.webp";
+import { photo } from "@/lib/gallery";
+
+// The gallery preview: the pool at sunset to lead, then the living room and a
+// bedroom -- outside, in, and where you sleep, which is the order a guest
+// weighs a chalet in.
+const PREVIEW_LEAD = photo("pool-01");
+const PREVIEW_SIDE = [photo("living-01"), photo("rooms-01")];
 import { ArrowRight, Cpu, Tv, Waves, ChefHat, Bed, Wifi, MapPin, Phone } from "lucide-react";
 
 /**
@@ -201,16 +205,17 @@ function Home() {
                 className="group block h-full overflow-hidden bg-black"
               >
                 <img
-                  src={room1}
-                  alt={lang === "en" ? "Bizarri Chalet interior" : "داخل شاليه بيزاري"}
+                  src={PREVIEW_LEAD.full}
+                  alt={lang === "en" ? "The pool at Bizarri Chalet" : "المسبح في شاليه بيزاري"}
                   loading="lazy"
-                  width={1206}
-                  height={780}
+                  decoding="async"
+                  width={2000}
+                  height={1445}
                   className="h-full min-h-[280px] w-full object-cover transition-transform duration-700 group-hover:scale-105 md:min-h-[520px]"
                 />
               </Link>
             </Reveal>
-            {[room4, room5].map((src, i) => (
+            {PREVIEW_SIDE.map(({ thumb: src }, i) => (
               <Reveal key={i} delay={(i + 1) * 90}>
                 <Link
                   to="/photos/$lang"
@@ -221,8 +226,9 @@ function Home() {
                     src={src}
                     alt=""
                     loading="lazy"
-                    width={1206}
-                    height={785}
+                    decoding="async"
+                    width={800}
+                    height={600}
                     className="h-full min-h-[200px] w-full object-cover transition-transform duration-700 group-hover:scale-105 md:min-h-[252px]"
                   />
                 </Link>
