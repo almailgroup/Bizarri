@@ -57,6 +57,14 @@ type Step = "details" | "done";
 interface BookingSearch {
   step?: Step;
   /**
+   * Arriving from the Offers page with an offer chosen: the shape to open on,
+   * and for a holiday which one. Read once as the page opens and then taken
+   * out of the address, so it is where the guest starts rather than a
+   * setting that fights them when they pick something else.
+   */
+  shape?: DateFilter;
+  occasion?: string;
+  /**
    * The code dialog is open. An entry of its own for the same reason the
    * steps are: on a phone, Back is how a popup is dismissed, and it used to
    * close the whole form instead, dropping the guest on the dates.
@@ -68,13 +76,20 @@ export const Route = createFileRoute("/booking/$lang")({
   component: Booking,
   beforeLoad: requireLang,
   validateSearch: (s: Record<string, unknown>): BookingSearch =>
-    s.step === "details"
-      ? s.verify === true || s.verify === "true"
-        ? { step: "details", verify: true }
-        : { step: "details" }
-      : s.step === "done"
-        ? { step: "done" }
-        : {},
+    !s.step && FILTERS.includes(s.shape as DateFilter)
+      ? {
+          shape: s.shape as DateFilter,
+          ...(s.shape === "holiday" && typeof s.occasion === "string" && s.occasion
+            ? { occasion: s.occasion }
+            : {}),
+        }
+      : s.step === "details"
+        ? s.verify === true || s.verify === "true"
+          ? { step: "details", verify: true }
+          : { step: "details" }
+        : s.step === "done"
+          ? { step: "done" }
+          : {},
 });
 
 /**
@@ -82,7 +97,7 @@ export const Route = createFileRoute("/booking/$lang")({
  * picks a shape and then a day inside it, and the calendar selects the whole
  * stay. Sun-Wed is also sold a day at a time, which is what "day" is.
  */
-type DateFilter = "day" | "weekday" | "weekend" | "holiday";
+type DateFilter = "day" | "weekday" | "weekend" | "holiday" | "fullWeek";
 
 /**
  * startDow null means any day of the week can begin a window, which is what
@@ -101,15 +116,18 @@ const FILTER_SHAPE: Record<
   day: { startDow: null, length: 1 }, // any single day
   weekday: { startDow: 0, length: 4 }, // Sun–Wed
   weekend: { startDow: 4, length: 3 }, // Thu–Sat
+  fullWeek: { startDow: 0, length: 7 }, // Sun–Sat, the two packages together
 };
 
-const FILTERS: DateFilter[] = ["day", "weekday", "weekend", "holiday"];
+// Holiday beside Weekend; Full week last, being the two before it combined.
+const FILTERS: DateFilter[] = ["day", "weekday", "weekend", "holiday", "fullWeek"];
 
 const FILTER_LABEL = {
   day: "filterByDay",
   weekday: "filterWeekday",
   weekend: "filterWeekend",
   holiday: "filterHoliday",
+  fullWeek: "filterFullWeek",
 } as const;
 
 const FILTER_NOTE = {
@@ -117,6 +135,7 @@ const FILTER_NOTE = {
   weekday: "filterWeekdayNote",
   weekend: "filterWeekendNote",
   holiday: "filterHolidayNote",
+  fullWeek: "filterFullWeekNote",
 } as const;
 
 const MAX_ID_BYTES = 5 * 1024 * 1024;
@@ -142,9 +161,18 @@ function Booking() {
       : "تحقق من التوفر واطلب إقامتك في شاليه بيزاري.",
   );
 
-  const { step } = Route.useSearch();
+  const { step, shape, occasion } = Route.useSearch();
   const navigate = Route.useNavigate();
   const [chaletId, setChaletId] = useState(1);
+
+  // The offer chosen on the Offers page, read as the calendar first opens and
+  // then dropped from the address -- replaced, so Back still returns to the
+  // offers -- leaving the guest free to choose something else from there.
+  const [offer] = useState(() => ({ shape, occasion }));
+  useEffect(() => {
+    if (shape || occasion) navigate({ search: {}, replace: true, resetScroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [confirmed, setConfirmed] = useState<BookingRow | null>(null);
 
   // A confirmation is only ever this visit's own: reloaded, or followed from
@@ -186,6 +214,8 @@ function Booking() {
             chaletId={chaletId}
             setChaletId={setChaletId}
             showForm={step === "details"}
+            initialShape={offer.shape}
+            initialOccasion={offer.occasion}
             onDone={(b) => {
               rememberBookingRef(b.ref);
               setConfirmed(b);
@@ -372,10 +402,16 @@ function Calendar({
   chaletId,
   setChaletId,
   showForm,
+  initialShape,
+  initialOccasion,
   onDone,
 }: {
   chaletId: number;
   setChaletId: (id: number) => void;
+  /** The shape to open on, when an offer was chosen on the Offers page. */
+  initialShape?: DateFilter;
+  /** …and, for a holiday, which occasion: its stay is chosen outright. */
+  initialOccasion?: string;
   /** The details step is in the address; see BookingSearch. */
   showForm: boolean;
   onDone: (b: BookingRow) => void;
@@ -392,7 +428,7 @@ function Calendar({
   const [error, setError] = useState("");
   // A day at a time is the least committing of the three, so it is where the
   // calendar opens.
-  const [filter, setFilter] = useState<DateFilter>("day");
+  const [filter, setFilter] = useState<DateFilter>(initialShape ?? "day");
   // Whether this visit put the details step into history itself. When it did,
   // the page's own Back button is the browser's Back -- the entry behind is
   // the dates -- so the two can never disagree, and pressing one after the
@@ -692,6 +728,29 @@ function Calendar({
     setStart(null);
     setEnd(null);
   }, [shapes, filter]);
+
+  // A holiday chosen on the Offers page has fixed dates, so there is nothing
+  // left to pick: show its month and select it, once availability is in.
+  // Only if it is still free -- otherwise the Holiday shape is open on its
+  // month and the calendar shows it taken, which is the truth of it.
+  const pendingOccasion = useRef(initialOccasion);
+  useEffect(() => {
+    const id = pendingOccasion.current;
+    if (!id || !calendar || !occasions) return;
+    pendingOccasion.current = undefined;
+    const o = occasions.find((x) => x.id === id);
+    if (!o) return;
+    const from = parseDate(o.start);
+    userPaged.current = true;
+    setJumped(false);
+    setMonth(startOfMonth(from));
+    const w = windowsIn(startOfMonth(from), "holiday").get(fmtDate(from));
+    if (w) {
+      setStart(w.start);
+      setEnd(w.end);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calendar, occasions]);
   const tooShort = current !== null && current.days < minStay;
   // Thu–Sat is one product, so a stay may not take a slice of it. Checked
   // here as well as on the tap: a selection can also arrive from a quick
@@ -828,11 +887,13 @@ function Calendar({
             a guest it means three days from a Thursday at 350. */}
         <div
           className={`mb-4 grid gap-2 ${
-            shapes.length === 4
-              ? "grid-cols-2 sm:grid-cols-4"
-              : shapes.length === 2
-                ? "grid-cols-2"
-                : "grid-cols-3"
+            shapes.length === 5
+              ? "grid-cols-2 md:grid-cols-5 [&>*:last-child]:col-span-2 md:[&>*:last-child]:col-span-1"
+              : shapes.length === 4
+                ? "grid-cols-2 sm:grid-cols-4"
+                : shapes.length === 2
+                  ? "grid-cols-2"
+                  : "grid-cols-3"
           }`}
           role="group"
           aria-label={tr("pickShape")}

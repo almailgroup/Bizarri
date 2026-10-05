@@ -215,13 +215,13 @@ const clickDay = (p, dow, nth = 0) =>
       b.innerText.replace(/\n+/g, " | "),
     ),
   );
-  ck("Every way to book is offered at once", cards.length === 4, cards.join(" / "));
-  // The three rule-based shapes name their days; Holiday names its occasions,
+  ck("Every way to book is offered at once", cards.length === 5, cards.join(" / "));
+  // The rule-based shapes name their days; Holiday names its occasions,
   // since its dates are whatever the admin has entered.
   const ruled = cards.filter((t) => !/^HOLIDAY/.test(t));
   ck(
     "Each says which days it means",
-    ruled.length === 3 && ruled.every((t) => /Sun|Thu/.test(t)),
+    ruled.length === 4 && ruled.every((t) => /Sun|Thu/.test(t)),
     ruled.find((t) => !/Sun|Thu/.test(t)) ?? "all do",
   );
   ck(
@@ -623,7 +623,7 @@ for (const [name, days] of [
   );
   ck(
     "The Holiday card is always offered, right after Weekend",
-    names.join(",") === "BY DAY,WEEKDAY,WEEKEND,HOLIDAY",
+    names.join(",") === "BY DAY,WEEKDAY,WEEKEND,HOLIDAY,FULL WEEK",
     names.join(", "),
   );
   const tops = await p.evaluate(() =>
@@ -631,7 +631,7 @@ for (const [name, days] of [
       Math.round(b.getBoundingClientRect().top),
     ),
   );
-  ck("…all four in one row", new Set(tops).size === 1, tops.join(","));
+  ck("…all five in one row", new Set(tops).size === 1, tops.join(","));
 
   await p.getByRole("button", { name: /^Holiday/i }).click();
   await p.waitForTimeout(500);
@@ -664,7 +664,8 @@ for (const [name, days] of [
   await ctx.close();
 }
 
-// On a phone the four sit two by two rather than squeezed into one row.
+// On a phone they sit two by two, the fifth across the width, rather than
+// squeezed into one row.
 {
   const { p, ctx } = await calendar(1, "ar", [], { width: 390, height: 844 });
   const boxes = await p.evaluate(() =>
@@ -674,10 +675,11 @@ for (const [name, days] of [
     }),
   );
   ck(
-    "On a phone the four shapes sit two by two",
-    boxes.length === 4 &&
-      new Set(boxes.map((x) => x.top)).size === 2 &&
-      boxes.every((x) => x.w > 140),
+    "On a phone the shapes sit two by two, the last across the width",
+    boxes.length === 5 &&
+      new Set(boxes.map((x) => x.top)).size === 3 &&
+      boxes.every((x) => x.w > 140) &&
+      boxes[4].w > boxes[0].w * 1.8,
     boxes.map((x) => `${x.label}@${x.top}`).join(", "),
   );
   ck("…and Holiday is named in Arabic", boxes[3]?.label.includes("العطلات"), boxes[3]?.label);

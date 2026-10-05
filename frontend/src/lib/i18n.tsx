@@ -71,6 +71,11 @@ export const t: Dict = {
   close: { en: "Close", ar: "إغلاق" },
   language: { en: "العربية", ar: "English" },
   startBooking: { en: "Start your booking request", ar: "ابدأ طلب الحجز" },
+  choosePackageHint: {
+    en: "Choose an offer, then start your request — it will be picked for you on the booking page.",
+    ar: "اختر عرضاً ثم ابدأ طلبك — سيتم تحديده لك تلقائياً في صفحة الحجز.",
+  },
+  offerChosen: { en: "Selected", ar: "تم الاختيار" },
   invalidSelection: {
     en: "Invalid selection. Please pick a Sunday or Thursday — packages auto-fill.",
     ar: "اختيار غير صالح. يرجى اختيار يوم الأحد أو الخميس — تُحدد الباقات تلقائياً.",
@@ -184,6 +189,8 @@ export const t: Dict = {
   // because Thu-Sat is sold whole. Saying which days saves a guest tapping a
   // Friday and finding nothing happens.
   filterByDayNote: { en: "Sun – Wed · one day", ar: "الأحد – الأربعاء · يوم واحد" },
+  filterFullWeek: { en: "Full week", ar: "أسبوع كامل" },
+  filterFullWeekNote: { en: "Sun – Sat · 7 days", ar: "الأحد – السبت · 7 أيام" },
   filterWeekday: { en: "Weekday", ar: "أيام الأسبوع" },
   filterWeekdayNote: { en: "Sun – Wed · 4 days", ar: "الأحد – الأربعاء · 4 أيام" },
   // The card only appears when an occasion is coming up, and names it; the
