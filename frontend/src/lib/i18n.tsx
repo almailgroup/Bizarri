@@ -189,7 +189,16 @@ export const t: Dict = {
   // The card only appears when an occasion is coming up, and names it; the
   // note is the fallback for the moment before the occasions have loaded.
   filterHoliday: { en: "Holiday", ar: "العطلات" },
-  filterHolidayNote: { en: "Special occasion", ar: "مناسبة خاصة" },
+  filterHolidayNote: { en: "Eid & public holidays", ar: "الأعياد والعطل الرسمية" },
+  noHolidaysTitle: {
+    en: "No holiday dates are open yet",
+    ar: "لا توجد مواعيد عطلات متاحة للحجز حالياً",
+  },
+  noHolidaysBody: {
+    en: "Holiday stays open for booking as each holiday is announced, each at its own price. Message us on WhatsApp and we will tell you as soon as the next one opens.",
+    ar: "تُفتح إقامات العطلات للحجز عند الإعلان عن كل عطلة، ولكل منها سعرها الخاص. راسلنا عبر واتساب وسنبلغك فور فتح الحجز للعطلة القادمة.",
+  },
+  askAboutHolidays: { en: "Ask about holidays", ar: "اسأل عن العطلات" },
   filterWeekend: { en: "Weekend", ar: "نهاية الأسبوع" },
   filterWeekendNote: { en: "Thu – Sat · 3 days", ar: "الخميس – السبت · 3 أيام" },
   filterHint: {

@@ -43,8 +43,13 @@ const eid = (() => {
   return { from, to };
 })();
 
-async function calendar(minStayDays, lang = LANG, occasions = []) {
-  const ctx = await b.newContext({ viewport: { width: 1100, height: 1000 } });
+async function calendar(
+  minStayDays,
+  lang = LANG,
+  occasions = [],
+  viewport = { width: 1100, height: 1000 },
+) {
+  const ctx = await b.newContext({ viewport });
   await ctx.route(/^https?:\/\/(?!localhost)/, (r) => {
     const u = r.request().url();
     if (!SUPA.test(u)) return r.abort();
@@ -201,7 +206,7 @@ const clickDay = (p, dow, nth = 0) =>
 //
 // The quick picks above the calendar are gone. What they did -- name a stay,
 // say when it is and what it costs, and land it in one tap -- is what the
-// three shape cards do now, so this is the same promise tested where it lives.
+// shape cards do now, so this is the same promise tested where it lives.
 {
   const { p, ctx } = await calendar(1);
 
@@ -210,11 +215,19 @@ const clickDay = (p, dow, nth = 0) =>
       b.innerText.replace(/\n+/g, " | "),
     ),
   );
-  ck("Every way to book is offered at once", cards.length === 3, cards.join(" / "));
+  ck("Every way to book is offered at once", cards.length === 4, cards.join(" / "));
+  // The three rule-based shapes name their days; Holiday names its occasions,
+  // since its dates are whatever the admin has entered.
+  const ruled = cards.filter((t) => !/^HOLIDAY/.test(t));
   ck(
     "Each says which days it means",
-    cards.every((t) => /Sun|Thu/.test(t)),
-    cards.find((t) => !/Sun|Thu/.test(t)) ?? "all do",
+    ruled.length === 3 && ruled.every((t) => /Sun|Thu/.test(t)),
+    ruled.find((t) => !/Sun|Thu/.test(t)) ?? "all do",
+  );
+  ck(
+    "…and Holiday says which holidays",
+    cards.some((t) => /^HOLIDAY \| Eid & public holidays/.test(t)),
+    cards[3],
   );
   // The cards carry no price: the rates strip above them does, and repeating
   // it three times made the row of choices read as a price list.
@@ -599,7 +612,8 @@ for (const [name, days] of [
 //
 // Unlike the other three, a holiday is not a rule about weekdays and a
 // length: it is whatever the admin entered under Special Occasions, with its
-// own dates and its own flat price. The card is only there when there is one.
+// own dates and its own flat price. The card is always there, beside Weekend;
+// with nothing open it says so rather than showing a year of grey days.
 {
   const { p, ctx } = await calendar(1, "en", []);
   const names = await p.evaluate(() =>
@@ -608,9 +622,68 @@ for (const [name, days] of [
     ),
   );
   ck(
-    "With nothing coming up there is no Holiday card",
-    !names.includes("HOLIDAY"),
+    "The Holiday card is always offered, right after Weekend",
+    names.join(",") === "BY DAY,WEEKDAY,WEEKEND,HOLIDAY",
     names.join(", "),
+  );
+  const tops = await p.evaluate(() =>
+    [...document.querySelectorAll('[role="group"] button[aria-pressed]')].map((b) =>
+      Math.round(b.getBoundingClientRect().top),
+    ),
+  );
+  ck("…all four in one row", new Set(tops).size === 1, tops.join(","));
+
+  await p.getByRole("button", { name: /^Holiday/i }).click();
+  await p.waitForTimeout(500);
+  ck(
+    "With none open, choosing it says so",
+    await p.getByText("No holiday dates are open yet").isVisible(),
+  );
+  ck(
+    "…instead of a calendar of days that cannot be had",
+    (await p.locator('[role="grid"]').count()) === 0,
+  );
+  ck(
+    "…and not as if the months were simply full",
+    (await p.getByText(/Nothing free this month/i).count()) === 0,
+  );
+  const wa = p.getByRole("link", { name: /Ask about holidays/i });
+  ck(
+    "…offering WhatsApp to ask about the next one",
+    (await wa.isVisible()) && /^https:\/\/wa\.me\//.test((await wa.getAttribute("href")) ?? ""),
+    await wa.getAttribute("href"),
+  );
+  ck(
+    "…and no way forward that leads nowhere",
+    (await p.getByRole("button", { name: /^Continue$/i }).count()) === 0,
+  );
+
+  await p.getByRole("button", { name: /^Weekend/i }).click();
+  await p.waitForTimeout(400);
+  ck("Back on Weekend, the calendar returns", (await p.locator('[role="grid"]').count()) === 1);
+  await ctx.close();
+}
+
+// On a phone the four sit two by two rather than squeezed into one row.
+{
+  const { p, ctx } = await calendar(1, "ar", [], { width: 390, height: 844 });
+  const boxes = await p.evaluate(() =>
+    [...document.querySelectorAll('[role="group"] button[aria-pressed]')].map((b) => {
+      const r = b.getBoundingClientRect();
+      return { top: Math.round(r.top), w: Math.round(r.width), label: b.innerText.split("\n")[0] };
+    }),
+  );
+  ck(
+    "On a phone the four shapes sit two by two",
+    boxes.length === 4 &&
+      new Set(boxes.map((x) => x.top)).size === 2 &&
+      boxes.every((x) => x.w > 140),
+    boxes.map((x) => `${x.label}@${x.top}`).join(", "),
+  );
+  ck("…and Holiday is named in Arabic", boxes[3]?.label.includes("العطلات"), boxes[3]?.label);
+  ck(
+    "…without the page scrolling sideways",
+    (await p.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 1,
   );
   await ctx.close();
 }

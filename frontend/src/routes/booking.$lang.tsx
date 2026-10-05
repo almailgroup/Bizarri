@@ -665,17 +665,26 @@ function Calendar({
    * a stay that is too short.
    */
   const shapes = useMemo(() => {
-    const fit = FILTERS.filter((f) =>
-      // A holiday's length is whatever the occasion is, so it is offered when
-      // there is one to offer rather than by measuring it against the
-      // minimum; an occasion shorter than the minimum is a contradiction the
-      // admin has to resolve, and the server says so.
-      f === "holiday" ? holidaysAhead : FILTER_SHAPE[f].length >= minStay,
+    const fit = FILTERS.filter(
+      (f) =>
+        // Holiday is always on offer, beside Weekend, whether or not one is
+        // open yet: a guest planning around Eid looks for it by name, and a
+        // card that comes and goes with the admin's calendar is one they
+        // cannot find. With nothing open it says so and points to WhatsApp
+        // (see noHolidays). Its length is whatever the occasion is, so it is
+        // not measured against the minimum; an occasion shorter than that is
+        // a contradiction for the admin to resolve, and the server says so.
+        f === "holiday" || FILTER_SHAPE[f].length >= minStay,
     );
     // A minimum longer than every shape is a misconfiguration rather than a
     // reason to offer nothing; the server has the final say either way.
-    return fit.length ? fit : FILTERS.filter((f) => f !== "holiday");
-  }, [minStay, holidaysAhead]);
+    return fit.length > 1 ? fit : FILTERS;
+  }, [minStay]);
+
+  // Holiday chosen, but none is open for booking: there is no calendar worth
+  // showing -- a year of grey days reads as "fully booked" -- so the space
+  // says what is actually the case and offers the way to ask.
+  const noHolidays = filter === "holiday" && !holidaysAhead;
 
   useEffect(() => {
     if (shapes.includes(filter)) return;
@@ -818,7 +827,13 @@ function Calendar({
             you and what it costs, because "Weekend" on its own does not tell
             a guest it means three days from a Thursday at 350. */}
         <div
-          className={`mb-4 grid gap-2 ${shapes.length === 2 ? "grid-cols-2" : "grid-cols-3"}`}
+          className={`mb-4 grid gap-2 ${
+            shapes.length === 4
+              ? "grid-cols-2 sm:grid-cols-4"
+              : shapes.length === 2
+                ? "grid-cols-2"
+                : "grid-cols-3"
+          }`}
           role="group"
           aria-label={tr("pickShape")}
         >
@@ -863,291 +878,309 @@ function Calendar({
           })}
         </div>
 
-        {jumped && (
+        {jumped && !noHolidays && (
           <p className="mb-4 border border-border bg-secondary p-4 text-sm">
             {tr("noneThisMonth")}
           </p>
         )}
 
-        <div className="relative border border-border p-2 sm:p-6 md:p-8">
-          {isLoading && (
-            <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/70 text-sm uppercase tracking-widest text-muted-foreground">
-              {lang === "en" ? "Loading availability…" : "جارٍ تحميل التوفر…"}
-            </div>
-          )}
-
-          <div className="mb-6 flex items-center justify-between">
-            <button
-              onClick={() => changeMonth(-1)}
-              disabled={atFirstMonth}
-              aria-label={lang === "en" ? "Previous month" : "الشهر السابق"}
-              className="shrink-0 p-2 enabled:hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-25"
-            >
-              <ChevronLeft className="h-5 w-5 rtl:rotate-180" />
-            </button>
-            <p
-              className="whitespace-nowrap font-display text-xl capitalize sm:text-2xl"
-              aria-live="polite"
-            >
-              {monthName}
-            </p>
-            <button
-              onClick={() => changeMonth(1)}
-              disabled={atLastMonth}
-              aria-label={lang === "en" ? "Next month" : "الشهر التالي"}
-              className="shrink-0 p-2 enabled:hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-25"
-            >
-              <ChevronRight className="h-5 w-5 rtl:rotate-180" />
-            </button>
+        {noHolidays ? (
+          <div className="border border-border p-6 sm:p-10" role="status">
+            <p className="font-display text-2xl">{tr("noHolidaysTitle")}</p>
+            <p className="mt-3 max-w-prose text-sm text-muted-foreground">{tr("noHolidaysBody")}</p>
+            <WhatsAppLink
+              context={{ chaletId }}
+              label={tr("askAboutHolidays")}
+              className="mt-6 inline-flex items-center gap-2 border border-foreground px-6 py-3 text-sm uppercase tracking-widest transition-colors hover:bg-foreground hover:text-background"
+            />
           </div>
+        ) : (
+          <>
+            <div className="relative border border-border p-2 sm:p-6 md:p-8">
+              {isLoading && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/70 text-sm uppercase tracking-widest text-muted-foreground">
+                  {lang === "en" ? "Loading availability…" : "جارٍ تحميل التوفر…"}
+                </div>
+              )}
 
-          <div className="mb-2 grid grid-cols-7 gap-0.5 text-center text-xs uppercase tracking-wider text-muted-foreground sm:gap-1">
-            {weekdayLabels.map((w) => (
-              <div key={w} className="py-2">
-                {w}
-              </div>
-            ))}
-          </div>
-
-          <div
-            role="grid"
-            aria-label={monthName}
-            onKeyDown={onGridKeyDown}
-            // Tighter gaps on a phone buy the cells themselves a few pixels
-            // each, which is the difference between a 37px tap target and a
-            // 40px one on a 360px screen.
-            className="grid grid-cols-7 gap-0.5 sm:gap-1"
-          >
-            {cells.map((d, i) => {
-              if (!d) return <div key={`pad-${i}`} />;
-              const iso = fmtDate(d);
-              const past = isPast(d);
-              // A future day the server refuses is held by a booking or blocked
-              // by the admin — that is what black means. Past days are simply
-              // gone, and are faded instead.
-              const reserved = !past && dayBlocked(d);
-              const offPackage = !windows.has(iso);
-              // Off-shape days are aria-disabled rather than disabled: a
-              // disabled button cannot take focus, and with "one day" as the
-              // opening shape three columns in seven are off-shape, so arrow
-              // keys had nothing to land on and the grid stopped being
-              // navigable at all. They stay in the roving order, read as
-              // unavailable, and do nothing when pressed -- selectDay already
-              // returns when a day is in no window. Past and reserved days
-              // are genuinely gone rather than merely out of shape, and stay
-              // disabled.
-              const disabled = past || reserved;
-              const selected = isEdge(d);
-              const within = inRange(d);
-              const priced = byDay.get(iso)?.custom === true;
-              const occ = occasionFor(d);
-              const dayLabel = d.toLocaleDateString(dateLocale(lang, "en-US"), {
-                weekday: "long",
-                day: "numeric",
-                month: "long",
-              });
-
-              const tone = reserved
-                ? "bg-black text-white cursor-not-allowed"
-                : past
-                  ? "cursor-not-allowed text-muted-foreground/30"
-                  : selected
-                    ? // An outlined circle, not a filled one: the ring marks the
-                      // day without hiding its number under a solid block, and
-                      // ring-inset keeps it inside the cell so nothing shifts.
-                      "bg-background font-semibold text-foreground ring-2 ring-inset ring-foreground"
-                    : within
-                      ? "bg-secondary text-foreground"
-                      : offPackage
-                        ? "cursor-not-allowed text-muted-foreground/30"
-                        : occ
-                          ? "ring-1 ring-inset ring-foreground/25 hover:bg-secondary"
-                          : "hover:bg-secondary";
-
-              return (
+              <div className="mb-6 flex items-center justify-between">
                 <button
-                  key={iso}
-                  type="button"
-                  disabled={disabled}
-                  aria-disabled={offPackage || undefined}
-                  onClick={() => selectDay(d)}
-                  aria-label={`${dayLabel}${reserved ? ` — ${tr("reservedLabel")}` : ""}${
-                    occ ? ` — ${lang === "en" ? occ.nameEn : occ.nameAr || occ.nameEn}` : ""
-                  }`}
-                  aria-pressed={!!selected}
-                  data-day={iso}
-                  tabIndex={fmtDate(activeDay) === iso ? 0 : -1}
-                  // The cell is square, so a full radius is a circle -- every
-                  // cell, so reserved, chosen and in-between days are all the
-                  // same shape and differ only in fill: black for taken, a
-                  // ring for the two ends of the stay, grey for the days
-                  // between. The focus outline follows the radius.
-                  className={`relative flex aspect-square flex-col items-center justify-center rounded-full text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-current ${tone}`}
+                  onClick={() => changeMonth(-1)}
+                  disabled={atFirstMonth}
+                  aria-label={lang === "en" ? "Previous month" : "الشهر السابق"}
+                  className="shrink-0 p-2 enabled:hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-25"
                 >
-                  {d.getDate()}
-                  {priced && !reserved && !past && (
-                    <span
-                      className="absolute bottom-1 h-1 w-1 rounded-full bg-foreground/50"
-                      aria-hidden="true"
-                    />
-                  )}
+                  <ChevronLeft className="h-5 w-5 rtl:rotate-180" />
                 </button>
-              );
-            })}
-          </div>
+                <p
+                  className="whitespace-nowrap font-display text-xl capitalize sm:text-2xl"
+                  aria-live="polite"
+                >
+                  {monthName}
+                </p>
+                <button
+                  onClick={() => changeMonth(1)}
+                  disabled={atLastMonth}
+                  aria-label={lang === "en" ? "Next month" : "الشهر التالي"}
+                  className="shrink-0 p-2 enabled:hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-25"
+                >
+                  <ChevronRight className="h-5 w-5 rtl:rotate-180" />
+                </button>
+              </div>
 
-          {/* The count, where the counting happens. Reading it off a summary
+              <div className="mb-2 grid grid-cols-7 gap-0.5 text-center text-xs uppercase tracking-wider text-muted-foreground sm:gap-1">
+                {weekdayLabels.map((w) => (
+                  <div key={w} className="py-2">
+                    {w}
+                  </div>
+                ))}
+              </div>
+
+              <div
+                role="grid"
+                aria-label={monthName}
+                onKeyDown={onGridKeyDown}
+                // Tighter gaps on a phone buy the cells themselves a few pixels
+                // each, which is the difference between a 37px tap target and a
+                // 40px one on a 360px screen.
+                className="grid grid-cols-7 gap-0.5 sm:gap-1"
+              >
+                {cells.map((d, i) => {
+                  if (!d) return <div key={`pad-${i}`} />;
+                  const iso = fmtDate(d);
+                  const past = isPast(d);
+                  // A future day the server refuses is held by a booking or blocked
+                  // by the admin — that is what black means. Past days are simply
+                  // gone, and are faded instead.
+                  const reserved = !past && dayBlocked(d);
+                  const offPackage = !windows.has(iso);
+                  // Off-shape days are aria-disabled rather than disabled: a
+                  // disabled button cannot take focus, and with "one day" as the
+                  // opening shape three columns in seven are off-shape, so arrow
+                  // keys had nothing to land on and the grid stopped being
+                  // navigable at all. They stay in the roving order, read as
+                  // unavailable, and do nothing when pressed -- selectDay already
+                  // returns when a day is in no window. Past and reserved days
+                  // are genuinely gone rather than merely out of shape, and stay
+                  // disabled.
+                  const disabled = past || reserved;
+                  const selected = isEdge(d);
+                  const within = inRange(d);
+                  const priced = byDay.get(iso)?.custom === true;
+                  const occ = occasionFor(d);
+                  const dayLabel = d.toLocaleDateString(dateLocale(lang, "en-US"), {
+                    weekday: "long",
+                    day: "numeric",
+                    month: "long",
+                  });
+
+                  const tone = reserved
+                    ? "bg-black text-white cursor-not-allowed"
+                    : past
+                      ? "cursor-not-allowed text-muted-foreground/30"
+                      : selected
+                        ? // An outlined circle, not a filled one: the ring marks the
+                          // day without hiding its number under a solid block, and
+                          // ring-inset keeps it inside the cell so nothing shifts.
+                          "bg-background font-semibold text-foreground ring-2 ring-inset ring-foreground"
+                        : within
+                          ? "bg-secondary text-foreground"
+                          : offPackage
+                            ? "cursor-not-allowed text-muted-foreground/30"
+                            : occ
+                              ? "ring-1 ring-inset ring-foreground/25 hover:bg-secondary"
+                              : "hover:bg-secondary";
+
+                  return (
+                    <button
+                      key={iso}
+                      type="button"
+                      disabled={disabled}
+                      aria-disabled={offPackage || undefined}
+                      onClick={() => selectDay(d)}
+                      aria-label={`${dayLabel}${reserved ? ` — ${tr("reservedLabel")}` : ""}${
+                        occ ? ` — ${lang === "en" ? occ.nameEn : occ.nameAr || occ.nameEn}` : ""
+                      }`}
+                      aria-pressed={!!selected}
+                      data-day={iso}
+                      tabIndex={fmtDate(activeDay) === iso ? 0 : -1}
+                      // The cell is square, so a full radius is a circle -- every
+                      // cell, so reserved, chosen and in-between days are all the
+                      // same shape and differ only in fill: black for taken, a
+                      // ring for the two ends of the stay, grey for the days
+                      // between. The focus outline follows the radius.
+                      className={`relative flex aspect-square flex-col items-center justify-center rounded-full text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-current ${tone}`}
+                    >
+                      {d.getDate()}
+                      {priced && !reserved && !past && (
+                        <span
+                          className="absolute bottom-1 h-1 w-1 rounded-full bg-foreground/50"
+                          aria-hidden="true"
+                        />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* The count, where the counting happens. Reading it off a summary
               below the fold means tapping, scrolling, checking, scrolling
               back — so it sits against the grid and follows the pointer while
               a check-out day is still being chosen. */}
-          {start && (
-            <div className="mt-5 border-t border-border pt-4">
-              <div>
-                <p className="font-display text-xl" aria-live="polite">
-                  {previewEnd
-                    ? selectedDays === 1
-                      ? tr("oneDaySelected")
-                      : tr("daysSelected").replace("{n}", String(selectedDays))
-                    : tr("pickEndHint")}
+              {start && (
+                <div className="mt-5 border-t border-border pt-4">
+                  <div>
+                    <p className="font-display text-xl" aria-live="polite">
+                      {previewEnd
+                        ? selectedDays === 1
+                          ? tr("oneDaySelected")
+                          : tr("daysSelected").replace("{n}", String(selectedDays))
+                        : tr("pickEndHint")}
+                    </p>
+                    {previewEnd && (
+                      <p className="mt-1 text-sm text-muted-foreground" dir="ltr">
+                        {fmtDate(start)} → {fmtDate(previewEnd)}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {!monthHasWindow && (
+                <p className="mt-4 text-xs text-muted-foreground">{tr("filterNoneLeft")}</p>
+              )}
+              {atLastMonth && (
+                <p className="mt-4 text-xs text-muted-foreground">{tr("horizonNote")}</p>
+              )}
+
+              <div className="mt-6 flex flex-wrap gap-4 text-xs text-muted-foreground">
+                <span className="flex items-center gap-2">
+                  <span className="h-3 w-3 rounded-full bg-black" /> {tr("reservedLabel")}
+                </span>
+                <span className="flex items-center gap-2">
+                  <span className="h-3 w-3 rounded-full ring-2 ring-inset ring-foreground" />{" "}
+                  {tr("selectedLabel")}
+                </span>
+                <span className="flex items-center gap-2">
+                  <span className="h-3 w-3 rounded-full border border-border bg-secondary" />{" "}
+                  {lang === "en" ? "In stay" : "ضمن الإقامة"}
+                </span>
+                <span className="flex items-center gap-2">
+                  <span className="h-3 w-3 rounded-full ring-1 ring-inset ring-foreground/25" />{" "}
+                  {tr("specialPkg")}
+                </span>
+                <span className="flex items-center gap-2">
+                  <span className="h-1 w-1 rounded-full bg-foreground/50" /> {tr("customPricing")}
+                </span>
+              </div>
+            </div>
+
+            {/* Only once there is something to summarise: three boxes of em-dashes
+            were the tallest thing between the calendar and the button, and
+            said nothing. The calendar states the length on its own. */}
+            <div className={`mt-6 grid gap-3 sm:grid-cols-3 ${start ? "" : "hidden sm:grid"}`}>
+              <div className="border border-border p-4">
+                <p className="text-xs uppercase tracking-widest text-muted-foreground">
+                  {tr("checkIn")}
                 </p>
-                {previewEnd && (
-                  <p className="mt-1 text-sm text-muted-foreground" dir="ltr">
-                    {fmtDate(start)} → {fmtDate(previewEnd)}
+                <p className="mt-1 font-display text-xl" dir="ltr">
+                  {start ? fmtDate(start) : "—"}
+                </p>
+                {start && (
+                  <p className="mt-0.5 text-sm text-muted-foreground">
+                    {formatHour(CHECK_IN_HOUR, lang)}
                   </p>
                 )}
               </div>
+              <div className="border border-border p-4">
+                <p className="text-xs uppercase tracking-widest text-muted-foreground">
+                  {tr("checkOut")}
+                </p>
+                {/* The morning after the last booked day -- see checkOutDay. */}
+                <p className="mt-1 font-display text-xl" dir="ltr">
+                  {end ? fmtDate(checkOutDay(end)) : "—"}
+                </p>
+                {end && (
+                  <p className="mt-0.5 text-sm text-muted-foreground">
+                    {formatHour(CHECK_OUT_HOUR, lang)}
+                  </p>
+                )}
+              </div>
+              <div
+                className={`border p-4 ${
+                  tooShort
+                    ? "border-destructive"
+                    : "border-foreground bg-foreground text-background"
+                }`}
+              >
+                <p className="text-xs uppercase tracking-widest opacity-70">
+                  {tr("total")}
+                  {current ? ` · ${current.days} ${tr("nightsLabel")}` : ""}
+                </p>
+                <p className="mt-1 font-display text-xl">
+                  {current && !tooShort ? formatMoney(current.total, lang) : "—"}
+                </p>
+              </div>
             </div>
-          )}
 
-          {!monthHasWindow && (
-            <p className="mt-4 text-xs text-muted-foreground">{tr("filterNoneLeft")}</p>
-          )}
-          {atLastMonth && <p className="mt-4 text-xs text-muted-foreground">{tr("horizonNote")}</p>}
-
-          <div className="mt-6 flex flex-wrap gap-4 text-xs text-muted-foreground">
-            <span className="flex items-center gap-2">
-              <span className="h-3 w-3 rounded-full bg-black" /> {tr("reservedLabel")}
-            </span>
-            <span className="flex items-center gap-2">
-              <span className="h-3 w-3 rounded-full ring-2 ring-inset ring-foreground" />{" "}
-              {tr("selectedLabel")}
-            </span>
-            <span className="flex items-center gap-2">
-              <span className="h-3 w-3 rounded-full border border-border bg-secondary" />{" "}
-              {lang === "en" ? "In stay" : "ضمن الإقامة"}
-            </span>
-            <span className="flex items-center gap-2">
-              <span className="h-3 w-3 rounded-full ring-1 ring-inset ring-foreground/25" />{" "}
-              {tr("specialPkg")}
-            </span>
-            <span className="flex items-center gap-2">
-              <span className="h-1 w-1 rounded-full bg-foreground/50" /> {tr("customPricing")}
-            </span>
-          </div>
-        </div>
-
-        {/* Only once there is something to summarise: three boxes of em-dashes
-            were the tallest thing between the calendar and the button, and
-            said nothing. The calendar states the length on its own. */}
-        <div className={`mt-6 grid gap-3 sm:grid-cols-3 ${start ? "" : "hidden sm:grid"}`}>
-          <div className="border border-border p-4">
-            <p className="text-xs uppercase tracking-widest text-muted-foreground">
-              {tr("checkIn")}
-            </p>
-            <p className="mt-1 font-display text-xl" dir="ltr">
-              {start ? fmtDate(start) : "—"}
-            </p>
-            {start && (
-              <p className="mt-0.5 text-sm text-muted-foreground">
-                {formatHour(CHECK_IN_HOUR, lang)}
+            {current && !tooShort && current.occasion && (
+              <p className="mt-3 text-sm text-muted-foreground">
+                {tr("specialPkg")} ·{" "}
+                {lang === "en"
+                  ? current.occasion.nameEn
+                  : current.occasion.nameAr || current.occasion.nameEn}
               </p>
             )}
-          </div>
-          <div className="border border-border p-4">
-            <p className="text-xs uppercase tracking-widest text-muted-foreground">
-              {tr("checkOut")}
-            </p>
-            {/* The morning after the last booked day -- see checkOutDay. */}
-            <p className="mt-1 font-display text-xl" dir="ltr">
-              {end ? fmtDate(checkOutDay(end)) : "—"}
-            </p>
-            {end && (
-              <p className="mt-0.5 text-sm text-muted-foreground">
-                {formatHour(CHECK_OUT_HOUR, lang)}
+            {current && !tooShort && current.packageKey && current.packageKey !== "special" && (
+              <p className="mt-3 text-sm text-muted-foreground">
+                {current.packageKey === "fullWeek"
+                  ? tr("fullWeekPkg")
+                  : current.packageKey === "weekend"
+                    ? tr("weekendPkg")
+                    : tr("weekdayPkg")}
               </p>
             )}
-          </div>
-          <div
-            className={`border p-4 ${
-              tooShort ? "border-destructive" : "border-foreground bg-foreground text-background"
-            }`}
-          >
-            <p className="text-xs uppercase tracking-widest opacity-70">
-              {tr("total")}
-              {current ? ` · ${current.days} ${tr("nightsLabel")}` : ""}
-            </p>
-            <p className="mt-1 font-display text-xl">
-              {current && !tooShort ? formatMoney(current.total, lang) : "—"}
-            </p>
-          </div>
-        </div>
+            {current && !tooShort && current.hasCustom && (
+              <p className="mt-3 text-sm text-muted-foreground">{tr("customPricing")}</p>
+            )}
 
-        {current && !tooShort && current.occasion && (
-          <p className="mt-3 text-sm text-muted-foreground">
-            {tr("specialPkg")} ·{" "}
-            {lang === "en"
-              ? current.occasion.nameEn
-              : current.occasion.nameAr || current.occasion.nameEn}
-          </p>
-        )}
-        {current && !tooShort && current.packageKey && current.packageKey !== "special" && (
-          <p className="mt-3 text-sm text-muted-foreground">
-            {current.packageKey === "fullWeek"
-              ? tr("fullWeekPkg")
-              : current.packageKey === "weekend"
-                ? tr("weekendPkg")
-                : tr("weekdayPkg")}
-          </p>
-        )}
-        {current && !tooShort && current.hasCustom && (
-          <p className="mt-3 text-sm text-muted-foreground">{tr("customPricing")}</p>
-        )}
-
-        {/* Selection, price and refusals were all silent to a screen reader:
+            {/* Selection, price and refusals were all silent to a screen reader:
             the calendar changed underneath them with no announcement. */}
-        <p aria-live="polite" className="sr-only">
-          {error
-            ? error
-            : current && !tooShort && start && end
-              ? `${fmtDate(start)} → ${fmtDate(end)}, ${current.days} ${tr("nightsLabel")}, ${formatMoney(current.total, lang)}`
-              : ""}
-        </p>
+            <p aria-live="polite" className="sr-only">
+              {error
+                ? error
+                : current && !tooShort && start && end
+                  ? `${fmtDate(start)} → ${fmtDate(end)}, ${current.days} ${tr("nightsLabel")}, ${formatMoney(current.total, lang)}`
+                  : ""}
+            </p>
 
-        {error && (
-          <p className="mt-4 text-sm text-destructive" role="alert">
-            {error}
-          </p>
+            {error && (
+              <p className="mt-4 text-sm text-destructive" role="alert">
+                {error}
+              </p>
+            )}
+
+            <div className="mt-8 flex flex-wrap gap-3">
+              <button
+                onClick={goToForm}
+                disabled={!ready}
+                className="bg-black px-8 py-4 text-sm uppercase tracking-widest text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-30"
+              >
+                {tr("continueLabel")}
+              </button>
+              <button
+                onClick={() => {
+                  setStart(null);
+                  setEnd(null);
+                  setError("");
+                }}
+                className="border border-border px-8 py-4 text-sm uppercase tracking-widest hover:bg-secondary"
+              >
+                {tr("clear")}
+              </button>
+            </div>
+          </>
         )}
-
-        <div className="mt-8 flex flex-wrap gap-3">
-          <button
-            onClick={goToForm}
-            disabled={!ready}
-            className="bg-black px-8 py-4 text-sm uppercase tracking-widest text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-30"
-          >
-            {tr("continueLabel")}
-          </button>
-          <button
-            onClick={() => {
-              setStart(null);
-              setEnd(null);
-              setError("");
-            }}
-            className="border border-border px-8 py-4 text-sm uppercase tracking-widest hover:bg-secondary"
-          >
-            {tr("clear")}
-          </button>
-        </div>
 
         <p className="mt-8 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
           {tr("whatsappAlt")}
