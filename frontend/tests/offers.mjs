@@ -128,6 +128,19 @@ async function fromOffers(p, pick) {
     pressed === 5,
     String(pressed),
   );
+  // The by-the-day card matches the rule: weekdays a day at a time, the
+  // weekend only whole. It used to say "3 days or more" and quote a Thu-Sat
+  // daily rate that no booking could use.
+  const perDay = await p.getByRole("button", { name: /By the day/i }).innerText();
+  ck(
+    "By the day says weekdays can be booked from a single day",
+    /Sunday to Wednesday.*single day/s.test(perDay) && !/3 days or more/.test(perDay),
+    perDay.replace(/\n+/g, " | "),
+  );
+  ck(
+    "…and quotes no Thursday-Saturday daily rate",
+    /KD 75/.test(perDay) && !/120/.test(perDay) && !/Thu – Sat, per day/i.test(perDay),
+  );
   ck(
     "Nothing is chosen until the guest chooses",
     (await p.locator('main button[aria-pressed="true"]').count()) === 0,
@@ -193,7 +206,7 @@ for (const [name, re, want] of [
   ["Weekend package", /Thu – Sat Package/i, "WEEKEND"],
   ["Weekday package", /Sun – Wed Package/i, "WEEKDAY"],
   ["Full week package", /Full Week Package/i, "FULL WEEK"],
-  ["Per-day rate", /Custom dates/i, "BY DAY"],
+  ["Per-day rate", /By the day/i, "BY DAY"],
 ]) {
   const { ctx, p } = await page();
   await fromOffers(p, () => p.getByRole("button", { name: re }).first().click());

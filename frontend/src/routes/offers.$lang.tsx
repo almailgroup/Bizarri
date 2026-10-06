@@ -159,14 +159,6 @@ function Offers() {
                   {formatMoney(rates.dailyWeekday, lang)}
                 </span>
               </span>
-              <span>
-                <span className="block text-xs uppercase tracking-widest text-muted-foreground">
-                  {tr("weekendNight")}
-                </span>
-                <span className="mt-1 block font-display text-2xl">
-                  {formatMoney(rates.dailyWeekend, lang)}
-                </span>
-              </span>
             </span>
           </button>
         </Reveal>

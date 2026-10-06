@@ -148,17 +148,19 @@ export const t: Dict = {
   // Offers
   offers: { en: "Offers", ar: "العروض" },
   offersIntro: {
-    en: "Fixed-rate packages for the whole chalet. Custom dates are priced per day.",
-    ar: "باقات بسعر ثابت للشاليه بالكامل. التواريخ المخصصة تُسعّر يومياً.",
+    en: "Fixed-rate packages for the whole chalet, or a single weekday at the daily rate.",
+    ar: "باقات بسعر ثابت للشاليه بالكامل، أو يوم واحد من أيام الأسبوع بالسعر اليومي.",
   },
   fullWeekPkg: { en: "Full Week Package", ar: "باقة الأسبوع الكامل" },
   days7: { en: "7 days", ar: "7 أيام" },
   days4: { en: "4 days", ar: "4 أيام" },
   days3: { en: "3 days", ar: "3 أيام" },
-  perDayRates: { en: "Custom dates", ar: "تواريخ مخصصة" },
+  perDayRates: { en: "By the day", ar: "باليوم" },
+  // The public card. Thu-Sat is not sold by the day -- only as the whole
+  // weekend -- so this says so rather than quoting a rate for it.
   perDayIntro: {
-    en: "Any other stay of 3 days or more is priced per day.",
-    ar: "أي إقامة أخرى من 3 أيام فأكثر تُسعّر يومياً.",
+    en: "Sunday to Wednesday can be booked a day at a time, from a single day. Thursday to Saturday is booked as the whole weekend.",
+    ar: "يمكن حجز أيام الأحد إلى الأربعاء يوماً بيوم، ابتداءً من يوم واحد. أما الخميس إلى السبت فيُحجز كعطلة نهاية أسبوع كاملة.",
   },
   weekdayNight: { en: "Sun – Wed, per day", ar: "الأحد – الأربعاء، لليوم" },
   weekendNight: { en: "Thu – Sat, per day", ar: "الخميس – السبت، لليوم" },
