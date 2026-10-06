@@ -39,8 +39,8 @@ const OCCASION = {
   active: true,
 };
 
-async function page() {
-  const ctx = await b.newContext({ viewport: { width: 1200, height: 1000 } });
+async function page(viewport = { width: 1200, height: 1000 }) {
+  const ctx = await b.newContext({ viewport });
   await ctx.route(/^https?:\/\/(?!localhost)/, (r) => {
     const u = r.request().url();
     if (!SUPA.test(u)) return r.abort();
@@ -142,6 +142,33 @@ async function fromOffers(p, pick) {
   const weekend = p.getByRole("button", { name: /Thu – Sat Package/i });
   await weekend.click();
   ck("Choosing one marks it", (await weekend.getAttribute("aria-pressed")) === "true");
+  // Light grey, not inverted to black: the owner found black heavy on a phone.
+  // Read once the colour transition has finished, not halfway through it.
+  await p.waitForTimeout(500);
+  const bg = await weekend.evaluate((el) => {
+    const c = document.createElement("canvas").getContext("2d");
+    c.fillStyle = getComputedStyle(el).backgroundColor;
+    c.fillRect(0, 0, 1, 1);
+    const [r, g, b] = c.getImageData(0, 0, 1, 1).data;
+    return {
+      lum: (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255,
+      css: getComputedStyle(el).backgroundColor,
+    };
+  });
+  ck(
+    "…in light grey, not black",
+    bg.lum > 0.85 && bg.lum < 0.995 && !/\/\s*0?\.\d+\)$/.test(bg.css),
+    `${bg.css} (${bg.lum.toFixed(2)})`,
+  );
+  ck(
+    "…with its text still dark",
+    await weekend.evaluate((el) => {
+      const c = getComputedStyle(el.querySelector("h2"))
+        .color.match(/[\d.]+/g)
+        .map(Number);
+      return c[0] < 80 && c[1] < 80 && c[2] < 80;
+    }),
+  );
   ck(
     "…and the button carries it",
     /shape=weekend/.test((await cta(p).getAttribute("href")) ?? ""),
@@ -197,6 +224,31 @@ for (const [name, re, want] of [
     await p.waitForTimeout(700);
     ck("…and Back returns to the offers", path(p) === "/offers/en", path(p));
   }
+  await ctx.close();
+}
+
+// ===================================== the booking page opens at its top
+// The button sits at the foot of a long page on a phone; arriving on the
+// booking page at the same offset dropped the guest past the heading and the
+// chalets, into the middle of the calendar.
+for (const [name, re] of [
+  ["a package", /Full Week Package/i],
+  ["a holiday", /National Day/i],
+]) {
+  const { ctx, p } = await page({ width: 390, height: 844 });
+  await p.goto(`${B}offers/en`, { waitUntil: "load" });
+  await p.waitForTimeout(900);
+  await p.getByRole("button", { name: re }).click();
+  await cta(p).scrollIntoViewIfNeeded();
+  const from = await p.evaluate(() => Math.round(window.scrollY));
+  await cta(p).click();
+  await p.waitForTimeout(1500);
+  const y = await p.evaluate(() => Math.round(window.scrollY));
+  ck(
+    `Choosing ${name} opens the booking page at the top`,
+    from > 400 && y === 0,
+    `${from}px → ${y}px`,
+  );
   await ctx.close();
 }
 

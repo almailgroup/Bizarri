@@ -95,18 +95,19 @@ function Offers() {
             const on = isChosen(p.key);
             return (
               <Reveal key={p.key} delay={i * 80}>
-                {/* A choice, not a poster: the filled card is the one chosen.
-                  The featured package keeps a heavier border instead, so
-                  it stands out without looking already picked. */}
+                {/* A choice, not a poster: the chosen card turns light grey
+                  with a dark border and a tick -- grey rather than black,
+                  which read as heavy on a phone. The featured package keeps a
+                  heavier border, so it stands out without looking picked. */}
                 <button
                   type="button"
                   onClick={() => choose({ shape: p.key })}
                   aria-pressed={on}
                   className={`relative flex h-full w-full flex-col justify-between border p-8 text-start transition-colors ${
                     on
-                      ? "border-foreground bg-foreground text-background"
+                      ? "border-foreground bg-secondary"
                       : p.feature
-                        ? "border-2 border-foreground hover:bg-secondary"
+                        ? "border-2 border-foreground hover:bg-secondary/50"
                         : "border-border hover:border-foreground/50"
                   }`}
                 >
@@ -116,17 +117,11 @@ function Offers() {
                     </span>
                   )}
                   <div>
-                    <p
-                      className={`text-xs uppercase tracking-widest ${
-                        on ? "opacity-70" : "text-muted-foreground"
-                      }`}
-                    >
+                    <p className="text-xs uppercase tracking-widest text-muted-foreground">
                       {p.length}
                     </p>
                     <h2 className="mt-3 font-display text-2xl">{p.name}</h2>
-                    <p className={`mt-2 text-sm ${on ? "opacity-70" : "text-muted-foreground"}`}>
-                      {p.span}
-                    </p>
+                    <p className="mt-2 text-sm text-muted-foreground">{p.span}</p>
                   </div>
                   <p className="mt-10 font-display text-4xl">{formatMoney(p.price, lang)}</p>
                 </button>
@@ -142,7 +137,7 @@ function Offers() {
             aria-pressed={isChosen("day")}
             className={`relative mt-4 block w-full border p-8 text-start transition-colors ${
               isChosen("day")
-                ? "border-foreground bg-foreground text-background"
+                ? "border-foreground bg-secondary"
                 : "border-border hover:border-foreground/50"
             }`}
           >
@@ -151,13 +146,13 @@ function Offers() {
                 <Check className="h-4 w-4" aria-hidden="true" /> {tr("offerChosen")}
               </span>
             )}
-            <span className="block text-xs uppercase tracking-widest opacity-70">
+            <span className="block text-xs uppercase tracking-widest text-muted-foreground">
               {tr("perDayRates")}
             </span>
-            <span className="mt-3 block max-w-lg opacity-70">{tr("perDayIntro")}</span>
+            <span className="mt-3 block max-w-lg text-muted-foreground">{tr("perDayIntro")}</span>
             <span className="mt-6 flex flex-wrap gap-x-14 gap-y-4">
               <span>
-                <span className="block text-xs uppercase tracking-widest opacity-70">
+                <span className="block text-xs uppercase tracking-widest text-muted-foreground">
                   {tr("weekdayNight")}
                 </span>
                 <span className="mt-1 block font-display text-2xl">
@@ -165,7 +160,7 @@ function Offers() {
                 </span>
               </span>
               <span>
-                <span className="block text-xs uppercase tracking-widest opacity-70">
+                <span className="block text-xs uppercase tracking-widest text-muted-foreground">
                   {tr("weekendNight")}
                 </span>
                 <span className="mt-1 block font-display text-2xl">
@@ -194,18 +189,18 @@ function Offers() {
                       aria-pressed={on}
                       className={`border p-4 text-start transition-colors ${
                         on
-                          ? "border-foreground bg-foreground text-background"
+                          ? "border-foreground bg-secondary"
                           : "border-border hover:border-foreground/50"
                       }`}
                     >
-                      <span className="flex items-center justify-between gap-2 text-xs uppercase tracking-widest opacity-70">
+                      <span className="flex items-center justify-between gap-2 text-xs uppercase tracking-widest text-muted-foreground">
                         {lang === "en" ? o.nameEn : o.nameAr || o.nameEn}
                         {on && <Check className="h-4 w-4" aria-hidden="true" />}
                       </span>
                       <span className="mt-1 block font-display text-2xl">
                         {formatMoney(o.price, lang)}
                       </span>
-                      <span className="block text-sm opacity-70" dir="ltr">
+                      <span className="block text-sm text-muted-foreground" dir="ltr">
                         {o.start} → {o.end}
                       </span>
                     </button>

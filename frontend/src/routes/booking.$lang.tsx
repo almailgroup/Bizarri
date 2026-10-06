@@ -168,9 +168,15 @@ function Booking() {
   // The offer chosen on the Offers page, read as the calendar first opens and
   // then dropped from the address -- replaced, so Back still returns to the
   // offers -- leaving the guest free to choose something else from there.
+  //
+  // Not with resetScroll: false. This runs while the router is still
+  // finishing the arrival from the Offers page, and that flag overrode the
+  // arrival's own reset: the guest pressed the button at the foot of the
+  // offers and landed 1,200px down the booking page, past the heading and
+  // the chalets. A fresh arrival starts at the top, so let it.
   const [offer] = useState(() => ({ shape, occasion }));
   useEffect(() => {
-    if (shape || occasion) navigate({ search: {}, replace: true, resetScroll: false });
+    if (shape || occasion) navigate({ search: {}, replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [confirmed, setConfirmed] = useState<BookingRow | null>(null);
