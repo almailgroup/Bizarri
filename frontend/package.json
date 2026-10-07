@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "test:integration": "node --experimental-strip-types tests/pricing-mirror.mjs && node tests/deploy.mjs && node tests/lang-routes.mjs && node tests/be-test.mjs && node tests/fixes.mjs && node tests/authtest.mjs && node tests/admin-features.mjs && node tests/new-features.mjs && node tests/logo.mjs && node tests/a11y.mjs && node tests/mobile.mjs && node tests/bidi.mjs && node tests/verify-lookup.mjs && node tests/calendar-range.mjs && node tests/history.mjs && node tests/gallery.mjs && node tests/offers.mjs && node tests/notify-whatsapp-logic.mjs && node tests/notify-routing.mjs"
+    "test:integration": "node --experimental-strip-types tests/pricing-mirror.mjs && node tests/deploy.mjs && node tests/lang-routes.mjs && node tests/be-test.mjs && node tests/fixes.mjs && node tests/authtest.mjs && node tests/admin-features.mjs && node tests/new-features.mjs && node tests/logo.mjs && node tests/a11y.mjs && node tests/mobile.mjs && node tests/bidi.mjs && node tests/verify-lookup.mjs && node tests/calendar-range.mjs && node tests/history.mjs && node tests/gallery.mjs && node tests/offers.mjs && node tests/scroll-top.mjs && node tests/notify-whatsapp-logic.mjs && node tests/notify-routing.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

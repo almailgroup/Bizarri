@@ -23,6 +23,13 @@ export const getRouter = () => {
     basepath: import.meta.env.BASE_URL,
     context: { queryClient },
     scrollRestoration: true,
+    // Instant, not the stylesheet's smooth scrolling, which the router would
+    // otherwise inherit: a new page appeared wherever the last one had been
+    // scrolled to and then slid up through itself for most of a second --
+    // 3,600px of the home page going past before its hero. Smooth stays for
+    // what it is for, links within a page; arriving on a page is not that.
+    // Back restores the old position the same way: at once.
+    scrollRestorationBehavior: "instant",
     defaultPreload: "intent",
     defaultPreloadStaleTime: 0,
   });
