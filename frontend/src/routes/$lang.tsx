@@ -13,7 +13,17 @@ import { photo } from "@/lib/gallery";
 // weighs a chalet in.
 const PREVIEW_LEAD = photo("pool-01");
 const PREVIEW_SIDE = [photo("living-01"), photo("rooms-01")];
-import { ArrowRight, Cpu, Tv, Waves, ChefHat, Bed, Wifi, MapPin, Phone } from "lucide-react";
+import {
+  ArrowRight,
+  Armchair,
+  BedDouble,
+  Car,
+  Goal,
+  UtensilsCrossed,
+  Waves,
+  MapPin,
+  Phone,
+} from "lucide-react";
 
 /**
  * The homepage, /en or /ar.
@@ -33,13 +43,27 @@ export const Route = createFileRoute("/$lang")({
   },
 });
 
+// Six of the Facilities page's items, in the owner's words, so the two pages
+// never describe different chalets. The full list is one link away.
 const highlights = [
-  { icon: Cpu, en: "Fully automated smart home", ar: "منزل ذكي مؤتمت بالكامل" },
-  { icon: Waves, en: "Private pool & beach access", ar: "مسبح خاص وإطلالة على الشاطئ" },
-  { icon: Tv, en: '65" TV with 5.1 sound bar', ar: "تلفزيون 65 بوصة مع ساوند بار 5.1" },
-  { icon: Bed, en: "Premium California King bed", ar: "سرير كاليفورنيا كنغ فاخر" },
-  { icon: ChefHat, en: "Full kitchen with Nespresso", ar: "مطبخ متكامل مع نسبريسو" },
-  { icon: Wifi, en: "5G internet throughout", ar: "إنترنت الجيل الخامس في كل مكان" },
+  { icon: BedDouble, en: "7 bedrooms sleeping 14 guests", ar: "7 غرف نوم تكفي لعدد 14 شخص" },
+  {
+    icon: Waves,
+    en: "An outdoor swimming pool, with heating",
+    ar: "حمام سباحة خارجي مع خاصية التدفئة",
+  },
+  { icon: Armchair, en: "Outdoor seating right on the lagoon", ar: "جلسة خارجية على الخور مباشرة" },
+  {
+    icon: UtensilsCrossed,
+    en: "A fully equipped kitchen and dining for 12",
+    ar: "مطبخ مجهز بالكامل وطاولة طعام تكفي لعدد 12 شخص",
+  },
+  {
+    icon: Goal,
+    en: "A children's play area with a football pitch",
+    ar: "منطقة ألعاب للأطفال مع ملعب كرة قدم",
+  },
+  { icon: Car, en: "Parking for 9 cars", ar: "مواقف تتسع لعدد 9 سيارات" },
 ];
 
 function Home() {
@@ -47,8 +71,8 @@ function Home() {
   usePageMeta(
     "",
     lang === "en"
-      ? "A premium private chalet experience in Kuwait by Almail Group — smart, private and designed for relaxation."
-      : "تجربة شاليه خاص فاخر في الكويت من مجموعة الميل — ذكي وخاص ومصمم للاسترخاء.",
+      ? "Bizarri Chalet in Al Khiran, Kuwait, by Almail Group: 7 bedrooms for 14 guests, a heated pool and seating on the lagoon, and a children's play area."
+      : "شاليه بيزاري في الخيران، الكويت، من مجموعة الميل: 7 غرف نوم تكفي 14 شخص، حمام سباحة مع تدفئة وجلسة على الخور، ومنطقة ألعاب للأطفال.",
   );
 
   return (

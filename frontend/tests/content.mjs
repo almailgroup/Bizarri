@@ -203,6 +203,57 @@ for (const lang of ["en", "ar"]) {
   await ctx.close();
 }
 
+// ====================================== home highlights match the facilities
+// The home page's six highlights used to describe a different chalet -- a
+// smart home, 5G, a California King bed, Nespresso -- from the one the
+// Facilities page now lists. Each highlight has to be something Facilities
+// says too.
+for (const lang of ["en", "ar"]) {
+  const { ctx, p } = await page();
+  await p.goto(`${B}${lang}`, { waitUntil: "load" });
+  await p.waitForTimeout(900);
+  const highlights = await p.evaluate(() =>
+    [...document.querySelectorAll("#chalet .grid p")].map((x) => x.textContent.trim()),
+  );
+  const home = await p.evaluate(() => document.body.innerText);
+  const meta = await p.evaluate(
+    () => document.querySelector('meta[name="description"]')?.getAttribute("content") ?? "",
+  );
+  await p.goto(`${B}facilities/${lang}`, { waitUntil: "load" });
+  await p.waitForTimeout(900);
+  const fac = await p.evaluate(() => document.querySelector("main").innerText);
+  // The words that carry each claim, as Facilities words them.
+  const facts =
+    lang === "en"
+      ? [
+          "7 bedrooms sleeping 14 guests",
+          "with heating",
+          "Outdoor seating right on the lagoon",
+          "fully equipped kitchen",
+          "football pitch",
+          "Parking for 9 cars",
+        ]
+      : [
+          "7 غرف نوم تكفي لعدد 14 شخص",
+          "خاصية التدفئة",
+          "جلسة خارجية على الخور مباشرة",
+          "مطبخ مجهز بالكامل",
+          "ملعب كرة قدم",
+          "9 سيارات",
+        ];
+  ck(
+    `The home page has six highlights, each one on the Facilities page too (${lang})`,
+    highlights.length === 6 && facts.every((f, i) => highlights[i].includes(f) && fac.includes(f)),
+    highlights.join(" | "),
+  );
+  ck(
+    `…and none of the old claims (${lang})`,
+    !/smart|Nespresso|California|5G|65"|ذكي|نسبريسو|كاليفورنيا|الجيل الخامس/i.test(home + meta),
+    meta,
+  );
+  await ctx.close();
+}
+
 await b.close();
 console.log(`\n${fails} failing`);
 process.exit(fails ? 1 : 0);
