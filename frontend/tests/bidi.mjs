@@ -1,7 +1,7 @@
 /**
  * A "+" or "@" is bidi-neutral. Dropped into the Arabic page's RTL run it
  * lands at the visual end, so +96594040955 reads back as 96594040955+ and
- * @bizarri.chalet as bizarri.chalet@ — wrong numbers, on the contact page.
+ * @bizarri_chalet as bizarri_chalet@ — wrong numbers, on the contact page.
  *
  * Nothing in the DOM says this: textContent is correct either way. The only
  * honest check is where the glyphs actually land, so this measures the "+"
@@ -63,8 +63,8 @@ ck("/contact really is the Arabic page", dir === "rtl", `dir=${dir}`);
 const phone = await visualOrder("+96594040955");
 ck("The phone reads +965\u2026 left to right", phone === "+96594040955", `reads "${phone}"`);
 
-const handle = await visualOrder("@bizarri.chalet");
-ck("The Instagram handle keeps its @ in front", handle === "@bizarri.chalet", `reads "${handle}"`);
+const handle = await visualOrder("@bizarri_chalet");
+ck("The Instagram handle keeps its @ in front", handle === "@bizarri_chalet", `reads "${handle}"`);
 const mail = await visualOrder("sales@bizarri.com");
 ck("The email is not reordered either", mail === "sales@bizarri.com", `reads "${mail}"`);
 

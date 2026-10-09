@@ -136,21 +136,18 @@ let { p, ctx } = await mk("America/New_York");
 await p.waitForTimeout(900);
 await p.getByRole("button", { name: "Next month" }).click();
 await p.waitForTimeout(400);
-const day = (n) =>
-  p
-    .locator(".grid.grid-cols-7 button")
-    .filter({ hasText: new RegExp(`^${n}$`) })
-    .first();
-// Sun 11 - Wed 14 in one tap. The mocked server answers with 11 - 17
-// whatever was chosen, which is the point: the confirmation has to show the
-// dates the server stored rather than the ones the browser picked, and now
-// that the two deliberately differ it can only pass by reading the response.
+// A Sun - Wed in one tap -- the first one offered, rather than "the 11th",
+// which is only a weekday in some months. The mocked server answers with
+// 11 - 17 whatever was chosen, which is the point: the confirmation has to
+// show the dates the server stored rather than the ones the browser picked,
+// and with the two deliberately different it can only pass by reading the
+// response.
 await p
   .getByRole("button", { name: /^Weekday/i })
   .first()
   .click();
 await p.waitForTimeout(400);
-await day(11).click();
+await p.locator('[role="grid"] button:not([disabled]):not([aria-disabled="true"])').first().click();
 await p.waitForTimeout(400);
 await p.getByRole("button", { name: /^Continue$/i }).click();
 await p.waitForTimeout(400);

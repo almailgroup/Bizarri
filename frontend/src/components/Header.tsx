@@ -17,12 +17,16 @@ const primaryNav: { to: NavPath; key: TrKey }[] = [
   { to: "/facilities/$lang", key: "facilities" },
   { to: "/photos/$lang", key: "photos" },
   { to: "/offers/$lang", key: "offers" },
+  { to: "/packages/$lang", key: "packages" },
   { to: "/booking/$lang", key: "booking" },
   { to: "/contact/$lang", key: "contact" },
 ];
 
+// Everything in the bar up to Booking, then the pages that only the menu
+// carries. Counted by name rather than by position: a fifth header entry
+// once pushed Booking out of the phone menu by sitting before it.
 const menuNav: { to: NavPath; key: TrKey }[] = [
-  ...primaryNav.slice(0, 4),
+  ...primaryNav.slice(0, primaryNav.findIndex((n) => n.key === "booking") + 1),
   { to: "/reservation/$lang", key: "yourReservation" },
   { to: "/news/$lang", key: "news" },
   { to: "/rules/$lang", key: "rules" },

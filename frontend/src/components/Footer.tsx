@@ -98,6 +98,24 @@ export function Footer() {
             </li>
             <li>
               <Link
+                to="/offers/$lang"
+                params={{ lang }}
+                className="-my-1 inline-block py-2 text-white/70 hover:text-white"
+              >
+                {tr("offers")}
+              </Link>
+            </li>
+            <li>
+              <Link
+                to="/packages/$lang"
+                params={{ lang }}
+                className="-my-1 inline-block py-2 text-white/70 hover:text-white"
+              >
+                {tr("packages")}
+              </Link>
+            </li>
+            <li>
+              <Link
                 to="/news/$lang"
                 params={{ lang }}
                 className="-my-1 inline-block py-2 text-white/70 hover:text-white"

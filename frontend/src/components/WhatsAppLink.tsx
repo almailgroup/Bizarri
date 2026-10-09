@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { MessageCircle } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { useContactInfo } from "@/lib/api";
@@ -16,7 +17,8 @@ export function WhatsAppLink({
   /** Folded into the prefilled message so we open on what they were doing. */
   context?: { chaletId?: number; start?: Date | null; end?: Date | null };
   className?: string;
-  label?: string;
+  /** Text, or markup when part of it -- a phone number -- needs its own direction. */
+  label?: ReactNode;
 }) {
   const { tr, lang } = useI18n();
   const contact = useContactInfo();

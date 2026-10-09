@@ -140,6 +140,7 @@ const ROUTES = [
   "facilities",
   "photos",
   "offers",
+  "packages",
   "booking",
   "reservation",
   "news",

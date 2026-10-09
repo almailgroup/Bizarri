@@ -601,12 +601,23 @@ export interface ContactInfo {
   maps: string;
 }
 
+/**
+ * "@handle" from an Instagram profile URL, so the handle shown on a page is
+ * always the account its link opens.
+ */
+export function instagramHandle(url: string): string {
+  const m = url.match(/instagram\.com\/([^/?#]+)/i);
+  return m ? `@${m[1]}` : url;
+}
+
 /** Shown until the settings row loads, and whenever a field is left blank. */
 const DEFAULT_CONTACT: ContactInfo = {
   phone: "+96594040955",
   whatsapp: "96594040955",
   email: "sales@bizarri.com",
-  instagram: "https://www.instagram.com/bizarri.chalet",
+  // As the owner gives it: "انستغرام: bizarri_chalet". An Instagram URL set
+  // in the admin's Site Settings takes precedence over this.
+  instagram: "https://www.instagram.com/bizarri_chalet",
   maps: "https://maps.app.goo.gl/5wjw1skfpqdnDhFa6",
 };
 

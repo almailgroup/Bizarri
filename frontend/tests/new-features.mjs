@@ -1338,10 +1338,11 @@ async function adminPage(state, tab) {
 
   // Offers falls back to the built-in rates, which keeps the page useful —
   // but a guest must not quote a stale price believing it is live.
-  await p.goto(pageUrl("offers"), { waitUntil: "load" });
+  // The rates moved from Offers to the Packages page.
+  await p.goto(pageUrl("packages"), { waitUntil: "load" });
   await p.waitForTimeout(1500);
   const offersText = await p.locator("body").innerText();
-  ck("Offers still shows prices during an outage", /600/.test(offersText));
+  ck("Packages still shows prices during an outage", /600/.test(offersText));
   ck(
     "…but says they are standard rather than live",
     /standard prices/i.test(offersText),

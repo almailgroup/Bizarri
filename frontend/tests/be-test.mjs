@@ -57,6 +57,36 @@ function mock(ctx, state) {
   });
 }
 
+/**
+ * The week everything below is about, chosen from today rather than written
+ * in. It used to be "Thu 8 – Sat 10 October 2026", which held until the 9th
+ * of October and then failed for a reason that had nothing to do with the
+ * code. A Sunday at least a week ahead, early enough in its month that the
+ * Sunday after it is in the same month, so one page of the calendar shows it
+ * all.
+ */
+const ymd = (d) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const W = (() => {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + 7);
+  for (;;) {
+    const next = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 7);
+    if (d.getDay() === 0 && next.getMonth() === d.getMonth()) break;
+    d.setDate(d.getDate() + 1);
+  }
+  const at = (n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+  return {
+    sun: d,
+    customMon: at(1),
+    blockedWed: at(3),
+    thu: at(4),
+    nextSun: at(7),
+    monthName: d.toLocaleDateString("en-US", { month: "long", year: "numeric" }),
+  };
+})();
+
 const baseState = () => ({
   calls: [],
   // What the mailer "sent"; the form only ever learns it the way a guest
@@ -93,7 +123,8 @@ const baseState = () => ({
     updated_by: null,
   },
   news: [],
-  // Mirror the SQL: past days blocked, 2026-10-06 blocked, 2026-10-05 priced 200
+  // Mirror the SQL: past days blocked, the anchor week's Wednesday blocked,
+  // its Monday custom-priced at 200.
   calendar: ({ p_from, p_to }) => {
     const out = [];
     const d = new Date(p_from + "T00:00:00");
@@ -103,10 +134,10 @@ const baseState = () => ({
     for (; d <= end; d.setDate(d.getDate() + 1)) {
       const iso = d.toISOString().slice(0, 10);
       const dow = d.getDay();
-      const custom = iso === "2026-10-05";
+      const custom = iso === ymd(W.customMon);
       out.push({
         day: iso,
-        blocked: d < today || iso === "2026-10-06",
+        blocked: d < today || iso === ymd(W.blockedWed),
         price: custom ? 200 : dow >= 4 ? 120 : 75,
         custom,
       });
@@ -150,14 +181,15 @@ async function page(route, state) {
   return { p, ctx };
 }
 
-// ---------- offers reads rates from the server ----------
+// ---------- packages reads rates from the server ----------
+// (The rates were on the Offers page until Packages became a page of its own.)
 let st = baseState();
-let { p, ctx } = await page("offers", st);
+let { p, ctx } = await page("packages", st);
 ck(
-  "Offers fetches rates from Supabase",
+  "Packages fetches rates from Supabase",
   st.calls.some((c) => c.path === "rates"),
 );
-ck("Offers renders the server's full-week rate", await p.getByText("KD 600").isVisible());
+ck("Packages renders the server's full-week rate", await p.getByText("KD 600").isVisible());
 await ctx.close();
 
 // ---------- booking calendar uses availability_calendar ----------
@@ -172,21 +204,23 @@ const calCall = st.calls.find((c) => c.path === "rpc/availability_calendar");
 ck("Calendar calls availability_calendar RPC", !!calCall, JSON.stringify(calCall?.body));
 ck("RPC is scoped to a chalet", calCall?.body?.p_chalet_id === 1);
 
-// Navigate to October 2026 and check the server's blocked day is disabled.
+// Navigate to the anchor week's month and check the server's blocked day is
+// disabled.
 // By name rather than by pressing Next a fixed number of times: the calendar
 // now opens on the first month that has a stay you can tap, so where it
 // starts depends on the shape and the day of the month.
 for (let i = 0; i < 6; i++) {
   const heading = await p.locator('[role="grid"]').getAttribute("aria-label");
-  if (/October 2026/i.test(heading ?? "")) break;
+  if ((heading ?? "").includes(W.monthName)) break;
   await p.getByRole("button", { name: "Next month" }).click();
   await p.waitForTimeout(300);
 }
 const blocked6 = await p.evaluate(
-  () =>
+  (n) =>
     [...document.querySelectorAll(".grid.grid-cols-7 button")].find(
-      (x) => x.textContent.trim() === "6",
+      (x) => x.textContent.trim() === n,
     )?.disabled,
+  String(W.blockedWed.getDate()),
 );
 ck("Server-blocked day is disabled in the UI", blocked6 === true);
 
@@ -214,32 +248,34 @@ const shape = async (name) => {
   await p.waitForTimeout(400);
 };
 
-// Thu 8 – Sat 10 October 2026 is free; the weekend rate is the server's.
+// The anchor week's Thu – Sat is free; the weekend rate is the server's.
 await shape("Weekend");
-await day(8).click();
+await day(W.thu.getDate()).click();
 await p.waitForTimeout(400);
 ck("Weekend priced from server rates (KD 350)", (await total()) === "KD 350", await total());
 
-// Sun 11 – Wed 14 is free too, and carries the other package rate.
+// The following Sun – Wed is free too, and carries the other package rate.
 await p.getByRole("button", { name: /^Clear$/i }).click();
 await shape("Weekday");
-await day(11).click();
+await day(W.nextSun.getDate()).click();
 await p.waitForTimeout(400);
 ck("Weekday priced from server rates (KD 300)", (await total()) === "KD 300", await total());
 
-// The server blocked 2026-10-06, a Wednesday, which sits inside the Sun 4 -
-// Wed 7 window. The whole window goes with it rather than the guest being
+// The server blocked the anchor week's Wednesday, which sits inside its
+// Sun - Wed window. The whole window goes with it rather than the guest being
 // allowed to choose it and then told no.
-const blockedWindow = await p.evaluate(() =>
-  [...document.querySelectorAll(".grid.grid-cols-7 button")]
-    .find((x) => x.textContent.trim() === "4")
-    ?.getAttribute("aria-disabled"),
+const blockedWindow = await p.evaluate(
+  (n) =>
+    [...document.querySelectorAll(".grid.grid-cols-7 button")]
+      .find((x) => x.textContent.trim() === n)
+      ?.getAttribute("aria-disabled"),
+  String(W.sun.getDate()),
 );
 ck("A window holding a blocked day cannot be chosen", blockedWindow === "true", blockedWindow);
 
 await p.getByRole("button", { name: /^Clear$/i }).click();
 await shape("Weekend");
-await day(8).click();
+await day(W.thu.getDate()).click();
 await p.waitForTimeout(300);
 await p.getByRole("button", { name: /^Continue$/i }).click();
 await p.waitForTimeout(400);

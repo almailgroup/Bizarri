@@ -39,7 +39,7 @@ const OCCASION = {
   active: true,
 };
 
-async function page(viewport = { width: 1200, height: 1000 }) {
+async function page(viewport = { width: 1200, height: 1000 }, occasions = [OCCASION]) {
   const ctx = await b.newContext({ viewport });
   await ctx.route(/^https?:\/\/(?!localhost)/, (r) => {
     const u = r.request().url();
@@ -77,7 +77,7 @@ async function page(viewport = { width: 1200, height: 1000 }) {
         updated_at: "",
         updated_by: null,
       });
-    if (path === "special_occasions") return send([OCCASION]);
+    if (path === "special_occasions") return send(occasions);
     if (path === "rpc/availability_calendar") {
       const out = [];
       const d = new Date(body.p_from + "T00:00:00");
@@ -106,10 +106,11 @@ const shapeOn = (p) =>
       .join(","),
   );
 
-async function fromOffers(p, pick) {
+/** From the Offers page (holidays) or the Packages page, through to booking. */
+async function fromOffers(p, pick, from = "offers") {
   await p.goto(`${B}en`, { waitUntil: "load" });
   await p.waitForTimeout(500);
-  await p.goto(`${B}offers/en`, { waitUntil: "load" });
+  await p.goto(`${B}${from}/en`, { waitUntil: "load" });
   await p.waitForTimeout(900);
   await pick();
   await p.waitForTimeout(200);
@@ -117,17 +118,57 @@ async function fromOffers(p, pick) {
   await p.waitForTimeout(1500);
 }
 
-// ======================================================== the offers page
+// ============================================== packages and offers, apart
+// One page until the owner asked for them separately: the year-round stays
+// on Packages, the holiday prices on Offers.
 {
   const { ctx, p } = await page();
   await p.goto(`${B}offers/en`, { waitUntil: "load" });
   await p.waitForTimeout(900);
+  ck(
+    "The Offers page lists the holiday offers",
+    (await p.locator("main button[aria-pressed]").count()) === 1 &&
+      (await p.getByRole("button", { name: /National Day/i }).isVisible()),
+  );
+  ck(
+    "…and not the packages, which have their own page",
+    (await p.getByText(/Full Week Package|Thu – Sat Package|By the day/i).count()) === 0,
+  );
+  await ctx.close();
+}
+{
+  const { ctx, p } = await page(undefined, []);
+  await p.goto(`${B}offers/en`, { waitUntil: "load" });
+  await p.waitForTimeout(900);
+  ck(
+    "With no offers running, the Offers page says so",
+    await p.getByText("No offers running right now").isVisible(),
+  );
+  const wa = p.getByRole("link", { name: /Ask about offers/i });
+  ck(
+    "…offers WhatsApp to ask about the next one",
+    /^https:\/\/wa\.me\//.test((await wa.getAttribute("href")) ?? ""),
+  );
+  const pk = p.getByRole("link", { name: /See our packages/i });
+  ck("…and points to the packages", (await pk.getAttribute("href")) === "/packages/en");
+  await pk.click();
+  await p.waitForTimeout(800);
+  ck("…which open", path(p) === "/packages/en", path(p));
+  await ctx.close();
+}
+
+// ====================================================== the packages page
+{
+  const { ctx, p } = await page();
+  await p.goto(`${B}packages/en`, { waitUntil: "load" });
+  await p.waitForTimeout(900);
   const pressed = await p.locator("main button[aria-pressed]").count();
   ck(
-    "Every offer can be chosen: three packages, per day, the occasion",
-    pressed === 5,
+    "Every package can be chosen: the three packages and by the day",
+    pressed === 4,
     String(pressed),
   );
+  ck("…and the holiday offers are not here", (await p.getByText(/National Day/i).count()) === 0);
   // The by-the-day card matches the rule: weekdays a day at a time, the
   // weekend only whole. It used to say "3 days or more" and quote a Thu-Sat
   // daily rate that no booking could use.
@@ -209,7 +250,7 @@ for (const [name, re, want] of [
   ["Per-day rate", /By the day/i, "BY DAY"],
 ]) {
   const { ctx, p } = await page();
-  await fromOffers(p, () => p.getByRole("button", { name: re }).first().click());
+  await fromOffers(p, () => p.getByRole("button", { name: re }).first().click(), "packages");
   ck(`${name}: the booking page opens on it`, (await shapeOn(p)) === want, await shapeOn(p));
   ck(`…with the address tidied`, path(p) === "/booking/en", path(p));
   if (want === "FULL WEEK") {
@@ -235,7 +276,7 @@ for (const [name, re, want] of [
     ck("…and it can still be changed", (await shapeOn(p)) === "WEEKDAY");
     await p.goBack();
     await p.waitForTimeout(700);
-    ck("…and Back returns to the offers", path(p) === "/offers/en", path(p));
+    ck("…and Back returns to the packages", path(p) === "/packages/en", path(p));
   }
   await ctx.close();
 }
@@ -244,22 +285,24 @@ for (const [name, re, want] of [
 // The button sits at the foot of a long page on a phone; arriving on the
 // booking page at the same offset dropped the guest past the heading and the
 // chalets, into the middle of the calendar.
-for (const [name, re] of [
-  ["a package", /Full Week Package/i],
-  ["a holiday", /National Day/i],
+for (const [name, re, source] of [
+  ["a package", /Full Week Package/i, "packages"],
+  ["a holiday", /National Day/i, "offers"],
 ]) {
   const { ctx, p } = await page({ width: 390, height: 844 });
-  await p.goto(`${B}offers/en`, { waitUntil: "load" });
+  await p.goto(`${B}${source}/en`, { waitUntil: "load" });
   await p.waitForTimeout(900);
   await p.getByRole("button", { name: re }).click();
-  await cta(p).scrollIntoViewIfNeeded();
+  // From the very foot of the page, however long it is.
+  await p.evaluate(() => window.scrollTo({ top: document.body.scrollHeight, behavior: "instant" }));
+  await p.waitForTimeout(200);
   const from = await p.evaluate(() => Math.round(window.scrollY));
   await cta(p).click();
   await p.waitForTimeout(1500);
   const y = await p.evaluate(() => Math.round(window.scrollY));
   ck(
     `Choosing ${name} opens the booking page at the top`,
-    from > 400 && y === 0,
+    from > 200 && y === 0,
     `${from}px → ${y}px`,
   );
   await ctx.close();

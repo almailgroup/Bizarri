@@ -33,6 +33,33 @@ const session = () => ({
   },
 });
 
+/**
+ * The bookings' dates, from today rather than written in: the accepted one
+ * used to be 6-9 October 2026, and the day the panel checks went into the
+ * past on the 9th. A Sunday at least a week ahead whose Wednesday is in the
+ * same month, so the panel shows the whole booking on one page.
+ */
+const ymd = (d) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const AHEAD = (() => {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + 7);
+  for (;;) {
+    const wed = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 3);
+    if (d.getDay() === 0 && wed.getMonth() === d.getMonth()) break;
+    d.setDate(d.getDate() + 1);
+  }
+  return d;
+})();
+const at = (n) => new Date(AHEAD.getFullYear(), AHEAD.getMonth(), AHEAD.getDate() + n);
+const A_START = ymd(AHEAD);
+const A_END = ymd(at(3));
+const A_MID = at(1).getDate();
+const A_MONTH = AHEAD.toLocaleDateString("en-US", { month: "long" });
+const B_START = ymd(at(25));
+const B_END = ymd(at(28));
+
 function makeState() {
   return {
     chalets: [
@@ -68,8 +95,8 @@ function makeState() {
         id: "b-1",
         ref: "BZR-AAA111",
         chalet_id: 1,
-        start_date: "2026-10-06",
-        end_date: "2026-10-09",
+        start_date: A_START,
+        end_date: A_END,
         days: 4,
         total: 300,
         currency: "KWD",
@@ -90,8 +117,8 @@ function makeState() {
         id: "b-2",
         ref: "BZR-BBB222",
         chalet_id: 2,
-        start_date: "2026-11-01",
-        end_date: "2026-11-04",
+        start_date: B_START,
+        end_date: B_END,
         days: 3,
         total: 350,
         currency: "KWD",
@@ -117,7 +144,7 @@ function makeState() {
         action: "booking.created",
         entity: "bookings",
         entity_id: "BZR-BBB222",
-        detail: { chalet: 2, start: "2026-11-01", end: "2026-11-04", total: 350 },
+        detail: { chalet: 2, start: B_START, end: B_END, total: 350 },
         created_at: new Date().toISOString(),
       },
       {
@@ -472,19 +499,22 @@ async function adminPage(state) {
   const { p, ctx } = await adminPage(state);
   await p.getByRole("button", { name: "Availability & Pricing", exact: true }).click();
   await p.waitForTimeout(500);
-  // Chalet 1 has an accepted booking Oct 6-9; the panel defaults to the
-  // current month, so page forward to October 2026 if needed.
+  // Chalet 1 has an accepted booking Sun-Wed of the anchor week; the panel
+  // defaults to the current month, so page forward to that month if needed.
   for (let i = 0; i < 3; i++) {
     const label = await p
       .locator("p.font-display.text-2xl")
       .first()
       .innerText()
       .catch(() => "");
-    if (label.includes("October")) break;
+    if (label.includes(A_MONTH)) break;
     await p.getByRole("button", { name: /next month/i }).click();
     await p.waitForTimeout(300);
   }
-  const day7 = p.locator(".grid.grid-cols-7 button", { hasText: "7" }).first();
+  const day7 = p
+    .locator(".grid.grid-cols-7 button")
+    .filter({ hasText: new RegExp(`^${A_MID}$`) })
+    .first();
   const title = await day7.getAttribute("title");
   ck(
     "A day inside an accepted booking is marked booked-by-guest",

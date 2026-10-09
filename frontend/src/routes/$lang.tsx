@@ -250,23 +250,31 @@ function Home() {
 
         <div className="mt-14 grid gap-4 sm:grid-cols-2">
           {[
+            // Days, as the Packages page counts them. These said 3 and 2
+            // nights, which the 2 PM check-in and noon check-out make 4
+            // and 3: Sun 2 PM to Thu noon, Thu 2 PM to Sun noon.
             {
+              shape: "weekday" as const,
               label: tr("weekdayPkg"),
-              nights: tr("nights3"),
+              nights: tr("days4"),
               en: "Sunday → Wednesday",
               ar: "الأحد → الأربعاء",
             },
             {
+              shape: "weekend" as const,
               label: tr("weekendPkg"),
-              nights: tr("nights2"),
+              nights: tr("days3"),
               en: "Thursday → Saturday",
               ar: "الخميس → السبت",
             },
           ].map((p, i) => (
             <Reveal key={p.label} delay={i * 90}>
+              {/* Straight to the booking page with this package chosen, as
+                  the Packages page does. */}
               <Link
                 to="/booking/$lang"
                 params={{ lang }}
+                search={{ shape: p.shape }}
                 className="group flex h-full flex-col justify-between border border-border p-9 transition-colors hover:border-foreground"
               >
                 <div>

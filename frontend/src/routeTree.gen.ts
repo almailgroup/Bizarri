@@ -16,6 +16,7 @@ import { Route as RulesLangRouteImport } from './routes/rules.$lang'
 import { Route as ReservationLangRouteImport } from './routes/reservation.$lang'
 import { Route as PrivacyLangRouteImport } from './routes/privacy.$lang'
 import { Route as PhotosLangRouteImport } from './routes/photos.$lang'
+import { Route as PackagesLangRouteImport } from './routes/packages.$lang'
 import { Route as OffersLangRouteImport } from './routes/offers.$lang'
 import { Route as NewsLangRouteImport } from './routes/news.$lang'
 import { Route as FacilitiesLangRouteImport } from './routes/facilities.$lang'
@@ -57,6 +58,11 @@ const PrivacyLangRoute = PrivacyLangRouteImport.update({
 const PhotosLangRoute = PhotosLangRouteImport.update({
   id: '/photos/$lang',
   path: '/photos/$lang',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PackagesLangRoute = PackagesLangRouteImport.update({
+  id: '/packages/$lang',
+  path: '/packages/$lang',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OffersLangRoute = OffersLangRouteImport.update({
@@ -106,6 +112,7 @@ export interface FileRoutesByFullPath {
   '/facilities/$lang': typeof FacilitiesLangRoute
   '/news/$lang': typeof NewsLangRoute
   '/offers/$lang': typeof OffersLangRoute
+  '/packages/$lang': typeof PackagesLangRoute
   '/photos/$lang': typeof PhotosLangRoute
   '/privacy/$lang': typeof PrivacyLangRoute
   '/reservation/$lang': typeof ReservationLangRoute
@@ -122,6 +129,7 @@ export interface FileRoutesByTo {
   '/facilities/$lang': typeof FacilitiesLangRoute
   '/news/$lang': typeof NewsLangRoute
   '/offers/$lang': typeof OffersLangRoute
+  '/packages/$lang': typeof PackagesLangRoute
   '/photos/$lang': typeof PhotosLangRoute
   '/privacy/$lang': typeof PrivacyLangRoute
   '/reservation/$lang': typeof ReservationLangRoute
@@ -139,6 +147,7 @@ export interface FileRoutesById {
   '/facilities/$lang': typeof FacilitiesLangRoute
   '/news/$lang': typeof NewsLangRoute
   '/offers/$lang': typeof OffersLangRoute
+  '/packages/$lang': typeof PackagesLangRoute
   '/photos/$lang': typeof PhotosLangRoute
   '/privacy/$lang': typeof PrivacyLangRoute
   '/reservation/$lang': typeof ReservationLangRoute
@@ -157,6 +166,7 @@ export interface FileRouteTypes {
     | '/facilities/$lang'
     | '/news/$lang'
     | '/offers/$lang'
+    | '/packages/$lang'
     | '/photos/$lang'
     | '/privacy/$lang'
     | '/reservation/$lang'
@@ -173,6 +183,7 @@ export interface FileRouteTypes {
     | '/facilities/$lang'
     | '/news/$lang'
     | '/offers/$lang'
+    | '/packages/$lang'
     | '/photos/$lang'
     | '/privacy/$lang'
     | '/reservation/$lang'
@@ -189,6 +200,7 @@ export interface FileRouteTypes {
     | '/facilities/$lang'
     | '/news/$lang'
     | '/offers/$lang'
+    | '/packages/$lang'
     | '/photos/$lang'
     | '/privacy/$lang'
     | '/reservation/$lang'
@@ -206,6 +218,7 @@ export interface RootRouteChildren {
   FacilitiesLangRoute: typeof FacilitiesLangRoute
   NewsLangRoute: typeof NewsLangRoute
   OffersLangRoute: typeof OffersLangRoute
+  PackagesLangRoute: typeof PackagesLangRoute
   PhotosLangRoute: typeof PhotosLangRoute
   PrivacyLangRoute: typeof PrivacyLangRoute
   ReservationLangRoute: typeof ReservationLangRoute
@@ -261,6 +274,13 @@ declare module '@tanstack/react-router' {
       path: '/photos/$lang'
       fullPath: '/photos/$lang'
       preLoaderRoute: typeof PhotosLangRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/packages/$lang': {
+      id: '/packages/$lang'
+      path: '/packages/$lang'
+      fullPath: '/packages/$lang'
+      preLoaderRoute: typeof PackagesLangRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/offers/$lang': {
@@ -326,6 +346,7 @@ const rootRouteChildren: RootRouteChildren = {
   FacilitiesLangRoute: FacilitiesLangRoute,
   NewsLangRoute: NewsLangRoute,
   OffersLangRoute: OffersLangRoute,
+  PackagesLangRoute: PackagesLangRoute,
   PhotosLangRoute: PhotosLangRoute,
   PrivacyLangRoute: PrivacyLangRoute,
   ReservationLangRoute: ReservationLangRoute,

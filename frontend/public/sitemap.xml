@@ -69,6 +69,22 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://bizarri.com/packages/en</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://bizarri.com/packages/en" />
+    <xhtml:link rel="alternate" hreflang="ar" href="https://bizarri.com/packages/ar" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://bizarri.com/packages/en" />
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://bizarri.com/packages/ar</loc>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://bizarri.com/packages/ar" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://bizarri.com/packages/en" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://bizarri.com/packages/en" />
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://bizarri.com/booking/en</loc>
     <xhtml:link rel="alternate" hreflang="en" href="https://bizarri.com/booking/en" />
     <xhtml:link rel="alternate" hreflang="ar" href="https://bizarri.com/booking/ar" />

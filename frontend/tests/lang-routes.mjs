@@ -155,7 +155,15 @@ const visit = async (url) => {
   // link would not have found it; sweeping the rendered page does.
   const stray = [];
   for (const lang of ["en", "ar"]) {
-    for (const page of ["", "/photos", "/booking", "/offers", "/contact", "/reservation"]) {
+    for (const page of [
+      "",
+      "/photos",
+      "/booking",
+      "/offers",
+      "/packages",
+      "/contact",
+      "/reservation",
+    ]) {
       await p.goto(`${B}/${page ? `${page}/` : ""}${lang}`, { waitUntil: "load" });
       await p.waitForTimeout(900);
       const bad = await p.evaluate(
@@ -163,6 +171,9 @@ const visit = async (url) => {
           [...document.querySelectorAll("a[href]")]
             .map((a) => a.getAttribute("href"))
             .filter((h) => h.startsWith("/") && !h.startsWith("//"))
+            // The path carries the language; a query after it (a package
+            // chosen ahead, ?shape=weekend) is not part of that question.
+            .map((h) => h.split("?")[0])
             .filter((h) => h !== `/${l}` && !h.endsWith(`/${l}`)),
         lang,
       );

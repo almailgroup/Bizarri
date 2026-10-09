@@ -4,74 +4,41 @@ import { useState } from "react";
 import { ArrowRight, Check } from "lucide-react";
 import { PageShell } from "@/components/PageShell";
 import { Reveal } from "@/components/Reveal";
+import { WhatsAppLink } from "@/components/WhatsAppLink";
 import { useI18n } from "@/lib/i18n";
 import { usePageMeta } from "@/hooks/use-page-meta";
-import { DEFAULT_RATES, fmtDate, formatMoney } from "@/lib/booking";
-import { useRates, useSpecialOccasions } from "@/lib/api";
+import { fmtDate, formatMoney, formatSpan, parseDate } from "@/lib/booking";
+import { useSpecialOccasions } from "@/lib/api";
 
 export const Route = createFileRoute("/offers/$lang")({
   component: Offers,
   beforeLoad: requireLang,
 });
 
+/**
+ * Holiday offers: Eid, national holidays and the like, each with its own
+ * dates and one price for the whole stay, entered by the admin under Special
+ * Occasions. The year-round stays are on the Packages page.
+ *
+ * Choosing one and pressing Start opens the booking page on the Holiday
+ * shape with that stay already selected, so there is nothing left to pick.
+ */
 function Offers() {
   const { tr, lang } = useI18n();
   usePageMeta(
     lang === "en" ? "Offers" : "العروض",
     lang === "en"
-      ? "Fixed-rate stay packages for Bizarri Chalet, plus per-day rates for custom dates."
-      : "باقات إقامة بسعر ثابت لشاليه بيزاري، وأسعار يومية للتواريخ المخصصة.",
+      ? "Special prices at Bizarri Chalet for Eid, national holidays and other occasions."
+      : "أسعار خاصة في شاليه بيزاري للأعياد والعطل الرسمية والمناسبات.",
   );
-  // Rates are admin-editable, so read them rather than hard-coding the figures.
-  const { data: stored, isError: ratesFailed } = useRates();
-  const rates = stored ?? DEFAULT_RATES;
-  const { data: occasions } = useSpecialOccasions();
-  // Past windows are noise on a price list; only what is still bookable.
+  const { data: occasions, isLoading } = useSpecialOccasions();
+  // Past windows are noise on an offers page; only what can still be booked.
   const today = fmtDate(new Date());
-  const upcoming = (occasions ?? []).filter((o) => o.end >= today);
+  const upcoming = (occasions ?? [])
+    .filter((o) => o.end >= today)
+    .sort((a, b) => a.start.localeCompare(b.start));
 
-  // The offer the guest has picked, carried to the booking page so it opens
-  // on that choice instead of asking for it again. A package becomes the
-  // calendar shape of the same name; a special occasion becomes the Holiday
-  // shape with that occasion's stay already selected.
-  const [chosen, setChosen] = useState<
-    | { shape: "fullWeek" | "weekday" | "weekend" | "day" }
-    | { shape: "holiday"; occasion: string }
-    | null
-  >(null);
-  const isChosen = (shape: string, occasion?: string) =>
-    chosen?.shape === shape &&
-    (occasion === undefined || ("occasion" in chosen && chosen.occasion === occasion));
-  // Tapping the chosen one again lets go of it, as a toggle should.
-  const choose = (next: NonNullable<typeof chosen>) =>
-    setChosen((cur) => (JSON.stringify(cur) === JSON.stringify(next) ? null : next));
-
-  const packages = [
-    {
-      key: "fullWeek" as const,
-      name: tr("fullWeekPkg"),
-      length: tr("days7"),
-      span: lang === "en" ? "Sunday → Saturday" : "الأحد → السبت",
-      price: rates.fullWeek,
-      feature: true,
-    },
-    {
-      key: "weekday" as const,
-      name: tr("weekdayPkg"),
-      length: tr("days4"),
-      span: lang === "en" ? "Sunday → Wednesday" : "الأحد → الأربعاء",
-      price: rates.weekday,
-      feature: false,
-    },
-    {
-      key: "weekend" as const,
-      name: tr("weekendPkg"),
-      length: tr("days3"),
-      span: lang === "en" ? "Thursday → Saturday" : "الخميس → السبت",
-      price: rates.weekend,
-      feature: false,
-    },
-  ];
+  const [chosen, setChosen] = useState<string | null>(null);
 
   return (
     <PageShell>
@@ -79,141 +46,91 @@ function Offers() {
         <p className="mb-6 text-xs uppercase tracking-[0.4em] text-muted-foreground">
           {tr("offers")}
         </p>
-        <h1 className="animate-fade-up font-display text-5xl md:text-6xl">{tr("ourPackages")}</h1>
-        <p className="animate-fade-up mt-5 max-w-lg text-muted-foreground">{tr("offersIntro")}</p>
+        <h1 className="animate-fade-up font-display text-5xl md:text-6xl">{tr("specialOffers")}</h1>
+        <p className="animate-fade-up mt-5 max-w-lg text-muted-foreground">
+          {tr("offersPageIntro")}
+        </p>
 
-        {ratesFailed && (
-          <p className="mt-10 border border-border bg-secondary p-4 text-sm text-muted-foreground">
-            {tr("ratesIndicative")}
-          </p>
-        )}
-
-        <p className="mt-16 text-sm text-muted-foreground">{tr("choosePackageHint")}</p>
-
-        <div className="mt-6 grid gap-4 md:grid-cols-3">
-          {packages.map((p, i) => {
-            const on = isChosen(p.key);
-            return (
-              <Reveal key={p.key} delay={i * 80}>
-                {/* A choice, not a poster: the chosen card turns light grey
-                  with a dark border and a tick -- grey rather than black,
-                  which read as heavy on a phone. The featured package keeps a
-                  heavier border, so it stands out without looking picked. */}
-                <button
-                  type="button"
-                  onClick={() => choose({ shape: p.key })}
-                  aria-pressed={on}
-                  className={`relative flex h-full w-full flex-col justify-between border p-8 text-start transition-colors ${
-                    on
-                      ? "border-foreground bg-secondary"
-                      : p.feature
-                        ? "border-2 border-foreground hover:bg-secondary/50"
-                        : "border-border hover:border-foreground/50"
-                  }`}
-                >
-                  {on && (
-                    <span className="absolute end-4 top-4 flex items-center gap-1 text-xs uppercase tracking-widest">
-                      <Check className="h-4 w-4" aria-hidden="true" /> {tr("offerChosen")}
-                    </span>
-                  )}
-                  <div>
-                    <p className="text-xs uppercase tracking-widest text-muted-foreground">
-                      {p.length}
-                    </p>
-                    <h2 className="mt-3 font-display text-2xl">{p.name}</h2>
-                    <p className="mt-2 text-sm text-muted-foreground">{p.span}</p>
-                  </div>
-                  <p className="mt-10 font-display text-4xl">{formatMoney(p.price, lang)}</p>
-                </button>
-              </Reveal>
-            );
-          })}
-        </div>
-
-        <Reveal delay={120}>
-          <button
-            type="button"
-            onClick={() => choose({ shape: "day" })}
-            aria-pressed={isChosen("day")}
-            className={`relative mt-4 block w-full border p-8 text-start transition-colors ${
-              isChosen("day")
-                ? "border-foreground bg-secondary"
-                : "border-border hover:border-foreground/50"
-            }`}
-          >
-            {isChosen("day") && (
-              <span className="absolute end-4 top-4 flex items-center gap-1 text-xs uppercase tracking-widest">
-                <Check className="h-4 w-4" aria-hidden="true" /> {tr("offerChosen")}
-              </span>
-            )}
-            <span className="block text-xs uppercase tracking-widest text-muted-foreground">
-              {tr("perDayRates")}
-            </span>
-            <span className="mt-3 block max-w-lg text-muted-foreground">{tr("perDayIntro")}</span>
-            <span className="mt-6 flex flex-wrap gap-x-14 gap-y-4">
-              <span>
-                <span className="block text-xs uppercase tracking-widest text-muted-foreground">
-                  {tr("weekdayNight")}
-                </span>
-                <span className="mt-1 block font-display text-2xl">
-                  {formatMoney(rates.dailyWeekday, lang)}
-                </span>
-              </span>
-            </span>
-          </button>
-        </Reveal>
-
-        {upcoming.length > 0 && (
-          <Reveal delay={140}>
-            <div className="mt-4 border border-border p-8">
-              <p className="text-xs uppercase tracking-widest text-muted-foreground">
-                {tr("specialOccasions")}
-              </p>
-              <p className="mt-3 max-w-lg text-muted-foreground">{tr("occasionsPublicIntro")}</p>
-              <div className="mt-6 grid gap-3 sm:grid-cols-2 md:grid-cols-3">
-                {upcoming.map((o) => {
-                  const on = isChosen("holiday", o.id);
-                  return (
+        {upcoming.length > 0 ? (
+          <>
+            <p className="mt-16 text-sm text-muted-foreground">{tr("chooseOfferHint")}</p>
+            <div className="mt-6 grid gap-4 md:grid-cols-3">
+              {upcoming.map((o, i) => {
+                const on = chosen === o.id;
+                return (
+                  <Reveal key={o.id} delay={i * 80}>
                     <button
-                      key={o.id}
                       type="button"
-                      onClick={() => choose({ shape: "holiday", occasion: o.id })}
+                      // Tapping the chosen one again lets go of it.
+                      onClick={() => setChosen(on ? null : o.id)}
                       aria-pressed={on}
-                      className={`border p-4 text-start transition-colors ${
+                      className={`relative flex h-full w-full flex-col justify-between border p-8 text-start transition-colors ${
                         on
                           ? "border-foreground bg-secondary"
                           : "border-border hover:border-foreground/50"
                       }`}
                     >
-                      <span className="flex items-center justify-between gap-2 text-xs uppercase tracking-widest text-muted-foreground">
-                        {lang === "en" ? o.nameEn : o.nameAr || o.nameEn}
-                        {on && <Check className="h-4 w-4" aria-hidden="true" />}
+                      {on && (
+                        <span className="absolute end-4 top-4 flex items-center gap-1 text-xs uppercase tracking-widest">
+                          <Check className="h-4 w-4" aria-hidden="true" /> {tr("offerChosen")}
+                        </span>
+                      )}
+                      <span>
+                        <span className="block text-xs uppercase tracking-widest text-muted-foreground">
+                          {formatSpan(parseDate(o.start), parseDate(o.end), lang)}
+                        </span>
+                        <span className="mt-3 block font-display text-2xl">
+                          {lang === "en" ? o.nameEn : o.nameAr || o.nameEn}
+                        </span>
+                        <span className="mt-2 block text-sm text-muted-foreground" dir="ltr">
+                          {o.start} → {o.end}
+                        </span>
                       </span>
-                      <span className="mt-1 block font-display text-2xl">
+                      <span className="mt-10 block font-display text-4xl">
                         {formatMoney(o.price, lang)}
                       </span>
-                      <span className="block text-sm text-muted-foreground" dir="ltr">
-                        {o.start} → {o.end}
-                      </span>
                     </button>
-                  );
-                })}
+                  </Reveal>
+                );
+              })}
+            </div>
+
+            <Reveal delay={160}>
+              <Link
+                to="/booking/$lang"
+                params={{ lang }}
+                search={chosen ? { shape: "holiday", occasion: chosen } : {}}
+                className="group mt-12 inline-flex items-center gap-2 bg-black px-10 py-4 text-sm uppercase tracking-widest text-white transition-opacity hover:opacity-90"
+              >
+                {tr("startBooking")}
+                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1 rtl:rotate-180 rtl:group-hover:-translate-x-1" />
+              </Link>
+            </Reveal>
+          </>
+        ) : (
+          !isLoading && (
+            // Nothing running: say so, and point to what is always available
+            // rather than leaving an empty page.
+            <div className="mt-16 border border-border p-8 sm:p-10" role="status">
+              <p className="font-display text-2xl">{tr("noOffersTitle")}</p>
+              <p className="mt-3 max-w-prose text-sm text-muted-foreground">{tr("noOffersBody")}</p>
+              <div className="mt-6 flex flex-wrap gap-3">
+                <WhatsAppLink
+                  label={tr("askAboutOffers")}
+                  className="inline-flex items-center gap-2 border border-foreground px-6 py-3 text-sm uppercase tracking-widest transition-colors hover:bg-foreground hover:text-background"
+                />
+                <Link
+                  to="/packages/$lang"
+                  params={{ lang }}
+                  className="group inline-flex items-center gap-2 bg-black px-6 py-3 text-sm uppercase tracking-widest text-white transition-opacity hover:opacity-90"
+                >
+                  {tr("seePackages")}
+                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1 rtl:rotate-180 rtl:group-hover:-translate-x-1" />
+                </Link>
               </div>
             </div>
-          </Reveal>
+          )
         )}
-
-        <Reveal delay={160}>
-          <Link
-            to="/booking/$lang"
-            params={{ lang }}
-            search={chosen ?? {}}
-            className="group mt-12 inline-flex items-center gap-2 bg-black px-10 py-4 text-sm uppercase tracking-widest text-white transition-opacity hover:opacity-90"
-          >
-            {tr("startBooking")}
-            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1 rtl:rotate-180 rtl:group-hover:-translate-x-1" />
-          </Link>
-        </Reveal>
       </section>
     </PageShell>
   );

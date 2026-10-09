@@ -37,6 +37,7 @@ const ROUTES = [
   "facilities",
   "photos",
   "offers",
+  "packages",
   "booking",
   "reservation",
   "news",
@@ -228,7 +229,7 @@ async function pool(jobs, n) {
       await p.close();
     }
   }
-  ck("All 22 pages open with a heading and no errors", broken.length === 0, broken.join(" | "));
+  ck("All 24 pages open with a heading and no errors", broken.length === 0, broken.join(" | "));
   await ctx.close();
 }
 

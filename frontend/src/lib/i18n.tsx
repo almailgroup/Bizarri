@@ -72,8 +72,12 @@ export const t: Dict = {
   language: { en: "العربية", ar: "English" },
   startBooking: { en: "Start your booking request", ar: "ابدأ طلب الحجز" },
   choosePackageHint: {
-    en: "Choose an offer, then start your request — it will be picked for you on the booking page.",
-    ar: "اختر عرضاً ثم ابدأ طلبك — سيتم تحديده لك تلقائياً في صفحة الحجز.",
+    en: "Choose a package, then start your request — it will be picked for you on the booking page.",
+    ar: "اختر باقة ثم ابدأ طلبك — سيتم تحديدها لك تلقائياً في صفحة الحجز.",
+  },
+  chooseOfferHint: {
+    en: "Choose an offer, then start your request — its dates will be picked for you on the booking page.",
+    ar: "اختر عرضاً ثم ابدأ طلبك — سيتم تحديد مواعيده لك تلقائياً في صفحة الحجز.",
   },
   offerChosen: { en: "Selected", ar: "تم الاختيار" },
   invalidSelection: {
@@ -147,7 +151,20 @@ export const t: Dict = {
 
   // Offers
   offers: { en: "Offers", ar: "العروض" },
-  offersIntro: {
+  packages: { en: "Packages", ar: "الباقات" },
+  specialOffers: { en: "Special offers", ar: "عروض خاصة" },
+  offersPageIntro: {
+    en: "Special prices for Eid, national holidays and other occasions — one price for the whole stay.",
+    ar: "أسعار خاصة للأعياد والعطل الرسمية والمناسبات — بسعر واحد للإقامة كاملة.",
+  },
+  noOffersTitle: { en: "No offers running right now", ar: "لا توجد عروض حالياً" },
+  noOffersBody: {
+    en: "Offers are announced for Eid, national holidays and other occasions. Message us on WhatsApp to hear about the next one, or see our packages, available all year.",
+    ar: "نعلن عن العروض في الأعياد والعطل الرسمية والمناسبات. راسلنا عبر واتساب لتعرف بالعرض القادم، أو اطّلع على باقاتنا المتاحة طوال العام.",
+  },
+  askAboutOffers: { en: "Ask about offers", ar: "اسأل عن العروض" },
+  seePackages: { en: "See our packages", ar: "اطّلع على باقاتنا" },
+  packagesPageIntro: {
     en: "Fixed-rate packages for the whole chalet, or a single weekday at the daily rate.",
     ar: "باقات بسعر ثابت للشاليه بالكامل، أو يوم واحد من أيام الأسبوع بالسعر اليومي.",
   },

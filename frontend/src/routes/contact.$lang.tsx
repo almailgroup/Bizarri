@@ -3,8 +3,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { PageShell } from "@/components/PageShell";
 import { useI18n } from "@/lib/i18n";
 import { usePageMeta } from "@/hooks/use-page-meta";
-import { useContactInfo } from "@/lib/api";
-import { Phone, Mail, MapPin, Instagram, MessageCircle, ArrowUpRight } from "lucide-react";
+import { instagramHandle, useContactInfo } from "@/lib/api";
+import { Phone, Mail, Instagram, MessageCircle } from "lucide-react";
 
 export const Route = createFileRoute("/contact/$lang")({
   component: Contact,
@@ -16,8 +16,8 @@ function Contact() {
   usePageMeta(
     lang === "en" ? "Contact" : "تواصل معنا",
     lang === "en"
-      ? "Reach Bizarri Chalet by phone, WhatsApp or email, or find us on the map."
-      : "تواصل مع شاليه بيزاري عبر الهاتف أو واتساب أو البريد الإلكتروني.",
+      ? "Reach Bizarri Chalet by phone, WhatsApp, email or Instagram."
+      : "تواصل مع شاليه بيزاري عبر الهاتف أو واتساب أو البريد الإلكتروني أو إنستغرام.",
   );
   const contact = useContactInfo();
   // `ltr` marks a value that is Latin or numeric rather than prose. On the
@@ -49,16 +49,9 @@ function Contact() {
     {
       icon: Instagram,
       label: "Instagram",
-      value: "@bizarri.chalet",
+      value: instagramHandle(contact.instagram),
       ltr: true,
       href: contact.instagram,
-    },
-    {
-      icon: MapPin,
-      label: tr("location"),
-      value: lang === "en" ? "Open in Maps" : "فتح في الخرائط",
-      ltr: false,
-      href: contact.maps,
     },
   ];
 
@@ -79,11 +72,11 @@ function Contact() {
               href={it.href}
               target={it.href.startsWith("http") ? "_blank" : undefined}
               rel="noopener noreferrer"
-              // Five cards in two columns leave a sixth cell empty, and the
-              // grid's own background shows through it as a grey block. The
-              // last card takes the whole row instead.
+              // An odd number of cards in two columns leaves a cell empty, and
+              // the grid's own background shows through it as a grey block;
+              // then the last card takes the whole row instead.
               className={`group bg-background p-8 hover:bg-black hover:text-white transition-colors animate-fade-up ${
-                i === items.length - 1 ? "sm:col-span-2" : ""
+                items.length % 2 === 1 && i === items.length - 1 ? "sm:col-span-2" : ""
               }`}
               style={{ animationDelay: `${i * 60}ms` }}
             >
@@ -98,32 +91,6 @@ function Contact() {
             </a>
           ))}
         </div>
-
-        {/* The old embed was ?q=Kuwait — a pin on the whole country, which told
-            a guest nothing. Until we have the chalet's coordinates this links
-            straight to the verified Maps entry instead of showing a wrong map. */}
-        <a
-          href={contact.maps}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="group mt-16 flex flex-wrap items-center justify-between gap-6 border border-border p-10 transition-colors hover:bg-black hover:text-white"
-        >
-          <span className="flex items-center gap-5">
-            <MapPin className="h-8 w-8 shrink-0" strokeWidth={1.25} />
-            <span>
-              <span className="block text-xs uppercase tracking-widest opacity-60">
-                {tr("location")}
-              </span>
-              <span className="mt-1 block font-display text-3xl">
-                {lang === "en" ? "Bizarri Chalet, Kuwait" : "شاليه بيزاري، الكويت"}
-              </span>
-            </span>
-          </span>
-          <span className="inline-flex items-center gap-2 text-sm uppercase tracking-widest">
-            {lang === "en" ? "Open in Maps" : "فتح في الخرائط"}
-            <ArrowUpRight className="h-4 w-4 transition-transform group-hover:translate-x-1 group-hover:-translate-y-1" />
-          </span>
-        </a>
       </section>
     </PageShell>
   );
