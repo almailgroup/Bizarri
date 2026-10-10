@@ -138,9 +138,10 @@ function makeState() {
     ],
     audit: [
       {
+        // A guest's request: request_booking runs with no signed-in user.
         id: 1,
-        actor: "admin-1",
-        actor_email: "admin@example.com",
+        actor: null,
+        actor_email: null,
         action: "booking.created",
         entity: "bookings",
         entity_id: "BZR-BBB222",
@@ -158,6 +159,8 @@ function makeState() {
         created_at: new Date().toISOString(),
       },
     ],
+    blocked: [],
+    dayPrices: {},
     calls: [],
   };
 }
@@ -230,8 +233,76 @@ function mock(ctx, state) {
       }
       return send(out);
     }
-    if (path === "blocked_dates") return send([]);
-    if (path === "day_prices") return send([]);
+    // PostgREST filters arrive as day=in.(2026-10-01,2026-10-02).
+    const inList = (key) =>
+      (decodeURIComponent(url.searchParams.get(key) ?? "").match(/^in\.\((.*)\)$/)?.[1] ?? "")
+        .split(",")
+        .filter(Boolean);
+    if (path === "blocked_dates") {
+      if (req.method() === "GET") return send(state.blocked.map((day) => ({ day })));
+      if (req.method() === "POST") {
+        for (const r of body) if (!state.blocked.includes(r.day)) state.blocked.push(r.day);
+        return send([]);
+      }
+      if (req.method() === "DELETE") {
+        const days = inList("day");
+        state.blocked = state.blocked.filter((d) => !days.includes(d));
+        return send([]);
+      }
+    }
+    if (path === "day_prices") {
+      if (req.method() === "POST") for (const r of body) state.dayPrices[r.day] = r.price;
+      if (req.method() === "DELETE") for (const d of inList("day")) delete state.dayPrices[d];
+      return send([]);
+    }
+    if (path === "rpc/quote_stay") {
+      const n =
+        Math.round(
+          (new Date(body.p_end + "T00:00:00") - new Date(body.p_start + "T00:00:00")) / 86400000,
+        ) + 1;
+      return send([
+        { total: n * 75, package_key: null, days: n, has_custom: false, occasion: null },
+      ]);
+    }
+    if (path === "rpc/set_booking_status") {
+      const bk = state.bookings.find((x) => x.id === body.p_id);
+      if (bk) bk.status = body.p_status;
+      return send(bk ?? {});
+    }
+    if (path === "rpc/admin_create_booking") {
+      const n =
+        Math.round(
+          (new Date(body.p_end + "T00:00:00") - new Date(body.p_start + "T00:00:00")) / 86400000,
+        ) + 1;
+      const row = {
+        id: `b-new-${state.bookings.length + 1}`,
+        ref: "BZR-NEW001",
+        chalet_id: body.p_chalet_id,
+        start_date: body.p_start,
+        end_date: body.p_end,
+        days: n,
+        total: body.p_total ?? n * 75,
+        currency: "KWD",
+        package_key: null,
+        guest_name: body.p_guest_name,
+        guest_phone: body.p_guest_phone,
+        guest_email: body.p_guest_email,
+        guests: body.p_guests,
+        notes: body.p_notes,
+        admin_note: body.p_admin_note,
+        status: body.p_status,
+        source: "admin",
+        notify_guest: body.p_notify_guest,
+        lang: body.p_lang,
+        civil_id_path: null,
+        created_at: new Date().toISOString(),
+        updated_at: "",
+        decided_at: null,
+        decided_by: null,
+      };
+      state.bookings = [row, ...state.bookings];
+      return send(row);
+    }
     if (path === "rates")
       return send({
         id: true,
@@ -249,8 +320,25 @@ function mock(ctx, state) {
   });
 }
 
-async function adminPage(state) {
-  const ctx = await b.newContext({ viewport: { width: 1400, height: 1000 } });
+/** Page the calendar forward until it shows `monthName`. */
+async function toMonth(p, monthName) {
+  for (let i = 0; i < 4; i++) {
+    const label = await p
+      .locator("[data-month-label]")
+      .innerText()
+      .catch(() => "");
+    if (label.includes(monthName)) return;
+    await p.getByRole("button", { name: /next month/i }).click();
+    await p.waitForTimeout(300);
+  }
+}
+
+async function adminPage(state, { phone = false } = {}) {
+  const ctx = await b.newContext(
+    phone
+      ? { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true }
+      : { viewport: { width: 1400, height: 1000 } },
+  );
   await ctx.route(/^https?:\/\/(?!localhost)/, (r) =>
     SUPA.test(r.request().url()) ? r.fallback() : r.abort(),
   );
@@ -501,25 +589,13 @@ async function adminPage(state) {
   await p.waitForTimeout(500);
   // Chalet 1 has an accepted booking Sun-Wed of the anchor week; the panel
   // defaults to the current month, so page forward to that month if needed.
-  for (let i = 0; i < 3; i++) {
-    const label = await p
-      .locator("p.font-display.text-2xl")
-      .first()
-      .innerText()
-      .catch(() => "");
-    if (label.includes(A_MONTH)) break;
-    await p.getByRole("button", { name: /next month/i }).click();
-    await p.waitForTimeout(300);
-  }
-  const day7 = p
-    .locator(".grid.grid-cols-7 button")
-    .filter({ hasText: new RegExp(`^${A_MID}$`) })
-    .first();
-  const title = await day7.getAttribute("title");
+  await toMonth(p, A_MONTH);
+  const day7 = p.locator(`[data-day="${ymd(at(1))}"]`);
+  const label = await day7.getAttribute("aria-label");
   ck(
     "A day inside an accepted booking is marked booked-by-guest",
-    title === "Booked by a guest",
-    title,
+    /Booked by a guest · Aisha Al-Sabah/.test(label ?? ""),
+    label,
   );
   await day7.click();
   await p.waitForTimeout(300);
@@ -626,10 +702,7 @@ async function adminPage(state) {
   await p.waitForTimeout(1200);
 
   const badge = await p.evaluate(() => {
-    const cell = [...document.querySelectorAll(".grid.grid-cols-7 button")].find(
-      (btn) => /\d/.test(btn.textContent) && btn.querySelector("span.rounded-full"),
-    );
-    const span = cell?.querySelector("span.rounded-full");
+    const span = document.querySelector("[data-day] [data-price]");
     if (!span) return null;
     const cs = getComputedStyle(span);
     return {
@@ -654,6 +727,327 @@ async function adminPage(state) {
     "…on a light background rather than none",
     !!badge && badge.bg !== "rgba(0, 0, 0, 0)",
     badge?.bg,
+  );
+  await ctx.close();
+}
+
+// ======================================== calendar: ranges, not single days
+// Blocking a week used to be seven taps and seven round trips. A selection is
+// now a range -- dragged, Shift-clicked or typed -- and each action covers it.
+{
+  const state = makeState();
+  const { p, ctx } = await adminPage(state);
+  await p.getByRole("button", { name: "Availability & Pricing", exact: true }).click();
+  await p.waitForTimeout(700);
+  await toMonth(p, A_MONTH);
+  const cell = (n) => p.locator(`[data-day="${ymd(at(n))}"]`);
+  const centre = async (n) => {
+    const b = await cell(n).boundingBox();
+    return [b.x + b.width / 2, b.y + b.height / 2];
+  };
+  const panel = p.locator("#selection-panel").locator("..");
+
+  // Drag from the booked Tuesday to the Saturday: five days, two of them held.
+  const [ax, ay] = await centre(2);
+  const [zx, zy] = await centre(6);
+  await p.mouse.move(ax, ay);
+  await p.mouse.down();
+  await p.mouse.move(zx, zy, { steps: 10 });
+  await p.mouse.up();
+  await p.waitForTimeout(300);
+  const pressed = await p.locator('[data-day][aria-pressed="true"]').count();
+  ck("Dragging across days selects the whole range", pressed === 5, `${pressed} selected`);
+  ck(
+    "…and the panel says how long it is",
+    await panel.getByText("5 days", { exact: true }).isVisible(),
+  );
+  ck(
+    "…and what is in it",
+    (await panel.getByText("3 available").isVisible()) &&
+      (await panel.getByText("2 booked").isVisible()),
+  );
+
+  const blockBtn = panel.getByRole("button", { name: /Mark 3 days unavailable/ });
+  ck("The block button counts only the days it can close", await blockBtn.isVisible());
+  await blockBtn.click();
+  await p.waitForTimeout(700);
+  const post = state.calls.find((c) => c.path === "blocked_dates" && c.method === "POST");
+  ck(
+    "One request closes all of them",
+    state.calls.filter((c) => c.path === "blocked_dates" && c.method === "POST").length === 1 &&
+      JSON.stringify(post?.body?.map((r) => r.day)) ===
+        JSON.stringify([ymd(at(4)), ymd(at(5)), ymd(at(6))]),
+    JSON.stringify(post?.body),
+  );
+  ck("…leaving the booked days alone", !post?.body?.some((r) => r.day === ymd(at(2))));
+  ck(
+    "…as an upsert, so a day already closed is not an error",
+    /on_conflict=chalet_id,day/.test(decodeURIComponent(post?.search ?? "")),
+    post?.search,
+  );
+  ck(
+    "…and says it worked",
+    await p.locator('[data-toast="success"]', { hasText: "3 days marked unavailable" }).isVisible(),
+  );
+  ck(
+    "The closed days now read as unavailable",
+    /Unavailable/.test((await cell(5).getAttribute("aria-label")) ?? ""),
+    await cell(5).getAttribute("aria-label"),
+  );
+
+  // From / To: the same range by typing, then reopen it.
+  await panel.getByRole("button", { name: /Clear selection/i }).click();
+  await panel.getByLabel("From", { exact: true }).fill(ymd(at(4)));
+  await panel.getByLabel("To", { exact: true }).fill(ymd(at(6)));
+  await p.waitForTimeout(300);
+  ck(
+    "Typing From and To selects the range too",
+    (await p.locator('[data-day][aria-pressed="true"]').count()) === 3,
+  );
+  await panel.getByRole("button", { name: /Make 3 days available/ }).click();
+  await p.waitForTimeout(700);
+  const del = state.calls.find((c) => c.path === "blocked_dates" && c.method === "DELETE");
+  ck(
+    "Reopening them is one request too",
+    decodeURIComponent(del?.search ?? "").includes(
+      `day=in.(${ymd(at(4))},${ymd(at(5))},${ymd(at(6))})`,
+    ),
+    decodeURIComponent(del?.search ?? ""),
+  );
+  ck("…and they are open again", state.blocked.length === 0, JSON.stringify(state.blocked));
+
+  // Shift-click extends from where the selection began.
+  await cell(4).click();
+  await cell(6).click({ modifiers: ["Shift"] });
+  await p.waitForTimeout(200);
+  ck(
+    "Shift-click extends the selection",
+    (await p.locator('[data-day][aria-pressed="true"]').count()) === 3,
+  );
+
+  // A price for every day in the range at once.
+  await panel.getByLabel("Custom price per day").fill("90");
+  await panel.getByRole("button", { name: "Apply price" }).click();
+  await p.waitForTimeout(700);
+  ck(
+    "A price applies to the whole range",
+    [4, 5, 6].every((n) => state.dayPrices[ymd(at(n))] === 90),
+    JSON.stringify(state.dayPrices),
+  );
+
+  // And the same dates can become a booking.
+  await panel.getByRole("button", { name: /Create a booking for these dates/ }).click();
+  await p.waitForTimeout(400);
+  const dlg = p.getByRole("dialog");
+  ck(
+    "The selection opens a new booking with its dates filled in",
+    (await dlg.getByLabel("Check-in date").inputValue()) === ymd(at(4)) &&
+      (await dlg.getByLabel("Check-out date").inputValue()) === ymd(at(7)),
+    `${await dlg.getByLabel("Check-in date").inputValue()} → ${await dlg.getByLabel("Check-out date").inputValue()}`,
+  );
+  await ctx.close();
+}
+
+// ========================================= deleting: one click to confirm
+{
+  const state = makeState();
+  const { p, ctx } = await adminPage(state);
+  await p.getByRole("button", { name: "Booking Requests" }).click();
+  await p.waitForTimeout(500);
+  const row = p.locator("li", { hasText: "Omar Khalid" });
+
+  await row.getByLabel("Delete request").click();
+  await p.waitForTimeout(300);
+  const dlg = p.getByRole("dialog");
+  ck(
+    "Delete asks plainly",
+    await dlg.getByText("Are you sure you want to delete this booking?").isVisible(),
+  );
+  ck("…with nothing to type", (await dlg.locator("input, textarea").count()) === 0);
+  ck(
+    "…and two clear answers",
+    (await dlg.getByRole("button", { name: "Yes, delete" }).isEnabled()) &&
+      (await dlg.getByRole("button", { name: "Cancel" }).isVisible()),
+  );
+
+  await dlg.getByRole("button", { name: "Cancel" }).click();
+  await p.waitForTimeout(300);
+  ck(
+    "Cancel deletes nothing",
+    (await p.getByRole("dialog").count()) === 0 &&
+      !state.calls.some((c) => c.path === "bookings" && c.method === "DELETE"),
+  );
+
+  await row.getByLabel("Delete request").click();
+  await p.getByRole("dialog").getByRole("button", { name: "Yes, delete" }).click();
+  await p.waitForTimeout(800);
+  const delCall = state.calls.find((c) => c.path === "bookings" && c.method === "DELETE");
+  ck(
+    "Yes deletes it in one click",
+    decodeURIComponent(delCall?.search ?? "").includes("id=eq.b-2"),
+  );
+  ck(
+    "…closes the dialog and says so",
+    (await p.getByRole("dialog").count()) === 0 &&
+      (await p.locator('[data-toast="success"]', { hasText: "BZR-BBB222 deleted" }).isVisible()),
+  );
+  ck(
+    "…and the booking is gone from the list",
+    (await p.locator("li", { hasText: "Omar Khalid" }).count()) === 0,
+  );
+  await ctx.close();
+}
+
+// ============================================== bookings the admin enters
+{
+  const state = makeState();
+  const { p, ctx } = await adminPage(state);
+  await p.getByRole("button", { name: "Booking Requests" }).click();
+  await p.waitForTimeout(500);
+  await p.getByRole("button", { name: "New booking" }).click();
+  await p.waitForTimeout(400);
+  const dlg = p.getByRole("dialog");
+  ck(
+    "New booking opens a form",
+    await dlg.getByRole("heading", { name: "New booking" }).isVisible(),
+  );
+
+  // Nothing filled in: every problem is named against its field, and nothing is sent.
+  await dlg.getByRole("button", { name: "Create booking" }).click();
+  await p.waitForTimeout(300);
+  ck(
+    "An empty form is refused field by field",
+    (await dlg.getByText("Choose a check-in and a check-out date").isVisible()) &&
+      (await dlg.getByText("Enter the guest's full name").isVisible()) &&
+      (await dlg.getByText("Enter a phone number with at least 8 digits").isVisible()) &&
+      (await dlg.getByText("Enter a valid email address").isVisible()),
+  );
+  ck(
+    "…without calling the server",
+    !state.calls.some((c) => c.path === "rpc/admin_create_booking"),
+  );
+
+  // Accepted over Aisha's accepted stay: said before Create, and Create held back.
+  await dlg.getByLabel("Check-in date").fill(A_START);
+  await dlg.getByLabel("Check-out date").fill(ymd(at(2)));
+  await dlg.getByRole("button", { name: "Accepted" }).click();
+  await p.waitForTimeout(300);
+  ck(
+    "A clash with an accepted booking is named",
+    await dlg.getByText(/overlap accepted booking BZR-AAA111 \(Aisha Al-Sabah\)/).isVisible(),
+  );
+  ck(
+    "…and an accepted booking cannot be created over it",
+    await p.getByRole("button", { name: "Create booking" }).isDisabled(),
+  );
+
+  // A clean one.
+  await dlg.getByLabel("Check-in date").fill(ymd(at(10)));
+  await dlg.getByLabel("Check-out date").fill(ymd(at(12)));
+  await p.waitForTimeout(500);
+  ck(
+    "The stay is spelled out",
+    await dlg.getByText(/^2 days · in .* at 2:00 PM · out .* at 12:00 PM$/).isVisible(),
+  );
+  ck(
+    "…and priced from the rates",
+    (await dlg.locator('[data-testid="quote"]').innerText()) === "KD 150",
+  );
+  await dlg.getByLabel("Full name", { exact: true }).fill("Phone Guest");
+  await dlg.getByLabel("Phone", { exact: true }).fill("+965 9000 1111");
+  await dlg.getByLabel("Email", { exact: true }).fill("Phone.Guest@Example.com");
+  await dlg.getByLabel("Guests", { exact: true }).fill("5");
+  await dlg.getByLabel("Internal note", { exact: true }).fill("Paid deposit by link");
+  await dlg.getByRole("button", { name: "Arabic" }).click();
+  await p.getByRole("button", { name: "Create booking" }).click();
+  await p.waitForTimeout(900);
+
+  const rpc = state.calls.find((c) => c.path === "rpc/admin_create_booking");
+  ck("Create calls admin_create_booking", !!rpc, JSON.stringify(rpc?.body));
+  ck(
+    "…with the last night, not the check-out day",
+    rpc?.body?.p_start === ymd(at(10)) && rpc?.body?.p_end === ymd(at(11)),
+    `${rpc?.body?.p_start} → ${rpc?.body?.p_end}`,
+  );
+  ck(
+    "…and the details as entered, tidied",
+    rpc?.body?.p_status === "accepted" &&
+      rpc?.body?.p_guest_email === "phone.guest@example.com" &&
+      rpc?.body?.p_guests === 5 &&
+      rpc?.body?.p_lang === "ar" &&
+      rpc?.body?.p_notify_guest === true &&
+      rpc?.body?.p_total === null &&
+      rpc?.body?.p_admin_note === "Paid deposit by link",
+    JSON.stringify(rpc?.body),
+  );
+  ck(
+    "The form closes and says which booking it made",
+    (await p.getByRole("dialog").count()) === 0 &&
+      (await p
+        .locator('[data-toast="success"]', { hasText: "Booking BZR-NEW001 created" })
+        .isVisible()),
+  );
+  const added = p.locator("li", { hasText: "Phone Guest" });
+  ck("The new booking is in the list straight away", await added.isVisible());
+  ck("…marked as the admin's", (await added.innerText()).includes("Added by admin"));
+  await ctx.close();
+}
+
+// ================================================== the calendar on a phone
+{
+  const state = makeState();
+  const { p, ctx } = await adminPage(state, { phone: true });
+  await p.getByRole("button", { name: "Availability & Pricing", exact: true }).click();
+  await p.waitForTimeout(700);
+  await toMonth(p, A_MONTH);
+  ck(
+    "The open tab is scrolled into view in the phone's tab strip",
+    await p.evaluate(() => {
+      const el = document.querySelector('nav [aria-current="true"]');
+      const r = el.getBoundingClientRect();
+      return r.left >= 0 && r.right <= window.innerWidth;
+    }),
+  );
+  await p.locator(`[data-day="${ymd(at(5))}"]`).tap();
+  await p.waitForTimeout(300);
+  ck(
+    "A tap selects that one day",
+    (await p.locator('[data-day][aria-pressed="true"]').count()) === 1 &&
+      (await p.locator(`[data-day="${ymd(at(5))}"]`).getAttribute("aria-pressed")) === "true",
+  );
+  ck(
+    "The calendar does not scroll sideways",
+    !(await p.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)),
+  );
+  const bar = p.locator(".fixed.inset-x-0.bottom-0").filter({ hasText: "Unavailable" });
+  ck("The main actions ride along at the foot of the screen", await bar.isVisible());
+  await bar.getByRole("button", { name: "Unavailable" }).tap();
+  await p.waitForTimeout(700);
+  ck(
+    "…and close the day from there",
+    JSON.stringify(state.blocked) === JSON.stringify([ymd(at(5))]),
+    JSON.stringify(state.blocked),
+  );
+  await ctx.close();
+}
+
+// ============================================ deciding from the overview
+{
+  const state = makeState();
+  const { p, ctx } = await adminPage(state);
+  await p.getByRole("button", { name: "Accept Omar Khalid" }).click();
+  await p.waitForTimeout(700);
+  const call = state.calls.find((c) => c.path === "rpc/set_booking_status");
+  ck(
+    "A pending request can be accepted from the overview",
+    call?.body?.p_id === "b-2" && call?.body?.p_status === "accepted",
+    JSON.stringify(call?.body),
+  );
+  ck(
+    "…and the result is confirmed",
+    await p
+      .locator('[data-toast="success"]', { hasText: "BZR-BBB222 marked Accepted" })
+      .isVisible(),
   );
   await ctx.close();
 }

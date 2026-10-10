@@ -14,6 +14,7 @@ import type {
   CalendarDay,
   ChaletRow,
   NewsRow,
+  QuoteRow,
   RatesRow,
   SettingRow,
   SpecialOccasionRow,
@@ -371,6 +372,80 @@ export function useDeleteBooking() {
   });
 }
 
+export interface AdminBookingInput {
+  chaletId: number;
+  /** First booked day. */
+  start: string;
+  /** Last booked day; check-out is the morning after. */
+  end: string;
+  name: string;
+  phone: string;
+  email: string;
+  guests: number;
+  status: Extract<BookingStatus, "pending" | "accepted">;
+  /** Null to price it from the rates. */
+  total: number | null;
+  notes: string;
+  adminNote: string;
+  lang: "en" | "ar";
+  notifyGuest: boolean;
+}
+
+/**
+ * A booking the admin enters by hand (phone, WhatsApp, walk-in). It goes
+ * through admin_create_booking(), which checks the caller is an admin,
+ * validates it and prices it; the row it returns is the truth.
+ */
+export function useAdminCreateBooking() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: AdminBookingInput): Promise<BookingRow> => {
+      const { data, error } = await supabase.rpc("admin_create_booking", {
+        p_chalet_id: input.chaletId,
+        p_start: input.start,
+        p_end: input.end,
+        p_guest_name: input.name,
+        p_guest_phone: input.phone,
+        p_guest_email: input.email,
+        p_guests: input.guests,
+        p_status: input.status,
+        p_total: input.total,
+        p_notes: input.notes || null,
+        p_admin_note: input.adminNote || null,
+        p_lang: input.lang,
+        p_notify_guest: input.notifyGuest,
+      });
+      if (error) fail("Could not create the booking", error);
+      return data as unknown as BookingRow;
+    },
+    onSuccess: (row) => {
+      // Shown straight away, before the refetch lands.
+      qc.setQueryData<BookingRow[]>(qk.bookings, (rows) => (rows ? [row, ...rows] : rows));
+      qc.invalidateQueries({ queryKey: qk.bookings });
+      qc.invalidateQueries({ queryKey: ["calendar"] });
+    },
+  });
+}
+
+/** What the server would charge for a stay, for the admin's new-booking form. */
+export function useQuote(chaletId: number, start: string, end: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ["quote", chaletId, start, end],
+    enabled: enabled && !!start && !!end && end >= start,
+    queryFn: async (): Promise<QuoteRow | null> => {
+      const { data, error } = await supabase.rpc("quote_stay", {
+        p_chalet_id: chaletId,
+        p_start: start,
+        p_end: end,
+      });
+      if (error) fail("Could not price the stay", error);
+      const row = (Array.isArray(data) ? data[0] : data) as QuoteRow | undefined;
+      return row ? { ...row, total: Number(row.total) } : null;
+    },
+    staleTime: 30_000,
+  });
+}
+
 export function useBlockedDates(chaletId: number, enabled: boolean) {
   return useQuery({
     queryKey: qk.blocked(chaletId),
@@ -386,28 +461,38 @@ export function useBlockedDates(chaletId: number, enabled: boolean) {
   });
 }
 
-export function useToggleBlocked() {
+/**
+ * Close or reopen several days at once, for the admin calendar's range
+ * selection. Closing is an upsert that ignores days already closed, so a
+ * selection that runs over a closed day is not an error; reopening deletes
+ * whichever of the days are closed and leaves the rest alone.
+ */
+export function useSetBlockedDays() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({
       chaletId,
-      day,
+      days,
       blocked,
     }: {
       chaletId: number;
-      day: string;
+      days: string[];
       blocked: boolean;
     }) => {
+      if (days.length === 0) return;
       if (blocked) {
+        const { error } = await supabase.from("blocked_dates").upsert(
+          days.map((day) => ({ chalet_id: chaletId, day })),
+          { onConflict: "chalet_id,day", ignoreDuplicates: true },
+        );
+        if (error) fail("Could not block the days", error);
+      } else {
         const { error } = await supabase
           .from("blocked_dates")
           .delete()
           .eq("chalet_id", chaletId)
-          .eq("day", day);
-        if (error) fail("Could not unblock the day", error);
-      } else {
-        const { error } = await supabase.from("blocked_dates").insert({ chalet_id: chaletId, day });
-        if (error) fail("Could not block the day", error);
+          .in("day", days);
+        if (error) fail("Could not unblock the days", error);
       }
     },
     onSuccess: (_d, v) => {
@@ -432,30 +517,33 @@ export function useDayPrices(chaletId: number, enabled: boolean) {
   });
 }
 
-export function useSetDayPrice() {
+/** Give several days one custom price, or (price null) hand them back to the rates. */
+export function useSetDayPrices() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({
       chaletId,
-      day,
+      days,
       price,
     }: {
       chaletId: number;
-      day: string;
+      days: string[];
       price: number | null;
     }) => {
+      if (days.length === 0) return;
       if (price === null) {
         const { error } = await supabase
           .from("day_prices")
           .delete()
           .eq("chalet_id", chaletId)
-          .eq("day", day);
-        if (error) fail("Could not clear the price", error);
+          .in("day", days);
+        if (error) fail("Could not clear the prices", error);
       } else {
-        const { error } = await supabase
-          .from("day_prices")
-          .upsert({ chalet_id: chaletId, day, price }, { onConflict: "chalet_id,day" });
-        if (error) fail("Could not save the price", error);
+        const { error } = await supabase.from("day_prices").upsert(
+          days.map((day) => ({ chalet_id: chaletId, day, price })),
+          { onConflict: "chalet_id,day" },
+        );
+        if (error) fail("Could not save the prices", error);
       }
     },
     onSuccess: (_d, v) => {

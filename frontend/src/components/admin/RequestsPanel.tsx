@@ -1,34 +1,71 @@
 import { useMemo, useState } from "react";
-import { Download, IdCard, Pencil, Search, Trash2, X } from "lucide-react";
+import {
+  CalendarPlus,
+  Download,
+  IdCard,
+  Inbox,
+  Mail,
+  Pencil,
+  Phone,
+  Search,
+  Trash2,
+  Users,
+  X,
+} from "lucide-react";
 import { useI18n } from "@/lib/i18n";
+import { dateLocale } from "@/lib/locale";
 import { checkOutDay, fmtDate, formatMoney, parseDate } from "@/lib/booking";
-import { civilIdUrl, useBookings, useDeleteBooking, useSetBookingStatus } from "@/lib/api";
+import {
+  civilIdUrl,
+  useBookings,
+  useChalets,
+  useDeleteBooking,
+  useSetBookingStatus,
+} from "@/lib/api";
 import type { BookingRow, BookingStatus } from "@/integrations/supabase/types";
 import { DeleteConfirm } from "./DeleteConfirm";
 import { EditBookingModal } from "./EditBookingModal";
+import { useAdminT } from "./strings";
+import { errorText, useToast } from "./toast";
+import {
+  Btn,
+  Card,
+  EmptyState,
+  ErrorNote,
+  IconBtn,
+  PanelHeader,
+  SkeletonList,
+  StatusBadge,
+  Tag,
+  cx,
+} from "./ui";
 
 const STATUS_ORDER: BookingStatus[] = ["pending", "accepted", "rejected"];
 
-export function RequestsPanel() {
+export function RequestsPanel({
+  initialQuery = "",
+  onNewBooking,
+}: {
+  initialQuery?: string;
+  onNewBooking: () => void;
+}) {
   const { tr, lang } = useI18n();
-  const { data: bookings, isLoading, error } = useBookings(true);
+  const t = useAdminT();
+  const toast = useToast();
+  const { data: bookings, isLoading, error, refetch } = useBookings(true);
+  const { data: chalets } = useChalets();
   const setStatus = useSetBookingStatus();
   const remove = useDeleteBooking();
   const [pendingDelete, setPendingDelete] = useState<BookingRow | null>(null);
   const [editing, setEditing] = useState<BookingRow | null>(null);
   const [filter, setFilter] = useState<BookingStatus | "all">("all");
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(initialQuery);
 
-  const statusLabel = (s: BookingStatus) =>
-    s === "accepted"
-      ? tr("statusAccepted")
-      : s === "rejected"
-        ? tr("statusRejected")
-        : s === "cancelled"
-          ? lang === "en"
-            ? "Cancelled"
-            : "ملغى"
-          : tr("statusPending");
+  const counts = useMemo(() => {
+    const c: Record<string, number> = { all: (bookings ?? []).length };
+    for (const b of bookings ?? []) c[b.status] = (c[b.status] ?? 0) + 1;
+    return c;
+  }, [bookings]);
 
   const packageName = (key: string | null) =>
     key === "fullWeek"
@@ -40,6 +77,11 @@ export function RequestsPanel() {
           : key === "special"
             ? tr("specialPkg")
             : "";
+
+  const chaletName = (id: number) => {
+    const c = (chalets ?? []).find((x) => x.id === id);
+    return c ? (lang === "en" ? c.name_en : c.name_ar) : `Chalet ${id}`;
+  };
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -61,7 +103,7 @@ export function RequestsPanel() {
     const sheet = XLSX.utils.json_to_sheet(
       rows.map((b) => ({
         "Booking ID": b.ref,
-        Status: statusLabel(b.status),
+        Status: t(b.status),
         Chalet: b.chalet_id,
         // The same check-in and check-out the guest is shown: arrival on the
         // first booked day, departure the morning after the last.
@@ -76,15 +118,16 @@ export function RequestsPanel() {
         Guests: b.guests,
         Notes: b.notes ?? "",
         "Internal note": b.admin_note ?? "",
+        Source: b.source === "admin" ? "Admin" : "Website",
         Submitted: new Date(b.created_at).toLocaleString("en-GB"),
       })),
     );
     sheet["!cols"] = [
       { wch: 12 },
-      { wch: 20 },
+      { wch: 12 },
       { wch: 8 },
-      { wch: 12 },
-      { wch: 12 },
+      { wch: 16 },
+      { wch: 16 },
       { wch: 6 },
       { wch: 12 },
       { wch: 20 },
@@ -94,6 +137,7 @@ export function RequestsPanel() {
       { wch: 8 },
       { wch: 40 },
       { wch: 30 },
+      { wch: 10 },
       { wch: 20 },
     ];
     const book = XLSX.utils.book_new();
@@ -101,159 +145,239 @@ export function RequestsPanel() {
     XLSX.writeFile(book, `bizarri-bookings-${fmtDate(new Date())}.xlsx`);
   };
 
-  const failure = setStatus.error ?? remove.error;
+  const changeStatus = (b: BookingRow, status: BookingStatus) =>
+    setStatus.mutate(
+      { id: b.id, status },
+      {
+        onSuccess: () => toast.success(t("statusChanged", { ref: b.ref, status: t(status) })),
+        onError: (err) => toast.error(errorText(err)),
+      },
+    );
+
+  const fmt = (iso: string, year = false) =>
+    parseDate(iso).toLocaleDateString(dateLocale(lang), {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      ...(year ? { year: "numeric" } : {}),
+    });
 
   return (
     <section>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
-        <h2 className="font-display text-3xl">{tr("requests")}</h2>
-        <div className="flex flex-wrap items-center gap-2">
-          {(["all", ...STATUS_ORDER] as const).map((f) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              aria-pressed={filter === f}
-              className={`px-3 py-2 text-xs uppercase tracking-widest transition-colors ${
-                filter === f
-                  ? "bg-foreground text-background"
-                  : "border border-border text-muted-foreground hover:bg-secondary"
-              }`}
+      <PanelHeader
+        title={tr("requests")}
+        description={counts.all ? t("bookingsCount", { n: counts.all }) : undefined}
+        actions={
+          <>
+            <Btn
+              onClick={exportXlsx}
+              disabled={rows.length === 0}
+              icon={<Download className="h-4 w-4" aria-hidden="true" />}
             >
-              {f === "all" ? (lang === "en" ? "All" : "الكل") : statusLabel(f)}
-            </button>
-          ))}
-          <button
-            onClick={exportXlsx}
-            disabled={rows.length === 0}
-            className="inline-flex items-center gap-2 border border-border px-5 py-2 text-xs uppercase tracking-widest transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            <Download className="h-4 w-4" /> {tr("exportExcel")}
-          </button>
-        </div>
-      </div>
+              {tr("exportExcel")}
+            </Btn>
+            <Btn
+              variant="primary"
+              onClick={onNewBooking}
+              icon={<CalendarPlus className="h-4 w-4" aria-hidden="true" />}
+            >
+              {t("newBooking")}
+            </Btn>
+          </>
+        }
+      />
 
-      <div className="relative mb-6 max-w-md">
-        <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder={tr("searchRequests")}
-          className="w-full border border-border bg-secondary py-2.5 pe-9 ps-10 text-sm outline-none focus:border-foreground"
-        />
-        {query && (
-          <button
-            onClick={() => setQuery("")}
-            aria-label={tr("clear")}
-            className="absolute end-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        )}
-      </div>
-
-      {failure && (
-        <p className="mb-4 border border-destructive p-4 text-sm text-destructive">
-          {(failure as Error).message}
-        </p>
-      )}
-      {error && (
-        <p className="mb-4 border border-destructive p-4 text-sm text-destructive">
-          {(error as Error).message}
-        </p>
-      )}
-      {isLoading && <p className="text-sm text-muted-foreground">…</p>}
-      {!isLoading && rows.length === 0 && (
-        <p className="text-sm text-muted-foreground">
-          {query ? tr("noMatches") : tr("noRequests")}
-        </p>
-      )}
-
-      <ul className="space-y-3">
-        {rows.map((b) => (
-          <li key={b.id} className="border border-border p-5">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <p className="font-mono text-xs text-muted-foreground" dir="ltr">
-                  {b.ref}
-                </p>
-                <p className="mt-1 font-display text-xl">{b.guest_name}</p>
-                <p className="mt-1 text-sm text-muted-foreground" dir="ltr">
-                  Chalet {b.chalet_id} · {b.start_date} → {b.end_date} ({b.days} {tr("nightsLabel")}
-                  )
-                </p>
-              </div>
-              <div className="flex items-start gap-3">
-                <p className="font-display text-2xl">{formatMoney(Number(b.total), lang)}</p>
-                <button
-                  onClick={() => setEditing(b)}
-                  aria-label={tr("editDetails")}
-                  className="flex h-11 w-11 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  <Pencil className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-
-            <div className="mt-4 grid gap-2 text-sm sm:grid-cols-3">
-              <a href={`tel:${b.guest_phone}`} dir="ltr" className="hover:underline">
-                {b.guest_phone}
-              </a>
-              <a href={`mailto:${b.guest_email}`} dir="ltr" className="truncate hover:underline">
-                {b.guest_email}
-              </a>
-              <span>
-                {tr("guestsLabel")}: {b.guests}
-              </span>
-            </div>
-            <CivilIdLink path={b.civil_id_path} />
-            {b.notes && <p className="mt-3 text-sm text-muted-foreground">{b.notes}</p>}
-            {b.admin_note && (
-              <p className="mt-2 border-s-2 border-foreground/30 ps-3 text-sm text-muted-foreground">
-                {tr("internalNote")}: {b.admin_note}
-              </p>
-            )}
-
-            <div className="mt-5 flex flex-wrap items-center gap-2">
-              {STATUS_ORDER.map((s) => (
-                <button
-                  key={s}
-                  disabled={setStatus.isPending}
-                  onClick={() => setStatus.mutate({ id: b.id, status: s })}
-                  aria-pressed={b.status === s}
-                  className={`px-4 py-2 text-xs uppercase tracking-widest transition-colors disabled:opacity-50 ${
-                    b.status === s
-                      ? s === "accepted"
-                        ? "bg-foreground text-background"
-                        : s === "rejected"
-                          ? "bg-destructive text-destructive-foreground"
-                          : "bg-secondary text-foreground"
-                      : "border border-border text-muted-foreground hover:bg-secondary"
-                  }`}
-                >
-                  {statusLabel(s)}
-                </button>
-              ))}
+      <Card className="mb-5 flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap gap-1" role="group" aria-label={t("changeStatus")}>
+          {(["all", ...STATUS_ORDER, "cancelled"] as const)
+            .filter((f) => f !== "cancelled" || counts.cancelled)
+            .map((f) => (
               <button
-                onClick={() => setPendingDelete(b)}
-                aria-label={tr("deleteRequest")}
-                className="ms-auto flex h-11 w-11 items-center justify-center text-muted-foreground transition-colors hover:text-destructive"
+                key={f}
+                type="button"
+                onClick={() => setFilter(f)}
+                aria-pressed={filter === f}
+                className={cx(
+                  "inline-flex min-h-10 items-center gap-2 rounded-md px-3 text-sm font-medium transition-colors",
+                  filter === f
+                    ? "bg-foreground text-background"
+                    : "text-muted-foreground hover:bg-secondary hover:text-foreground",
+                )}
               >
-                <Trash2 className="h-4 w-4" />
+                {f === "all" ? t("all") : t(f)}
+                <span
+                  className={cx(
+                    "rounded-full px-1.5 text-xs tabular-nums",
+                    filter === f ? "bg-background/20" : "bg-secondary",
+                  )}
+                >
+                  {counts[f] ?? 0}
+                </span>
               </button>
-            </div>
-          </li>
-        ))}
-      </ul>
+            ))}
+        </div>
+        <div className="relative w-full sm:max-w-xs">
+          <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={tr("searchRequests")}
+            aria-label={tr("searchRequests")}
+            className="min-h-10 w-full rounded-md border border-border bg-background py-2 pe-10 ps-9 text-sm outline-none focus:border-foreground focus:ring-2 focus:ring-foreground/10"
+          />
+          {query && (
+            <button
+              type="button"
+              onClick={() => setQuery("")}
+              aria-label={tr("clear")}
+              className="absolute end-0 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+      </Card>
+
+      {error && (
+        <div className="mb-4">
+          <ErrorNote onRetry={() => refetch()}>{errorText(error)}</ErrorNote>
+        </div>
+      )}
+
+      {isLoading ? (
+        <SkeletonList rows={3} />
+      ) : rows.length === 0 ? (
+        <EmptyState icon={<Inbox className="h-6 w-6" />}>
+          {query ? tr("noMatches") : tr("noRequests")}
+        </EmptyState>
+      ) : (
+        <ul className="space-y-3">
+          {rows.map((b) => {
+            const updating = setStatus.isPending && setStatus.variables?.id === b.id;
+            return (
+              <Card as="li" key={b.id} className="overflow-hidden">
+                <div className="p-4 sm:p-5">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <StatusBadge status={b.status} />
+                        {b.source === "admin" && <Tag>{t("addedByAdmin")}</Tag>}
+                        <span className="font-mono text-xs text-muted-foreground" dir="ltr">
+                          {b.ref}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-lg font-semibold">{b.guest_name}</p>
+                      <p className="mt-0.5 text-sm text-muted-foreground">
+                        {chaletName(b.chalet_id)} · {fmt(b.start_date)} → {fmt(b.end_date, true)} ·{" "}
+                        {b.days === 1 ? t("oneDay") : t("days", { n: b.days })}
+                      </p>
+                    </div>
+                    <div className="sm:text-end">
+                      <p className="text-xl font-semibold tabular-nums">
+                        {formatMoney(Number(b.total), lang)}
+                      </p>
+                      {b.package_key && (
+                        <p className="text-xs text-muted-foreground">
+                          {packageName(b.package_key)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm">
+                    <a
+                      href={`tel:${b.guest_phone}`}
+                      dir="ltr"
+                      className="inline-flex min-h-6 items-center gap-1.5 hover:underline"
+                    >
+                      <Phone className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+                      {b.guest_phone}
+                    </a>
+                    <a
+                      href={`mailto:${b.guest_email}`}
+                      dir="ltr"
+                      className="inline-flex min-h-6 min-w-0 items-center gap-1.5 hover:underline"
+                    >
+                      <Mail
+                        className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
+                        aria-hidden="true"
+                      />
+                      <span className="truncate">{b.guest_email}</span>
+                    </a>
+                    <span className="inline-flex items-center gap-1.5">
+                      <Users className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+                      {tr("guestsLabel")}: {b.guests}
+                    </span>
+                  </div>
+
+                  {b.source !== "admin" && <CivilIdLink path={b.civil_id_path} />}
+                  {b.notes && (
+                    <p className="mt-3 rounded-md bg-secondary px-3 py-2 text-sm">{b.notes}</p>
+                  )}
+                  {b.admin_note && (
+                    <p className="mt-2 border-s-2 border-amber-400 ps-3 text-sm text-muted-foreground">
+                      <span className="font-medium text-foreground">{tr("internalNote")}:</span>{" "}
+                      {b.admin_note}
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border bg-secondary/40 px-4 py-2 sm:px-5">
+                  <div className="flex flex-wrap gap-1" role="group" aria-label={t("changeStatus")}>
+                    {STATUS_ORDER.map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        disabled={updating}
+                        onClick={() => b.status !== s && changeStatus(b, s)}
+                        aria-pressed={b.status === s}
+                        className={cx(
+                          "min-h-10 rounded-md px-3 text-sm font-medium transition-colors disabled:opacity-50",
+                          b.status === s
+                            ? s === "accepted"
+                              ? "bg-emerald-600 text-white"
+                              : s === "rejected"
+                                ? "bg-destructive text-destructive-foreground"
+                                : "bg-amber-100 text-amber-900"
+                            : "text-muted-foreground hover:bg-background hover:text-foreground",
+                        )}
+                      >
+                        {t(s)}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex items-center">
+                    <IconBtn label={tr("editDetails")} onClick={() => setEditing(b)}>
+                      <Pencil className="h-4 w-4" />
+                    </IconBtn>
+                    <IconBtn
+                      tone="danger"
+                      label={tr("deleteRequest")}
+                      onClick={() => setPendingDelete(b)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </IconBtn>
+                  </div>
+                </div>
+              </Card>
+            );
+          })}
+        </ul>
+      )}
 
       {editing && <EditBookingModal booking={editing} onClose={() => setEditing(null)} />}
 
       {pendingDelete && (
         <DeleteConfirm
+          title={t("deleteBookingTitle")}
+          body={t("deleteBookingBody")}
           label={`${pendingDelete.ref} · ${pendingDelete.guest_name}`}
           onCancel={() => setPendingDelete(null)}
-          onConfirm={() => {
-            remove.mutate(pendingDelete.id);
+          onConfirm={async () => {
+            const ref = pendingDelete.ref;
+            await remove.mutateAsync(pendingDelete.id);
             setPendingDelete(null);
+            toast.success(t("bookingDeleted", { ref }));
           }}
         />
       )}
@@ -276,9 +400,10 @@ function CivilIdLink({ path }: { path: string | null }) {
 
   return (
     <div className="mt-3">
-      <button
-        type="button"
-        disabled={busy}
+      <Btn
+        size="sm"
+        busy={busy}
+        icon={<IdCard className="h-4 w-4" aria-hidden="true" />}
         onClick={async () => {
           setBusy(true);
           setError("");
@@ -290,10 +415,9 @@ function CivilIdLink({ path }: { path: string | null }) {
             setBusy(false);
           }
         }}
-        className="flex items-center gap-2 border border-border px-4 py-2 text-xs uppercase tracking-widest transition-colors hover:bg-secondary disabled:opacity-50"
       >
-        <IdCard className="h-4 w-4" /> {tr("viewCivilId")}
-      </button>
+        {tr("viewCivilId")}
+      </Btn>
       {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
     </div>
   );

@@ -93,6 +93,10 @@ export type BookingRow = {
   terms_accepted_at: string | null;
   /** The language the guest booked in; their confirmation email follows it. */
   lang: "en" | "ar";
+  /** guest: requested on the site. admin: entered from the dashboard. */
+  source: "guest" | "admin";
+  /** Whether the guest was emailed when the booking was created. */
+  notify_guest: boolean;
 };
 
 export type NewsRow = {
@@ -270,6 +274,24 @@ export type Database = {
       };
       set_booking_status: {
         Args: { p_id: string; p_status: BookingStatus; p_note?: string | null };
+        Returns: BookingRow;
+      };
+      admin_create_booking: {
+        Args: {
+          p_chalet_id: number;
+          p_start: string;
+          p_end: string;
+          p_guest_name: string;
+          p_guest_phone: string;
+          p_guest_email: string;
+          p_guests: number;
+          p_status?: BookingStatus;
+          p_total?: number | null;
+          p_notes?: string | null;
+          p_admin_note?: string | null;
+          p_lang?: string;
+          p_notify_guest?: boolean;
+        };
         Returns: BookingRow;
       };
     };

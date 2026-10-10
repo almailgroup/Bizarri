@@ -1,10 +1,16 @@
 import { useEffect, useState } from "react";
+import { RotateCcw, Save } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { DEFAULT_RATES, type Rates } from "@/lib/booking";
 import { useRates, useSaveRates } from "@/lib/api";
+import { useAdminT } from "./strings";
+import { errorText, useToast } from "./toast";
+import { Btn, Card, PanelHeader, cx, inputClass } from "./ui";
 
 export function RatesPanel() {
   const { tr, lang } = useI18n();
+  const t = useAdminT();
+  const toast = useToast();
   const { data: stored } = useRates();
   const save = useSaveRates();
   const [draft, setDraft] = useState<Rates | null>(null);
@@ -64,74 +70,77 @@ export function RatesPanel() {
     },
   ];
 
+  const persist = (value: Rates) =>
+    save.mutate(value, {
+      onSuccess: () => toast.success(t("saved")),
+      onError: (err) => toast.error(errorText(err)),
+    });
+
   return (
     <section>
-      <h2 className="mb-2 font-display text-3xl">{tr("packageRates")}</h2>
-      <p className="mb-2 text-sm text-muted-foreground">
-        {lang === "en"
-          ? "Applied when a stay matches a package exactly. Other stays use the per-day fallback rates; a custom daily price always wins."
-          : "تُطبَّق عندما تطابق الإقامة باقة تماماً. الإقامات الأخرى تستخدم الأسعار اليومية الاحتياطية؛ السعر المخصص له الأولوية دائماً."}
-      </p>
+      <PanelHeader
+        title={tr("packageRates")}
+        description={
+          lang === "en"
+            ? "Applied when a stay matches a package exactly. Other stays use the per-day fallback rates; a custom daily price always wins."
+            : "تُطبَّق عندما تطابق الإقامة باقة تماماً. الإقامات الأخرى تستخدم الأسعار اليومية الاحتياطية؛ السعر المخصص له الأولوية دائماً."
+        }
+      />
+
       {/* The rule the panel cannot show by laying out five equal boxes: the
           weekend is not a package a stay may or may not match, it is the only
           way those three days are sold. */}
-      <p className="mb-6 border-s-2 border-border ps-4 text-sm text-muted-foreground">
+      <p className="mb-6 rounded-md border-s-4 border-foreground/20 bg-background px-4 py-3 text-sm text-muted-foreground shadow-xs">
         {lang === "en"
           ? "Sun – Wed is sold by the day, and one day is a booking. Thu – Sat is not: it is one three-day stay at the weekend rate, whether it is taken alone or on the end of a longer one, and a guest cannot book part of it. That is why the daily weekend rate no longer prices anything — only a custom day price can break a weekend back into separate days."
           : "تُباع أيام الأحد إلى الأربعاء باليوم، ويوم واحد يُعدّ حجزاً. أما الخميس إلى السبت فلا: هي إقامة واحدة من ثلاثة أيام بسعر نهاية الأسبوع، سواء حُجزت وحدها أو ضمن إقامة أطول، ولا يمكن للضيف حجز جزء منها. لذلك لم يعد السعر اليومي لنهاية الأسبوع يُسعّر شيئاً — ولا يكسر نهاية الأسبوع إلى أيام منفصلة إلا سعر يومي مخصص."}
       </p>
 
-      {save.error && (
-        <p className="mb-4 border border-destructive p-4 text-sm text-destructive">
-          {(save.error as Error).message}
-        </p>
-      )}
-
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         {fields.map((f) => (
-          <label
-            key={f.key}
-            // The unused one stays editable — it is still the fallback a
-            // custom day price falls back to — but it should not read as one
-            // of the four numbers that price a stay today.
-            className={`block border border-border p-5 ${f.muted ? "opacity-60" : ""}`}
-          >
-            <span className="block text-xs uppercase tracking-widest text-muted-foreground">
-              {f.label}
-            </span>
-            <span className="mt-1 block text-[11px] text-muted-foreground/70">{f.hint}</span>
-            <input
-              type="number"
-              min={0}
-              value={rates[f.key]}
-              onChange={(e) => setDraft({ ...rates, [f.key]: Number(e.target.value) })}
-              className="mt-3 w-full border border-border bg-secondary px-3 py-2 font-display text-xl outline-none focus:border-foreground"
-            />
-          </label>
+          <Card key={f.key} className={cx("p-5", f.muted && "opacity-60")}>
+            {/* The unused one stays editable — it is still the fallback a
+                custom day price falls back to — but it should not read as one
+                of the four numbers that price a stay today. */}
+            <label className="block">
+              <span className="block text-sm font-medium">{f.label}</span>
+              <span className="mt-0.5 block text-xs text-muted-foreground">{f.hint}</span>
+              <div className="relative mt-3">
+                <input
+                  type="number"
+                  min={0}
+                  value={rates[f.key]}
+                  onChange={(e) => setDraft({ ...rates, [f.key]: Number(e.target.value) })}
+                  className={cx(inputClass, "pe-12 text-lg font-semibold tabular-nums")}
+                />
+                <span className="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                  {lang === "en" ? "KD" : "د.ك"}
+                </span>
+              </div>
+            </label>
+          </Card>
         ))}
       </div>
 
-      <div className="mt-4 flex items-center gap-4">
-        <button
-          onClick={() => save.mutate(rates)}
-          disabled={save.isPending}
-          className="bg-black px-8 py-3 text-sm uppercase tracking-widest text-white hover:opacity-90 disabled:opacity-50"
+      <div className="mt-5 flex flex-wrap items-center gap-2">
+        <Btn
+          variant="primary"
+          onClick={() => persist(rates)}
+          busy={save.isPending}
+          icon={<Save className="h-4 w-4" aria-hidden="true" />}
         >
           {tr("save")}
-        </button>
-        <button
+        </Btn>
+        <Btn
           onClick={() => {
             setDraft(DEFAULT_RATES);
-            save.mutate(DEFAULT_RATES);
+            persist(DEFAULT_RATES);
           }}
           disabled={save.isPending}
-          className="border border-border px-6 py-3 text-sm uppercase tracking-widest hover:bg-secondary disabled:opacity-50"
+          icon={<RotateCcw className="h-4 w-4" aria-hidden="true" />}
         >
           {tr("reset")}
-        </button>
-        {save.isSuccess && !save.isPending && (
-          <span className="text-sm text-muted-foreground">✓</span>
-        )}
+        </Btn>
       </div>
     </section>
   );

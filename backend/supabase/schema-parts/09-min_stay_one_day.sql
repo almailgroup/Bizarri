@@ -1,5 +1,5 @@
 -- ============================================================================
--- Part 9 of 14: min_stay_one_day
+-- Part 9 of 15: min_stay_one_day
 --
 -- Paste this whole file into the Supabase SQL editor and Run, then move on
 -- to the next part. Run them in order; each one is safe to run twice.

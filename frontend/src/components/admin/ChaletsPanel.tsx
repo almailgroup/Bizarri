@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import { useI18n } from "@/lib/i18n";
 import { useChalets, useUpdateChalet } from "@/lib/api";
 import type { ChaletRow } from "@/integrations/supabase/types";
+import { useAdminT } from "./strings";
+import { errorText, useToast } from "./toast";
+import { Btn, Card, Field, PanelHeader, inputClass } from "./ui";
 
 export function ChaletsPanel() {
   const { tr, lang } = useI18n();
@@ -9,13 +12,15 @@ export function ChaletsPanel() {
 
   return (
     <section>
-      <h2 className="mb-2 font-display text-3xl">{tr("chaletsMgmt")}</h2>
-      <p className="mb-6 text-sm text-muted-foreground">
-        {lang === "en"
-          ? "Turning a chalet off hides it from the booking page immediately — existing requests for it are untouched."
-          : "إيقاف شاليه يخفيه فوراً عن صفحة الحجز — الطلبات الحالية له تبقى كما هي."}
-      </p>
-      <div className="grid gap-4 sm:grid-cols-2">
+      <PanelHeader
+        title={tr("chaletsMgmt")}
+        description={
+          lang === "en"
+            ? "Turning a chalet off hides it from the booking page immediately — existing requests for it are untouched."
+            : "إيقاف شاليه يخفيه فوراً عن صفحة الحجز — الطلبات الحالية له تبقى كما هي."
+        }
+      />
+      <div className="grid gap-4 md:grid-cols-2">
         {(chalets ?? []).map((c) => (
           <ChaletCard key={c.id} chalet={c} />
         ))}
@@ -26,6 +31,8 @@ export function ChaletsPanel() {
 
 function ChaletCard({ chalet }: { chalet: ChaletRow }) {
   const { tr } = useI18n();
+  const t = useAdminT();
+  const toast = useToast();
   const update = useUpdateChalet();
   const [nameEn, setNameEn] = useState(chalet.name_en);
   const [nameAr, setNameAr] = useState(chalet.name_ar);
@@ -36,65 +43,76 @@ function ChaletCard({ chalet }: { chalet: ChaletRow }) {
   }, [chalet.name_en, chalet.name_ar]);
 
   const dirty = nameEn !== chalet.name_en || nameAr !== chalet.name_ar;
+  const feedback = {
+    onSuccess: () => toast.success(t("saved")),
+    onError: (err: unknown) => toast.error(errorText(err)),
+  };
 
   return (
-    <div className="border border-border p-6">
-      <div className="mb-4 flex items-center justify-between">
-        <p className="text-xs uppercase tracking-widest text-muted-foreground">
+    <Card className="p-5 sm:p-6">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <p className="text-sm font-medium text-muted-foreground">
           Chalet {chalet.id} · {chalet.slug}
         </p>
-        <label className="flex cursor-pointer items-center gap-2">
+        <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm">
           <input
             type="checkbox"
+            role="switch"
             checked={chalet.active}
             disabled={update.isPending}
-            onChange={(e) => update.mutate({ id: chalet.id, patch: { active: e.target.checked } })}
-            className="h-4 w-4 disabled:opacity-50"
+            onChange={(e) =>
+              update.mutate({ id: chalet.id, patch: { active: e.target.checked } }, feedback)
+            }
+            className="admin-switch"
           />
-          <span className="text-xs uppercase tracking-widest">{tr("chaletActive")}</span>
+          <span>{tr("chaletActive")}</span>
         </label>
       </div>
 
       {!chalet.active && (
-        <p className="mb-4 border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive">
+        <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
           {tr("chaletInactive")}
         </p>
       )}
 
-      <label className="block">
-        <span className="text-xs uppercase tracking-widest text-muted-foreground">
-          {tr("displayNameEn")}
-        </span>
-        <input
-          value={nameEn}
-          onChange={(e) => setNameEn(e.target.value)}
-          className="mt-1 w-full border border-border bg-secondary px-3 py-2 outline-none focus:border-foreground"
-        />
-      </label>
-      <label className="mt-3 block">
-        <span className="text-xs uppercase tracking-widest text-muted-foreground">
-          {tr("displayNameAr")}
-        </span>
-        <input
-          dir="rtl"
-          value={nameAr}
-          onChange={(e) => setNameAr(e.target.value)}
-          className="mt-1 w-full border border-border bg-secondary px-3 py-2 outline-none focus:border-foreground"
-        />
-      </label>
+      <div className="space-y-4">
+        <Field label={tr("displayNameEn")}>
+          {(a) => (
+            <input
+              {...a}
+              value={nameEn}
+              onChange={(e) => setNameEn(e.target.value)}
+              className={inputClass}
+            />
+          )}
+        </Field>
+        <Field label={tr("displayNameAr")}>
+          {(a) => (
+            <input
+              {...a}
+              dir="rtl"
+              value={nameAr}
+              onChange={(e) => setNameAr(e.target.value)}
+              className={inputClass}
+            />
+          )}
+        </Field>
+      </div>
 
-      <button
-        disabled={!dirty || update.isPending}
+      <Btn
+        variant="primary"
+        className="mt-5"
+        disabled={!dirty}
+        busy={update.isPending && !!update.variables?.patch.name_en}
         onClick={() =>
-          update.mutate({
-            id: chalet.id,
-            patch: { name_en: nameEn.trim(), name_ar: nameAr.trim() },
-          })
+          update.mutate(
+            { id: chalet.id, patch: { name_en: nameEn.trim(), name_ar: nameAr.trim() } },
+            feedback,
+          )
         }
-        className="mt-4 bg-black px-6 py-2.5 text-xs uppercase tracking-widest text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-30"
       >
         {tr("save")}
-      </button>
-    </div>
+      </Btn>
+    </Card>
   );
 }

@@ -411,15 +411,12 @@ const focused = (p) =>
   // translucent, which looks exactly like a missing backdrop.
   await p.waitForTimeout(1600);
   ck("The edit modal opens without breaking the layout", !(await overflows()));
-  const panel = await p.locator(".fixed.inset-0 > *").first().boundingBox();
+  const panel = await p.getByRole("dialog").boundingBox();
   ck("…and fits the screen", panel.width <= 390 && panel.x >= 0, JSON.stringify(panel));
-  const opaque = await p
-    .locator(".fixed.inset-0 > *")
-    .first()
-    .evaluate((el) => {
-      const s = getComputedStyle(el);
-      return { bg: s.backgroundColor, opacity: s.opacity };
-    });
+  const opaque = await p.getByRole("dialog").evaluate((el) => {
+    const s = getComputedStyle(el);
+    return { bg: s.backgroundColor, opacity: s.opacity };
+  });
   ck(
     "…over a solid panel, not the page showing through",
     opaque.opacity === "1" && !/rgba\(0, 0, 0, 0\)/.test(opaque.bg),

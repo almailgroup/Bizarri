@@ -149,6 +149,32 @@ for (const status of ["accepted", "rejected", "cancelled"]) {
   ck("An update with no previous row is ignored", r.action === "ignore", r.reason);
 }
 
+// ------------------------------------------- bookings the admin typed in
+// The team made it, so the team is not emailed about it; the guest hears
+// only if the admin left "email the guest" on.
+{
+  const admin = (over = {}) =>
+    classify({ type: "INSERT", record: booking({ source: "admin", ...over }) });
+  ck(
+    "An admin's accepted booking goes to the guest",
+    admin({ status: "accepted" }).action === "admin",
+  );
+  ck("…and so does a pending one", admin({ status: "pending" }).action === "admin");
+  ck(
+    "Not when the admin said not to email the guest",
+    admin({ status: "accepted", notify_guest: false }).action === "ignore",
+    admin({ status: "accepted", notify_guest: false }).reason,
+  );
+  ck(
+    "A guest's own request is still a new request",
+    classify({ type: "INSERT", record: booking({ source: "guest" }) }).action === "new",
+  );
+  ck(
+    "…as is a row from before the column existed",
+    classify({ type: "INSERT", record: booking() }).action === "new",
+  );
+}
+
 // A decision must never be mistaken for a new request: that would email the
 // team a second time and send the guest another "we have your request".
 ck(
@@ -383,6 +409,56 @@ ck(
     "…with the team's reported as not delivered",
     out.email?.attempted === true && out.email?.delivered === false,
   );
+}
+
+// ================================ an admin booking, delivered end to end
+{
+  env.RESEND_API_KEY = "re_test";
+  const deliver = async (record) => {
+    const sent = [];
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = async (url, init) => {
+      if (String(url).includes("resend.com")) sent.push(JSON.parse(init?.body ?? "{}"));
+      return new Response(JSON.stringify({ id: "x" }), { status: 200 });
+    };
+    const res = await handler(
+      new Request("http://local/", {
+        method: "POST",
+        body: JSON.stringify({ type: "INSERT", table: "bookings", record, old_record: null }),
+      }),
+    );
+    globalThis.fetch = realFetch;
+    return { status: res.status, out: await res.json(), sent };
+  };
+
+  const accepted = await deliver(booking({ source: "admin", status: "accepted" }));
+  ck(
+    "An admin's accepted booking emails only the guest",
+    accepted.sent.length === 1 && accepted.sent[0].to?.[0] === "guest@example.com",
+    JSON.stringify(accepted.sent.map((m) => m.to)),
+  );
+  ck(
+    '…and it is the confirmation, not "we have your request"',
+    /Confirmed/.test(accepted.sent[0]?.subject ?? "") &&
+      /Your booking is confirmed/.test(accepted.sent[0]?.html ?? ""),
+    accepted.sent[0]?.subject,
+  );
+
+  const pending = await deliver(booking({ source: "admin", status: "pending" }));
+  ck(
+    "A pending one sends the guest the request copy",
+    pending.sent.length === 1 && /booking request/i.test(pending.sent[0]?.subject ?? ""),
+    pending.sent[0]?.subject,
+  );
+
+  const quiet = await deliver(
+    booking({ source: "admin", status: "accepted", notify_guest: false }),
+  );
+  ck(
+    '"Don\'t email the guest" sends nothing at all',
+    quiet.sent.length === 0 && quiet.status === 200,
+  );
+  delete env.RESEND_API_KEY;
 }
 
 console.log(`\n${fails} failing`);

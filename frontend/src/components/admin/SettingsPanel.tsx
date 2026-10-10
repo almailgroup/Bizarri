@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { useSaveSetting, useSettings } from "@/lib/api";
+import { useAdminT } from "./strings";
+import { errorText, useToast } from "./toast";
+import { Btn, Card, Field, IconBtn, PanelHeader, inputClass } from "./ui";
 
 type ContactForm = {
   phone: string;
@@ -48,6 +51,8 @@ function readWhatsAppList(value: unknown): WhatsAppRecipient[] {
  */
 export function SettingsPanel() {
   const { tr, lang } = useI18n();
+  const t = useAdminT();
+  const toast = useToast();
   const { data: settings } = useSettings();
   const save = useSaveSetting();
 
@@ -63,199 +68,174 @@ export function SettingsPanel() {
     }
   }, [settings]);
 
-  const saveContact = () => save.mutate({ key: "contact", value: contact });
+  const persist = (key: string, value: Parameters<typeof save.mutate>[0]["value"]) =>
+    save.mutate(
+      { key, value },
+      {
+        onSuccess: () => toast.success(t("saved")),
+        onError: (err) => toast.error(errorText(err)),
+      },
+    );
+  const savingKey = save.isPending ? save.variables?.key : undefined;
+
+  const saveContact = () => persist("contact", contact);
   const saveEmails = () =>
-    save.mutate({
-      key: "notify_emails",
-      value: emails
+    persist(
+      "notify_emails",
+      emails
         .split(",")
         .map((s) => s.trim())
         .filter(Boolean),
-    });
+    );
   const saveWhatsapp = () =>
-    save.mutate({
-      key: "notify_whatsapp",
-      value: whatsapp.filter((r) => r.phone.trim() && r.apikey.trim()),
-    });
+    persist(
+      "notify_whatsapp",
+      whatsapp.filter((r) => r.phone.trim() && r.apikey.trim()),
+    );
+
+  const text = (key: keyof ContactForm, label: string, placeholder?: string, wide = false) => (
+    <Field label={label} className={wide ? "sm:col-span-2" : undefined}>
+      {(a) => (
+        <input
+          {...a}
+          dir="ltr"
+          type={key === "email" ? "email" : "text"}
+          value={contact[key]}
+          onChange={(e) => setContact({ ...contact, [key]: e.target.value })}
+          placeholder={placeholder}
+          className={inputClass}
+        />
+      )}
+    </Field>
+  );
 
   return (
     <section>
-      <h2 className="mb-2 font-display text-3xl">{tr("siteSettings")}</h2>
-      <p className="mb-6 text-sm text-muted-foreground">
-        {lang === "en"
-          ? "Feeds the Contact page and footer directly — changes appear on the live site right away."
-          : "تُغذّي صفحة التواصل والتذييل مباشرة — التغييرات تظهر على الموقع فوراً."}
-      </p>
+      <PanelHeader
+        title={tr("siteSettings")}
+        description={
+          lang === "en"
+            ? "Feeds the Contact page and footer directly — changes appear on the live site right away."
+            : "تُغذّي صفحة التواصل والتذييل مباشرة — التغييرات تظهر على الموقع فوراً."
+        }
+      />
 
-      {save.error && (
-        <p className="mb-4 border border-destructive p-4 text-sm text-destructive">
-          {(save.error as Error).message}
-        </p>
-      )}
-
-      <div className="border border-border p-6">
-        <h3 className="mb-4 font-display text-xl">{tr("contact")}</h3>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label className="block">
-            <span className="text-xs uppercase tracking-widest text-muted-foreground">
-              {tr("contactPhone")}
-            </span>
-            <input
-              dir="ltr"
-              value={contact.phone}
-              onChange={(e) => setContact({ ...contact, phone: e.target.value })}
-              placeholder="+96594040955"
-              className="mt-1 w-full border border-border bg-secondary px-3 py-2 outline-none focus:border-foreground"
-            />
-          </label>
-          <label className="block">
-            <span className="text-xs uppercase tracking-widest text-muted-foreground">
-              {tr("contactWhatsapp")}
-            </span>
-            <input
-              dir="ltr"
-              value={contact.whatsapp}
-              onChange={(e) => setContact({ ...contact, whatsapp: e.target.value })}
-              placeholder="96594040955"
-              className="mt-1 w-full border border-border bg-secondary px-3 py-2 outline-none focus:border-foreground"
-            />
-          </label>
-          <label className="block">
-            <span className="text-xs uppercase tracking-widest text-muted-foreground">
-              {tr("contactEmail")}
-            </span>
-            <input
-              dir="ltr"
-              type="email"
-              value={contact.email}
-              onChange={(e) => setContact({ ...contact, email: e.target.value })}
-              className="mt-1 w-full border border-border bg-secondary px-3 py-2 outline-none focus:border-foreground"
-            />
-          </label>
-          <label className="block">
-            <span className="text-xs uppercase tracking-widest text-muted-foreground">
-              {tr("contactInstagram")}
-            </span>
-            <input
-              dir="ltr"
-              value={contact.instagram}
-              onChange={(e) => setContact({ ...contact, instagram: e.target.value })}
-              placeholder="https://instagram.com/…"
-              className="mt-1 w-full border border-border bg-secondary px-3 py-2 outline-none focus:border-foreground"
-            />
-          </label>
-          <label className="block sm:col-span-2">
-            <span className="text-xs uppercase tracking-widest text-muted-foreground">
-              {tr("contactMaps")}
-            </span>
-            <input
-              dir="ltr"
-              value={contact.maps}
-              onChange={(e) => setContact({ ...contact, maps: e.target.value })}
-              placeholder="https://maps.app.goo.gl/…"
-              className="mt-1 w-full border border-border bg-secondary px-3 py-2 outline-none focus:border-foreground"
-            />
-          </label>
-        </div>
-        <button
-          onClick={saveContact}
-          disabled={save.isPending}
-          className="mt-5 bg-black px-8 py-3 text-sm uppercase tracking-widest text-white hover:opacity-90 disabled:opacity-50"
-        >
-          {tr("save")}
-        </button>
-      </div>
-
-      <div className="mt-6 border border-border p-6">
-        <h3 className="mb-1 font-display text-xl">{tr("notifyEmails")}</h3>
-        <p className="mb-4 text-xs text-muted-foreground">{tr("notifyEmailsHint")}</p>
-        <input
-          dir="ltr"
-          value={emails}
-          onChange={(e) => setEmails(e.target.value)}
-          placeholder="sales@bizarri.com, manager@bizarri.com"
-          className="w-full border border-border bg-secondary px-3 py-2 outline-none focus:border-foreground"
-        />
-        <button
-          onClick={saveEmails}
-          disabled={save.isPending}
-          className="mt-4 bg-black px-8 py-3 text-sm uppercase tracking-widest text-white hover:opacity-90 disabled:opacity-50"
-        >
-          {tr("save")}
-        </button>
-      </div>
-
-      <div className="mt-6 border border-border p-6">
-        <h3 className="mb-1 font-display text-xl">{tr("notifyWhatsapp")}</h3>
-        <p className="mb-2 text-xs text-muted-foreground">{tr("notifyWhatsappHint")}</p>
-        <p className="mb-4 border-s-2 border-foreground/30 ps-3 text-xs text-muted-foreground">
-          {tr("callmebotSteps")}
-        </p>
-
-        {whatsapp.length === 0 && (
-          <p className="mb-4 text-sm text-muted-foreground">{tr("noWhatsappNumbers")}</p>
-        )}
-
-        <div className="space-y-3">
-          {whatsapp.map((r, i) => (
-            <div key={i} className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
-              <label className="block">
-                <span className="text-xs uppercase tracking-widest text-muted-foreground">
-                  {tr("whatsappPhoneLabel")}
-                </span>
-                <input
-                  dir="ltr"
-                  value={r.phone}
-                  onChange={(e) => {
-                    const next = [...whatsapp];
-                    next[i] = { ...next[i], phone: e.target.value };
-                    setWhatsapp(next);
-                  }}
-                  placeholder="96594040955"
-                  className="mt-1 w-full border border-border bg-secondary px-3 py-2 outline-none focus:border-foreground"
-                />
-              </label>
-              <label className="block">
-                <span className="text-xs uppercase tracking-widest text-muted-foreground">
-                  {tr("whatsappApikeyLabel")}
-                </span>
-                <input
-                  dir="ltr"
-                  value={r.apikey}
-                  onChange={(e) => {
-                    const next = [...whatsapp];
-                    next[i] = { ...next[i], apikey: e.target.value };
-                    setWhatsapp(next);
-                  }}
-                  className="mt-1 w-full border border-border bg-secondary px-3 py-2 outline-none focus:border-foreground"
-                />
-              </label>
-              <button
-                onClick={() => setWhatsapp(whatsapp.filter((_, idx) => idx !== i))}
-                aria-label={lang === "en" ? "Remove number" : "إزالة الرقم"}
-                className="self-end p-2.5 text-muted-foreground transition-colors hover:text-destructive"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-4 flex gap-3">
-          <button
-            onClick={() => setWhatsapp([...whatsapp, { phone: "", apikey: "" }])}
-            className="inline-flex items-center gap-2 border border-border px-5 py-2.5 text-xs uppercase tracking-widest hover:bg-secondary"
-          >
-            <Plus className="h-4 w-4" /> {tr("addNumber")}
-          </button>
-          <button
-            onClick={saveWhatsapp}
+      <div className="space-y-6">
+        <Card className="p-5 sm:p-6">
+          <h3 className="mb-4 text-lg font-semibold">{tr("contact")}</h3>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {text("phone", tr("contactPhone"), "+96594040955")}
+            {text("whatsapp", tr("contactWhatsapp"), "96594040955")}
+            {text("email", tr("contactEmail"))}
+            {text("instagram", tr("contactInstagram"), "https://instagram.com/…")}
+            {text("maps", tr("contactMaps"), "https://maps.app.goo.gl/…", true)}
+          </div>
+          <Btn
+            variant="primary"
+            className="mt-5"
+            onClick={saveContact}
+            busy={savingKey === "contact"}
             disabled={save.isPending}
-            className="bg-black px-8 py-2.5 text-xs uppercase tracking-widest text-white hover:opacity-90 disabled:opacity-50"
           >
             {tr("save")}
-          </button>
-        </div>
+          </Btn>
+        </Card>
+
+        <Card className="p-5 sm:p-6">
+          <h3 className="text-lg font-semibold">{tr("notifyEmails")}</h3>
+          <p className="mb-4 mt-1 text-sm text-muted-foreground">{tr("notifyEmailsHint")}</p>
+          <input
+            dir="ltr"
+            aria-label={tr("notifyEmails")}
+            value={emails}
+            onChange={(e) => setEmails(e.target.value)}
+            placeholder="sales@bizarri.com, manager@bizarri.com"
+            className={inputClass}
+          />
+          <Btn
+            variant="primary"
+            className="mt-4"
+            onClick={saveEmails}
+            busy={savingKey === "notify_emails"}
+            disabled={save.isPending}
+          >
+            {tr("save")}
+          </Btn>
+        </Card>
+
+        <Card className="p-5 sm:p-6">
+          <h3 className="text-lg font-semibold">{tr("notifyWhatsapp")}</h3>
+          <p className="mb-3 mt-1 text-sm text-muted-foreground">{tr("notifyWhatsappHint")}</p>
+          <p className="mb-4 rounded-md bg-secondary px-3 py-2 text-xs text-muted-foreground">
+            {tr("callmebotSteps")}
+          </p>
+
+          {whatsapp.length === 0 && (
+            <p className="mb-4 text-sm text-muted-foreground">{tr("noWhatsappNumbers")}</p>
+          )}
+
+          <div className="space-y-3">
+            {whatsapp.map((r, i) => (
+              <div key={i} className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+                <Field label={tr("whatsappPhoneLabel")}>
+                  {(a) => (
+                    <input
+                      {...a}
+                      dir="ltr"
+                      value={r.phone}
+                      onChange={(e) => {
+                        const next = [...whatsapp];
+                        next[i] = { ...next[i], phone: e.target.value };
+                        setWhatsapp(next);
+                      }}
+                      placeholder="96594040955"
+                      className={inputClass}
+                    />
+                  )}
+                </Field>
+                <Field label={tr("whatsappApikeyLabel")}>
+                  {(a) => (
+                    <input
+                      {...a}
+                      dir="ltr"
+                      value={r.apikey}
+                      onChange={(e) => {
+                        const next = [...whatsapp];
+                        next[i] = { ...next[i], apikey: e.target.value };
+                        setWhatsapp(next);
+                      }}
+                      className={inputClass}
+                    />
+                  )}
+                </Field>
+                <IconBtn
+                  tone="danger"
+                  label={lang === "en" ? "Remove number" : "إزالة الرقم"}
+                  onClick={() => setWhatsapp(whatsapp.filter((_, idx) => idx !== i))}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </IconBtn>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Btn
+              onClick={() => setWhatsapp([...whatsapp, { phone: "", apikey: "" }])}
+              icon={<Plus className="h-4 w-4" aria-hidden="true" />}
+            >
+              {tr("addNumber")}
+            </Btn>
+            <Btn
+              variant="primary"
+              onClick={saveWhatsapp}
+              busy={savingKey === "notify_whatsapp"}
+              disabled={save.isPending}
+            >
+              {tr("save")}
+            </Btn>
+          </div>
+        </Card>
       </div>
     </section>
   );

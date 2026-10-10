@@ -145,8 +145,14 @@ backend/supabase/
     20260928090000_email_verification_and_phone_lookup.sql
                                       one-time email codes, the gate in front of
                                       request_booking, lookup by phone
+    …
+    20261011090000_admin_create_booking.sql
+                                      bookings entered from the dashboard:
+                                      admin_create_booking(), bookings.source
+                                      and bookings.notify_guest
   functions/
     _shared/http.ts                   CORS headers, shared by both functions
+    _shared/email.ts                  the branded email layout every message uses
     notify-booking/                   emails the team and the guest, WhatsApp
     send-email-code/                  mails the one-time code
   tests/

@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react";
-import { X } from "lucide-react";
+import { useState } from "react";
 import { useI18n } from "@/lib/i18n";
 import { useUpdateBookingDetails } from "@/lib/api";
 import type { BookingRow } from "@/integrations/supabase/types";
+import { useAdminT } from "./strings";
+import { errorText, useToast } from "./toast";
+import { Btn, ErrorNote, Field, Modal, inputClass } from "./ui";
 
 /**
  * Direct field edits — guest details, a manual price override, and an
@@ -17,7 +19,9 @@ export function EditBookingModal({
   booking: BookingRow;
   onClose: () => void;
 }) {
-  const { tr, lang } = useI18n();
+  const { tr } = useI18n();
+  const t = useAdminT();
+  const toast = useToast();
   const update = useUpdateBookingDetails();
   const [form, setForm] = useState({
     guest_name: booking.guest_name,
@@ -28,12 +32,6 @@ export function EditBookingModal({
     admin_note: booking.admin_note ?? "",
     total: String(booking.total),
   });
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,155 +50,129 @@ export function EditBookingModal({
           total: Number.isFinite(total) && total >= 0 ? total : booking.total,
         },
       },
-      { onSuccess: onClose },
+      {
+        onSuccess: () => {
+          toast.success(t("saved"));
+          onClose();
+        },
+      },
     );
   };
 
   return (
-    <div
-      className="animate-fade-in fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-6"
-      role="dialog"
-      aria-modal="true"
-      aria-label={tr("editDetails")}
+    <Modal
+      title={tr("editDetails")}
+      description={
+        <span className="font-mono" dir="ltr">
+          {booking.ref}
+        </span>
+      }
+      onClose={onClose}
+      busy={update.isPending}
+      footer={
+        <>
+          <Btn onClick={onClose} disabled={update.isPending}>
+            {tr("cancel")}
+          </Btn>
+          <Btn type="submit" form="edit-booking-form" variant="primary" busy={update.isPending}>
+            {update.isPending ? t("saving") : tr("saveChanges")}
+          </Btn>
+        </>
+      }
     >
-      <form
-        onSubmit={submit}
-        className="animate-scale-in max-h-[90vh] w-full max-w-lg overflow-y-auto border border-border bg-background p-8"
-      >
-        <div className="mb-6 flex items-start justify-between">
-          <div>
-            <h3 className="font-display text-2xl">{tr("editDetails")}</h3>
-            <p className="mt-1 font-mono text-xs text-muted-foreground" dir="ltr">
-              {booking.ref}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label={tr("close")}
-            className="-me-2 flex h-11 w-11 items-center justify-center text-muted-foreground hover:text-foreground"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
+      <form id="edit-booking-form" onSubmit={submit} className="space-y-4">
+        {update.error && <ErrorNote>{errorText(update.error)}</ErrorNote>}
 
-        {update.error && (
-          <p className="mb-4 border border-destructive p-3 text-sm text-destructive">
-            {(update.error as Error).message}
-          </p>
-        )}
-
-        <div className="space-y-4">
-          <label className="block">
-            <span className="text-xs uppercase tracking-widest text-muted-foreground">
-              {tr("fullName")}
-            </span>
+        <Field label={tr("fullName")}>
+          {(a) => (
             <input
+              {...a}
               value={form.guest_name}
               onChange={(e) => setForm({ ...form, guest_name: e.target.value })}
-              className="mt-1 w-full border border-border bg-secondary px-3 py-2 outline-none focus:border-foreground"
+              className={inputClass}
             />
-          </label>
+          )}
+        </Field>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="block">
-              <span className="text-xs uppercase tracking-widest text-muted-foreground">
-                {tr("phone")}
-              </span>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label={tr("phone")}>
+            {(a) => (
               <input
+                {...a}
                 dir="ltr"
+                type="tel"
                 value={form.guest_phone}
                 onChange={(e) => setForm({ ...form, guest_phone: e.target.value })}
-                className="mt-1 w-full border border-border bg-secondary px-3 py-2 outline-none focus:border-foreground"
+                className={inputClass}
               />
-            </label>
-            <label className="block">
-              <span className="text-xs uppercase tracking-widest text-muted-foreground">
-                {tr("email")}
-              </span>
+            )}
+          </Field>
+          <Field label={tr("email")}>
+            {(a) => (
               <input
+                {...a}
                 dir="ltr"
                 type="email"
                 value={form.guest_email}
                 onChange={(e) => setForm({ ...form, guest_email: e.target.value })}
-                className="mt-1 w-full border border-border bg-secondary px-3 py-2 outline-none focus:border-foreground"
+                className={inputClass}
               />
-            </label>
-          </div>
+            )}
+          </Field>
+        </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="block">
-              <span className="text-xs uppercase tracking-widest text-muted-foreground">
-                {tr("guests")}
-              </span>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label={tr("guests")}>
+            {(a) => (
               <input
+                {...a}
                 type="number"
                 min={1}
                 max={20}
                 value={form.guests}
                 onChange={(e) => setForm({ ...form, guests: e.target.value })}
-                className="mt-1 w-full border border-border bg-secondary px-3 py-2 outline-none focus:border-foreground"
+                className={inputClass}
               />
-            </label>
-            <label className="block">
-              <span className="text-xs uppercase tracking-widest text-muted-foreground">
-                {tr("total")} ({booking.currency})
-              </span>
+            )}
+          </Field>
+          <Field label={`${tr("total")} (${booking.currency})`}>
+            {(a) => (
               <input
+                {...a}
                 type="number"
                 min={0}
                 value={form.total}
                 onChange={(e) => setForm({ ...form, total: e.target.value })}
-                className="mt-1 w-full border border-border bg-secondary px-3 py-2 outline-none focus:border-foreground"
+                className={inputClass}
               />
-            </label>
-          </div>
+            )}
+          </Field>
+        </div>
 
-          <label className="block">
-            <span className="text-xs uppercase tracking-widest text-muted-foreground">
-              {tr("notes")}
-            </span>
+        <Field label={tr("notes")}>
+          {(a) => (
             <textarea
+              {...a}
               rows={2}
               value={form.notes}
               onChange={(e) => setForm({ ...form, notes: e.target.value })}
-              className="mt-1 w-full border border-border bg-secondary px-3 py-2 outline-none focus:border-foreground"
+              className={inputClass}
             />
-          </label>
+          )}
+        </Field>
 
-          <label className="block">
-            <span className="text-xs uppercase tracking-widest text-muted-foreground">
-              {tr("internalNote")}
-            </span>
-            <span className="mt-0.5 block text-[11px] text-muted-foreground/70">
-              {tr("internalNoteHint")}
-            </span>
+        <Field label={tr("internalNote")} hint={tr("internalNoteHint")}>
+          {(a) => (
             <textarea
+              {...a}
               rows={2}
               value={form.admin_note}
               onChange={(e) => setForm({ ...form, admin_note: e.target.value })}
-              className="mt-1 w-full border border-border bg-secondary px-3 py-2 outline-none focus:border-foreground"
+              className={inputClass}
             />
-          </label>
-        </div>
-
-        <div className="mt-6 flex gap-3">
-          <button
-            type="submit"
-            disabled={update.isPending}
-            className="flex-1 bg-black py-3 text-sm uppercase tracking-widest text-white hover:opacity-90 disabled:opacity-50"
-          >
-            {update.isPending ? (lang === "en" ? "Saving…" : "جارٍ الحفظ…") : tr("saveChanges")}
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="border border-border px-6 py-3 text-sm uppercase tracking-widest hover:bg-secondary"
-          >
-            {tr("cancel")}
-          </button>
-        </div>
+          )}
+        </Field>
       </form>
-    </div>
+    </Modal>
   );
 }

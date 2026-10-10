@@ -29,7 +29,8 @@ select 'migrations' as area, * from (values
   ('11 latin digits',     ((select bool_and(name_ar !~ '[٠-٩]') from public.chalets))),
   ('12 weekend rule',     (to_regprocedure('public.weekend_is_whole(date,date)')         is not null)),
   ('13 function lockdown', (not has_function_privilege('anon','public.start_email_verification(text)','execute'))),
-  ('14 Kuwait today',     (to_regprocedure('public.local_today(timestamptz)')            is not null))
+  ('14 Kuwait today',     (to_regprocedure('public.local_today(timestamptz)')            is not null)),
+  ('15 admin bookings',   (to_regprocedure('public.admin_create_booking(smallint,date,date,text,text,text,smallint,public.booking_status,numeric,text,text,text,boolean)') is not null))
 ) t(item, ok)
 union all
 select 'pricing', * from (values
@@ -63,6 +64,7 @@ select 'guest access', * from (values
   ('The throttle is server-only',   (not has_function_privilege('anon','public.note_lookup(text,text,integer)','execute'))),
   ('Deciding a booking is not anon',(not has_function_privilege('anon','public.set_booking_status(uuid,public.booking_status,text)','execute'))),
   ('…but an admin still can',       (has_function_privilege('authenticated','public.set_booking_status(uuid,public.booking_status,text)','execute'))),
+  ('Admin bookings are not anon',   (not has_function_privilege('anon','public.admin_create_booking(smallint,date,date,text,text,text,smallint,public.booking_status,numeric,text,text,text,boolean)','execute'))),
   ('The code minter reaches service_role', (has_function_privilege('service_role','public.start_email_verification(text)','execute'))),
   ('…but a guest may verify one',   (has_function_privilege('anon','public.verify_email_code(text,text)','execute'))),
   ('Lookup by ref',                 (has_function_privilege('anon','public.lookup_booking_by_ref(text)','execute'))),

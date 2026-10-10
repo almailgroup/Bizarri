@@ -1,5 +1,5 @@
 -- ============================================================================
--- Part 4 of 14: seed
+-- Part 4 of 15: seed
 --
 -- Paste this whole file into the Supabase SQL editor and Run, then move on
 -- to the next part. Run them in order; each one is safe to run twice.

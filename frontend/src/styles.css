@@ -242,3 +242,64 @@
 .font-mono {
   font-family: var(--font-sans);
 }
+
+/* ------------------------------------------------------------- dashboard */
+/* The site is square-cornered by design. The dashboard is a working tool and
+   is softer: it sets its own radius here, so every rounded-* inside it picks
+   this up without touching a guest page. */
+.admin-ui {
+  --radius: 0.625rem;
+}
+
+/* A checkbox drawn as a switch. Still a real checkbox underneath, so it keeps
+   its keyboard behaviour, its label and its checked state for free. */
+.admin-switch {
+  appearance: none;
+  position: relative;
+  width: 2.5rem;
+  height: 1.5rem;
+  flex-shrink: 0;
+  cursor: pointer;
+  border-radius: 9999px;
+  background: var(--color-border);
+  transition: background-color 0.15s;
+}
+.admin-switch::before {
+  content: "";
+  position: absolute;
+  top: 0.1875rem;
+  inset-inline-start: 0.1875rem;
+  width: 1.125rem;
+  height: 1.125rem;
+  border-radius: 9999px;
+  background: white;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.25);
+  transition: transform 0.15s;
+}
+.admin-switch:checked {
+  background: oklch(0.6 0.13 163);
+}
+.admin-switch:checked::before {
+  transform: translateX(1rem);
+}
+[dir="rtl"] .admin-switch:checked::before {
+  transform: translateX(-1rem);
+}
+.admin-switch:focus-visible {
+  outline: 2px solid var(--color-foreground);
+  outline-offset: 2px;
+}
+.admin-switch:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* A closed day is struck through, not just tinted: red alone says nothing to
+   someone who cannot tell it from the pending amber. */
+.admin-closed {
+  background-image: repeating-linear-gradient(
+    135deg,
+    transparent 0 6px,
+    rgb(254 202 202 / 0.75) 6px 8px
+  );
+}

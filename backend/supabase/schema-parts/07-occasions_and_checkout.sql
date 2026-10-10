@@ -1,5 +1,5 @@
 -- ============================================================================
--- Part 7 of 14: occasions_and_checkout
+-- Part 7 of 15: occasions_and_checkout
 --
 -- Paste this whole file into the Supabase SQL editor and Run, then move on
 -- to the next part. Run them in order; each one is safe to run twice.

@@ -1,13 +1,32 @@
 import { requireLang } from "@/lib/lang-route";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
-import { ArrowLeft, Globe, Lock, LogOut, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import {
+  CalendarDays,
+  ExternalLink,
+  Globe,
+  History,
+  Home,
+  Inbox,
+  LayoutDashboard,
+  Lock,
+  LogOut,
+  Newspaper,
+  PartyPopper,
+  Settings as SettingsIcon,
+  Tags,
+  X,
+  type LucideIcon,
+} from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
-import { useIsAdmin } from "@/lib/api";
+import { useBookings, useIsAdmin } from "@/lib/api";
 import logoWhite from "@/assets/bizarri-logo-white.png";
 import { OverviewPanel } from "@/components/admin/OverviewPanel";
-import { AvailabilityPanel } from "@/components/admin/AvailabilityPanel";
+import { AvailabilityPanel, type BookingPrefill } from "@/components/admin/AvailabilityPanel";
+import { NewBookingModal } from "@/components/admin/NewBookingModal";
+import { ToastProvider } from "@/components/admin/toast";
+import { useAdminT } from "@/components/admin/strings";
 import { RatesPanel } from "@/components/admin/RatesPanel";
 import { RequestsPanel } from "@/components/admin/RequestsPanel";
 import { ChaletsPanel } from "@/components/admin/ChaletsPanel";
@@ -15,7 +34,6 @@ import { NewsPanel } from "@/components/admin/NewsPanel";
 import { SettingsPanel } from "@/components/admin/SettingsPanel";
 import { OccasionsPanel } from "@/components/admin/OccasionsPanel";
 import { ActivityPanel } from "@/components/admin/ActivityPanel";
-import { useChalets } from "@/lib/api";
 
 const TABS = [
   "overview",
@@ -39,8 +57,13 @@ type Tab = (typeof TABS)[number];
 export const Route = createFileRoute("/admin/$lang")({
   component: Admin,
   beforeLoad: requireLang,
-  validateSearch: (s: Record<string, unknown>): { tab?: Tab } =>
-    TABS.includes(s.tab as Tab) && s.tab !== "overview" ? { tab: s.tab as Tab } : {},
+  // q is a search for the requests list, so the calendar can open a booking.
+  validateSearch: (s: Record<string, unknown>): { tab?: Tab; q?: string } => {
+    const tab = TABS.includes(s.tab as Tab) && s.tab !== "overview" ? (s.tab as Tab) : undefined;
+    const q =
+      tab === "requests" && typeof s.q === "string" && s.q.trim() ? s.q.slice(0, 80) : undefined;
+    return { ...(tab ? { tab } : {}), ...(q ? { q } : {}) };
+  },
 });
 
 function Admin() {
@@ -208,118 +231,173 @@ function NotAuthorised() {
 
 function Dashboard() {
   const { tr, lang } = useI18n();
+  const t = useAdminT();
   const { session, signOut } = useAuth();
-  const { data: chalets } = useChalets();
-  const tab: Tab = Route.useSearch().tab ?? "overview";
+  const { data: bookings } = useBookings(true);
+  const search = Route.useSearch();
+  const tab: Tab = search.tab ?? "overview";
   const navigate = Route.useNavigate();
-  const setTab = (t: Tab) => {
-    if (t !== tab) navigate({ search: t === "overview" ? {} : { tab: t } });
+  const setTab = (next: Tab, q?: string) => {
+    if (next !== tab || q !== search.q)
+      navigate({ search: next === "overview" ? {} : { tab: next, ...(q ? { q } : {}) } });
   };
   const [chaletId, setChaletId] = useState(1);
+  const [newBooking, setNewBooking] = useState<Partial<BookingPrefill> | null>(null);
+  const pending = (bookings ?? []).filter((b) => b.status === "pending").length;
 
-  const tabs: { key: Tab; label: string }[] = [
-    { key: "overview", label: tr("overview") },
-    { key: "requests", label: tr("requests") },
-    { key: "availability", label: tr("availability") },
-    { key: "rates", label: tr("packageRates") },
-    { key: "occasions", label: tr("specialOccasions") },
-    { key: "chalets", label: tr("chaletsMgmt") },
-    { key: "news", label: lang === "en" ? "News" : "الأخبار" },
-    { key: "settings", label: tr("siteSettings") },
-    { key: "activity", label: tr("activityLog") },
+  // On a phone the tabs are a strip that scrolls sideways; keep the open one
+  // in view, or arriving on Settings leaves its own tab off the edge.
+  const navRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    navRef.current
+      ?.querySelector<HTMLElement>('[aria-current="true"]')
+      ?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [tab]);
+
+  const tabs: { key: Tab; label: string; icon: LucideIcon }[] = [
+    { key: "overview", label: tr("overview"), icon: LayoutDashboard },
+    { key: "requests", label: tr("requests"), icon: Inbox },
+    { key: "availability", label: tr("availability"), icon: CalendarDays },
+    { key: "rates", label: tr("packageRates"), icon: Tags },
+    { key: "occasions", label: tr("specialOccasions"), icon: PartyPopper },
+    { key: "chalets", label: tr("chaletsMgmt"), icon: Home },
+    { key: "news", label: lang === "en" ? "News" : "الأخبار", icon: Newspaper },
+    { key: "settings", label: tr("siteSettings"), icon: SettingsIcon },
+    { key: "activity", label: tr("activityLog"), icon: History },
   ];
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-black text-white">
-        <div className="mx-auto flex h-20 max-w-7xl items-center justify-between gap-4 px-6">
-          <div className="flex items-center gap-4">
-            {/* The logo goes back to the site, as it does everywhere else on
-                it. The labelled link next to it is for anyone who would not
-                think to try the logo. */}
-            <Link to="/$lang" params={{ lang }} aria-label={tr("backToSite")}>
-              <img src={logoWhite} alt="Bizarri" className="h-10 w-auto" />
-            </Link>
-            <span className="hidden text-xs uppercase tracking-[0.4em] text-white/60 sm:inline">
-              {tr("dashboard")}
-            </span>
-          </div>
-          <div className="flex items-center gap-5">
-            <span className="hidden text-xs text-white/50 md:inline" dir="ltr">
-              {session?.user.email}
-            </span>
-            <LangToggle />
-            <Link
-              to="/$lang"
-              params={{ lang }}
-              className="flex min-h-11 items-center gap-2 px-2 text-xs uppercase tracking-widest hover:text-white/70"
-            >
-              <ArrowLeft className="h-4 w-4 rtl:rotate-180" /> {tr("viewSite")}
-            </Link>
-            <button
-              onClick={signOut}
-              className="-me-2 flex min-h-11 items-center gap-2 px-2 text-xs uppercase tracking-widest hover:text-white/70"
-            >
-              <LogOut className="h-4 w-4" /> {tr("logout")}
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <nav className="border-b border-border bg-secondary">
-        <div className="mx-auto flex max-w-7xl gap-1 overflow-x-auto px-6">
-          {tabs.map((t) => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              aria-current={tab === t.key}
-              className={`whitespace-nowrap border-b-2 px-4 py-4 text-xs uppercase tracking-widest transition-colors ${
-                tab === t.key
-                  ? "border-foreground text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-      </nav>
-
-      {tab === "availability" && (
-        <div className="border-b border-border bg-secondary/60">
-          <div className="mx-auto flex max-w-7xl items-center gap-2 px-6 py-3">
-            <span className="me-2 text-xs uppercase tracking-widest text-muted-foreground">
-              {tr("pickChalet")}
-            </span>
-            {(chalets ?? []).map((c) => (
-              <button
-                key={c.id}
-                onClick={() => setChaletId(c.id)}
-                aria-pressed={chaletId === c.id}
-                className={`px-4 py-2 text-xs uppercase tracking-widest transition-colors ${
-                  chaletId === c.id
-                    ? "bg-foreground text-background"
-                    : "border border-border hover:bg-background"
-                }`}
+    <ToastProvider>
+      <div className="admin-ui min-h-screen bg-secondary/50">
+        <header className="sticky top-0 z-40 border-b border-white/10 bg-black text-white">
+          <div className="flex h-16 items-center justify-between gap-4 px-4 sm:px-6">
+            <div className="flex min-w-0 items-center gap-4">
+              {/* The logo goes back to the site, as it does everywhere else on
+                  it. The labelled link next to it is for anyone who would not
+                  think to try the logo. */}
+              <Link
+                to="/$lang"
+                params={{ lang }}
+                aria-label={tr("backToSite")}
+                className="shrink-0"
               >
-                {lang === "en" ? c.name_en : c.name_ar}
+                <img src={logoWhite} alt="Bizarri" className="h-8 w-auto" />
+              </Link>
+              <span className="hidden h-6 w-px bg-white/20 sm:block" aria-hidden="true" />
+              <span className="hidden text-sm font-medium text-white/80 sm:inline">
+                {tr("dashboard")}
+              </span>
+            </div>
+            <div className="flex items-center gap-1 sm:gap-3">
+              <span
+                className="hidden text-xs text-white/50 lg:inline"
+                dir="ltr"
+                title={t("signedInAs")}
+              >
+                {session?.user.email}
+              </span>
+              <LangToggle />
+              <Link
+                to="/$lang"
+                params={{ lang }}
+                className="flex min-h-11 items-center gap-2 rounded-md px-2 text-sm text-white/80 hover:bg-white/10 hover:text-white"
+              >
+                <ExternalLink className="h-4 w-4" aria-hidden="true" />
+                <span className="hidden sm:inline">{tr("viewSite")}</span>
+                <span className="sr-only sm:hidden">{tr("viewSite")}</span>
+              </Link>
+              <button
+                onClick={signOut}
+                className="-me-2 flex min-h-11 items-center gap-2 rounded-md px-2 text-sm text-white/80 hover:bg-white/10 hover:text-white"
+              >
+                <LogOut className="h-4 w-4" aria-hidden="true" />
+                <span className="hidden sm:inline">{tr("logout")}</span>
+                <span className="sr-only sm:hidden">{tr("logout")}</span>
               </button>
-            ))}
+            </div>
           </div>
-        </div>
-      )}
+        </header>
 
-      <main className="mx-auto max-w-7xl px-6 py-12">
-        {tab === "overview" && <OverviewPanel />}
-        {tab === "requests" && <RequestsPanel />}
-        {tab === "availability" && <AvailabilityPanel chaletId={chaletId} />}
-        {tab === "rates" && <RatesPanel />}
-        {tab === "occasions" && <OccasionsPanel />}
-        {tab === "chalets" && <ChaletsPanel />}
-        {tab === "news" && <NewsPanel />}
-        {tab === "settings" && <SettingsPanel />}
-        {tab === "activity" && <ActivityPanel />}
-      </main>
-    </div>
+        <div className="lg:flex">
+          {/* One nav, two shapes: a sidebar on a wide screen, a strip of tabs
+              that scrolls sideways on a phone. One set of buttons either way,
+              so there is never a hidden twin of each tab. */}
+          <nav
+            aria-label={t("menu")}
+            className="sticky top-16 z-30 border-b border-border bg-background lg:h-[calc(100vh-4rem)] lg:w-64 lg:shrink-0 lg:border-b-0 lg:border-e"
+          >
+            <div
+              ref={navRef}
+              className="flex gap-1 overflow-x-auto px-3 py-2 lg:flex-col lg:overflow-visible lg:px-3 lg:py-5"
+            >
+              {tabs.map(({ key, label, icon: Icon }) => (
+                <button
+                  key={key}
+                  onClick={() => setTab(key)}
+                  aria-current={tab === key}
+                  className={`flex min-h-10 shrink-0 items-center gap-3 whitespace-nowrap rounded-md px-3 text-sm font-medium transition-colors ${
+                    tab === key
+                      ? "bg-foreground text-background"
+                      : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                  }`}
+                >
+                  <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  {label}
+                  {key === "requests" && pending > 0 && (
+                    <span
+                      aria-hidden="true"
+                      className={`ms-auto rounded-full px-2 py-0.5 text-xs tabular-nums ${
+                        tab === key ? "bg-background/20" : "bg-amber-100 text-amber-900"
+                      }`}
+                    >
+                      {pending}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </nav>
+
+          <main className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
+            <div className="mx-auto max-w-6xl">
+              {tab === "overview" && (
+                <OverviewPanel
+                  onNewBooking={() => setNewBooking({})}
+                  onOpenTab={(x) => setTab(x)}
+                />
+              )}
+              {tab === "requests" && (
+                <RequestsPanel
+                  key={search.q ?? ""}
+                  initialQuery={search.q ?? ""}
+                  onNewBooking={() => setNewBooking({})}
+                />
+              )}
+              {tab === "availability" && (
+                <AvailabilityPanel
+                  chaletId={chaletId}
+                  onChaletChange={setChaletId}
+                  onNewBooking={(prefill) => setNewBooking(prefill)}
+                  onOpenBooking={(ref) => setTab("requests", ref)}
+                />
+              )}
+              {tab === "rates" && <RatesPanel />}
+              {tab === "occasions" && <OccasionsPanel />}
+              {tab === "chalets" && <ChaletsPanel />}
+              {tab === "news" && <NewsPanel />}
+              {tab === "settings" && <SettingsPanel />}
+              {tab === "activity" && <ActivityPanel />}
+            </div>
+          </main>
+        </div>
+
+        {newBooking && (
+          <NewBookingModal
+            prefill={{ chaletId, ...newBooking }}
+            onClose={() => setNewBooking(null)}
+          />
+        )}
+      </div>
+    </ToastProvider>
   );
 }

@@ -372,6 +372,10 @@ interface BookingRecord {
   status?: string | null;
   /** The language the guest booked in, for their copy of the email. */
   lang?: string | null;
+  /** "admin" when it was entered from the dashboard rather than requested. */
+  source?: string | null;
+  /** False when the admin asked for the guest not to be emailed. */
+  notify_guest?: boolean | null;
 }
 
 interface WebhookPayload {
@@ -398,12 +402,23 @@ const NOTIFIED_STATUSES = ["accepted", "rejected", "cancelled", "pending"];
  * not just the one that matters.
  */
 export function classify(payload: WebhookPayload | null): {
-  action: "new" | "decision" | "ignore";
+  action: "new" | "admin" | "decision" | "ignore";
   reason?: string;
 } {
   const record = payload?.record;
   if (!record?.ref)
     return { action: "ignore", reason: "no booking in payload" };
+
+  // A booking the admin typed in is not a request for the team to act on --
+  // they made it -- so it only ever concerns the guest, and only if the admin
+  // left "email the guest" on. Checked before the generic insert below.
+  if (payload?.type === "INSERT" && record.source === "admin") {
+    if (record.notify_guest === false)
+      return { action: "ignore", reason: "admin booking, guest not to be emailed" };
+    if (record.status !== "accepted" && record.status !== "pending")
+      return { action: "ignore", reason: `admin booking with status ${record.status}` };
+    return { action: "admin" };
+  }
 
   // A direct call (no webhook envelope) is treated as a new request, which is
   // how this function was invoked before there was anything else to do.
@@ -999,6 +1014,17 @@ Deno.serve(async (req: Request) => {
 
     if (action === "decision") {
       const guestEmail = await sendDecisionEmail(booking);
+      return json({ ok: true, action, guestEmail }, 200, origin);
+    }
+
+    // Entered by the admin: an accepted booking gets the confirmation, a
+    // pending one the same "we have your request" a guest would. The team is
+    // not told about a booking one of them just made.
+    if (action === "admin") {
+      const guestEmail =
+        booking.status === "accepted"
+          ? await sendDecisionEmail(booking)
+          : await sendGuestEmail(booking);
       return json({ ok: true, action, guestEmail }, 200, origin);
     }
 

@@ -1,66 +1,86 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Trash2 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
+import { useAdminT } from "./strings";
+import { Btn, ErrorNote, Modal } from "./ui";
+import { errorText } from "./toast";
 
-/** Requires the word "Delete" to be typed, so a stray click cannot destroy a record. */
+/**
+ * "Are you sure?" with one click to answer.
+ *
+ * It used to make the admin type the word "Delete" first. That guards against
+ * a stray click, but the trash button already opens this dialog, so a stray
+ * click only ever got as far as a question -- and typing a word in English
+ * was a strange thing to ask of an Arabic dashboard. Now it is Yes or Cancel.
+ *
+ * onConfirm is awaited: the dialog stays open with a spinner until the delete
+ * has actually happened, and shows the reason if it did not, instead of
+ * closing on the click and leaving the admin to wonder.
+ */
 export function DeleteConfirm({
+  title,
+  body,
   label,
   onCancel,
   onConfirm,
 }: {
-  label: string;
+  title: string;
+  body?: string;
+  /** What is being deleted, e.g. "BZR-4K2M9X · Aisha". */
+  label?: string;
   onCancel: () => void;
-  onConfirm: () => void;
+  onConfirm: () => Promise<unknown> | void;
 }) {
+  const t = useAdminT();
   const { tr } = useI18n();
-  const [text, setText] = useState("");
-  const ready = text.trim().toLowerCase() === "delete";
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onCancel();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onCancel]);
+  const confirm = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      await onConfirm();
+    } catch (err) {
+      setError(errorText(err));
+      setBusy(false);
+    }
+  };
 
   return (
-    <div
-      className="animate-fade-in fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-6"
-      role="dialog"
-      aria-modal="true"
-      aria-label={tr("deleteConfirmTitle")}
+    <Modal
+      title={title}
+      onClose={onCancel}
+      size="sm"
+      busy={busy}
+      footer={
+        <>
+          {/* Focus starts here, so Enter pressed out of habit cancels. */}
+          <Btn onClick={onCancel} disabled={busy} data-autofocus>
+            {tr("cancel")}
+          </Btn>
+          <Btn
+            variant="danger"
+            onClick={confirm}
+            busy={busy}
+            icon={<Trash2 className="h-4 w-4" aria-hidden="true" />}
+          >
+            {busy ? t("deleting") : t("yesDelete")}
+          </Btn>
+        </>
+      }
     >
-      <div className="animate-scale-in w-full max-w-md border border-border bg-background p-8">
-        <h3 className="font-display text-2xl">{tr("deleteConfirmTitle")}</h3>
-        <p className="mt-2 font-mono text-xs text-muted-foreground" dir="ltr">
+      {label && (
+        <p className="mb-3 rounded-md bg-secondary px-3 py-2 font-mono text-sm" dir="ltr">
           {label}
         </p>
-        <p className="mt-4 text-sm text-muted-foreground">{tr("deleteConfirmBody")}</p>
-        <input
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          autoFocus
-          dir="ltr"
-          placeholder="Delete"
-          className="mt-4 w-full border border-border bg-secondary px-4 py-3 outline-none focus:border-foreground"
-        />
-        <div className="mt-6 flex gap-3">
-          <button
-            onClick={onConfirm}
-            disabled={!ready}
-            className="flex-1 bg-destructive py-3 text-sm uppercase tracking-widest text-destructive-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-30"
-          >
-            <span className="inline-flex items-center justify-center gap-2">
-              <Trash2 className="h-4 w-4" /> {tr("deleteRequest")}
-            </span>
-          </button>
-          <button
-            onClick={onCancel}
-            className="border border-border px-6 py-3 text-sm uppercase tracking-widest hover:bg-secondary"
-          >
-            {tr("cancel")}
-          </button>
+      )}
+      <p className="text-sm text-muted-foreground">{body ?? t("deleteGenericBody")}</p>
+      {error && (
+        <div className="mt-4">
+          <ErrorNote>{error}</ErrorNote>
         </div>
-      </div>
-    </div>
+      )}
+    </Modal>
   );
 }

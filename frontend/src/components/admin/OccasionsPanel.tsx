@@ -1,16 +1,31 @@
 import { useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { PartyPopper, Plus, Trash2 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { useAllOccasions, useDeleteOccasion, useSaveOccasion } from "@/lib/api";
-import { formatMoney } from "@/lib/booking";
+import { formatMoney, formatSpan, parseDate } from "@/lib/booking";
 import type { SpecialOccasionRow } from "@/integrations/supabase/types";
 import { DeleteConfirm } from "./DeleteConfirm";
+import { useAdminT } from "./strings";
+import { errorText, useToast } from "./toast";
+import {
+  Btn,
+  Card,
+  EmptyState,
+  Field,
+  IconBtn,
+  PanelHeader,
+  SkeletonList,
+  Tag,
+  inputClass,
+} from "./ui";
 
 const BLANK = { name_en: "", name_ar: "", start_date: "", end_date: "", price: "900" };
 
 export function OccasionsPanel() {
   const { tr, lang } = useI18n();
-  const { data: items } = useAllOccasions(true);
+  const t = useAdminT();
+  const toast = useToast();
+  const { data: items, isLoading } = useAllOccasions(true);
   const save = useSaveOccasion();
   const remove = useDeleteOccasion();
   const [form, setForm] = useState(BLANK);
@@ -18,11 +33,10 @@ export function OccasionsPanel() {
 
   // The DB refuses overlapping active windows; say so in plain language
   // rather than surfacing the raw exclusion-constraint text.
-  const saveError = save.error
-    ? /exclusion|occasions_no_overlap/i.test((save.error as Error).message)
+  const explain = (err: unknown) =>
+    /exclusion|occasions_no_overlap/i.test(errorText(err))
       ? tr("occasionOverlaps")
-      : (save.error as Error).message
-    : null;
+      : errorText(err);
 
   const valid =
     form.name_en.trim().length > 0 &&
@@ -33,139 +47,168 @@ export function OccasionsPanel() {
 
   return (
     <section>
-      <h2 className="mb-2 text-3xl font-semibold">{tr("specialOccasions")}</h2>
-      <p className="mb-6 max-w-2xl text-sm text-muted-foreground">{tr("occasionsHint")}</p>
+      <PanelHeader title={tr("specialOccasions")} description={tr("occasionsHint")} />
 
-      {saveError && (
-        <p className="mb-4 border border-destructive p-4 text-sm text-destructive">{saveError}</p>
-      )}
-
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (!valid) return;
-          save.mutate(
-            { ...form, price: Number(form.price), active: true },
-            { onSuccess: () => setForm(BLANK) },
-          );
-        }}
-        className="mb-8 grid gap-3 border border-border p-5 md:grid-cols-2"
-      >
-        <label className="block">
-          <span className="text-xs uppercase tracking-widest text-muted-foreground">
-            {tr("occasionName")}
-          </span>
-          <input
-            value={form.name_en}
-            onChange={(e) => setForm({ ...form, name_en: e.target.value })}
-            placeholder="Eid Al-Fitr"
-            className="mt-2 w-full border border-border bg-secondary px-4 py-3 outline-none focus:border-foreground"
-          />
-        </label>
-        <label className="block">
-          <span className="text-xs uppercase tracking-widest text-muted-foreground">
-            {tr("occasionNameAr")}
-          </span>
-          <input
-            value={form.name_ar}
-            dir="rtl"
-            onChange={(e) => setForm({ ...form, name_ar: e.target.value })}
-            placeholder="عيد الفطر"
-            className="mt-2 w-full border border-border bg-secondary px-4 py-3 outline-none focus:border-foreground"
-          />
-        </label>
-        <label className="block">
-          <span className="text-xs uppercase tracking-widest text-muted-foreground">
-            {tr("startDate")}
-          </span>
-          <input
-            type="date"
-            value={form.start_date}
-            onChange={(e) => setForm({ ...form, start_date: e.target.value })}
-            className="mt-2 w-full border border-border bg-secondary px-4 py-3 outline-none focus:border-foreground"
-          />
-        </label>
-        <label className="block">
-          <span className="text-xs uppercase tracking-widest text-muted-foreground">
-            {tr("endDate")}
-          </span>
-          <input
-            type="date"
-            value={form.end_date}
-            min={form.start_date || undefined}
-            onChange={(e) => setForm({ ...form, end_date: e.target.value })}
-            className="mt-2 w-full border border-border bg-secondary px-4 py-3 outline-none focus:border-foreground"
-          />
-        </label>
-        <label className="block">
-          <span className="text-xs uppercase tracking-widest text-muted-foreground">
-            {tr("priceLabel")}
-          </span>
-          <input
-            type="number"
-            min={0}
-            step="0.001"
-            value={form.price}
-            onChange={(e) => setForm({ ...form, price: e.target.value })}
-            className="mt-2 w-full border border-border bg-secondary px-4 py-3 outline-none focus:border-foreground"
-          />
-        </label>
-        <button
-          type="submit"
-          disabled={!valid || save.isPending}
-          className="flex items-center justify-center gap-2 self-end bg-black px-6 py-3 text-sm uppercase tracking-widest text-white disabled:opacity-50"
+      <Card className="mb-6 p-5 sm:p-6">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!valid) return;
+            save.mutate(
+              { ...form, price: Number(form.price), active: true },
+              {
+                onSuccess: () => {
+                  setForm(BLANK);
+                  toast.success(t("saved"));
+                },
+                onError: (err) => toast.error(explain(err)),
+              },
+            );
+          }}
+          className="grid gap-4 md:grid-cols-2 lg:grid-cols-3"
         >
-          <Plus className="h-4 w-4" /> {tr("addOccasion")}
-        </button>
-      </form>
+          <Field label={tr("occasionName")}>
+            {(a) => (
+              <input
+                {...a}
+                value={form.name_en}
+                onChange={(e) => setForm({ ...form, name_en: e.target.value })}
+                placeholder="Eid Al-Fitr"
+                className={inputClass}
+              />
+            )}
+          </Field>
+          <Field label={tr("occasionNameAr")}>
+            {(a) => (
+              <input
+                {...a}
+                value={form.name_ar}
+                dir="rtl"
+                onChange={(e) => setForm({ ...form, name_ar: e.target.value })}
+                placeholder="عيد الفطر"
+                className={inputClass}
+              />
+            )}
+          </Field>
+          <Field label={tr("priceLabel")}>
+            {(a) => (
+              <input
+                {...a}
+                type="number"
+                min={0}
+                step="0.001"
+                value={form.price}
+                onChange={(e) => setForm({ ...form, price: e.target.value })}
+                className={inputClass}
+              />
+            )}
+          </Field>
+          <Field label={tr("startDate")}>
+            {(a) => (
+              <input
+                {...a}
+                type="date"
+                value={form.start_date}
+                onChange={(e) => setForm({ ...form, start_date: e.target.value })}
+                className={inputClass}
+              />
+            )}
+          </Field>
+          <Field label={tr("endDate")}>
+            {(a) => (
+              <input
+                {...a}
+                type="date"
+                value={form.end_date}
+                min={form.start_date || undefined}
+                onChange={(e) => setForm({ ...form, end_date: e.target.value })}
+                className={inputClass}
+              />
+            )}
+          </Field>
+          <div className="flex items-end">
+            <Btn
+              type="submit"
+              variant="primary"
+              busy={save.isPending}
+              disabled={!valid}
+              className="w-full"
+              icon={<Plus className="h-4 w-4" aria-hidden="true" />}
+            >
+              {tr("addOccasion")}
+            </Btn>
+          </div>
+        </form>
+      </Card>
 
-      <ul className="space-y-3">
-        {(items ?? []).length === 0 && (
-          <li className="text-sm text-muted-foreground">{tr("noOccasions")}</li>
-        )}
-        {(items ?? []).map((o) => (
-          <li
-            key={o.id}
-            className="flex flex-wrap items-center justify-between gap-4 border border-border p-5"
-          >
-            <div>
-              <p className="text-xl font-semibold">
-                {lang === "en" ? o.name_en : o.name_ar || o.name_en}
-              </p>
-              <p className="mt-1 text-sm text-muted-foreground" dir="ltr">
-                {o.start_date} → {o.end_date} · {formatMoney(Number(o.price), lang)}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <label className="flex items-center gap-2 text-xs uppercase tracking-widest">
-                <input
-                  type="checkbox"
-                  checked={o.active}
-                  disabled={save.isPending}
-                  onChange={() => save.mutate({ ...o, active: !o.active })}
-                  className="h-4 w-4 accent-black"
-                />
-                {tr("activeLabel")}
-              </label>
-              <button
-                onClick={() => setPendingDelete(o)}
-                aria-label={`${tr("deleteRequest")} ${o.name_en}`}
-                className="flex h-11 w-11 items-center justify-center text-muted-foreground transition-colors hover:text-destructive"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            </div>
-          </li>
-        ))}
-      </ul>
+      {isLoading ? (
+        <SkeletonList rows={2} />
+      ) : (items ?? []).length === 0 ? (
+        <EmptyState icon={<PartyPopper className="h-6 w-6" />}>{tr("noOccasions")}</EmptyState>
+      ) : (
+        <ul className="space-y-3">
+          {(items ?? []).map((o) => (
+            <Card
+              as="li"
+              key={o.id}
+              className="flex flex-wrap items-center justify-between gap-4 p-5"
+            >
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-lg font-semibold">
+                    {lang === "en" ? o.name_en : o.name_ar || o.name_en}
+                  </p>
+                  {!o.active && <Tag>{lang === "en" ? "Off" : "متوقف"}</Tag>}
+                </div>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {formatSpan(parseDate(o.start_date), parseDate(o.end_date), lang)} ·{" "}
+                  <span className="font-medium text-foreground">
+                    {formatMoney(Number(o.price), lang)}
+                  </span>
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    role="switch"
+                    checked={o.active}
+                    disabled={save.isPending}
+                    onChange={() =>
+                      save.mutate(
+                        { ...o, active: !o.active },
+                        {
+                          onSuccess: () => toast.success(t("saved")),
+                          onError: (err) => toast.error(explain(err)),
+                        },
+                      )
+                    }
+                    className="admin-switch"
+                  />
+                  {tr("activeLabel")}
+                </label>
+                <IconBtn
+                  tone="danger"
+                  label={`${t("delete")} ${o.name_en}`}
+                  onClick={() => setPendingDelete(o)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </IconBtn>
+              </div>
+            </Card>
+          ))}
+        </ul>
+      )}
 
       {pendingDelete && (
         <DeleteConfirm
+          title={t("deleteOccasionTitle")}
           label={pendingDelete.name_en}
           onCancel={() => setPendingDelete(null)}
-          onConfirm={() => {
-            remove.mutate(pendingDelete.id);
+          onConfirm={async () => {
+            await remove.mutateAsync(pendingDelete.id);
             setPendingDelete(null);
+            toast.success(t("deleted"));
           }}
         />
       )}

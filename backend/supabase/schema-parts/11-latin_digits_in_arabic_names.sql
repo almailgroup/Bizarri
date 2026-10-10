@@ -1,5 +1,5 @@
 -- ============================================================================
--- Part 11 of 14: latin_digits_in_arabic_names
+-- Part 11 of 15: latin_digits_in_arabic_names
 --
 -- Paste this whole file into the Supabase SQL editor and Run, then move on
 -- to the next part. Run them in order; each one is safe to run twice.
