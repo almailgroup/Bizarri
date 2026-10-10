@@ -227,9 +227,11 @@ ck(
     html
       .replace(/<\/td>/g, " ")
       .replace(/<[^>]+>/g, "")
+      .replace(/&middot;/g, "·")
       .replace(/\s+/g, " ");
-  const inEn = "Check-in 2027-01-07 · 2:00 PM";
-  const outEn = "Check-out 2027-01-10 · 12:00 PM";
+  // Written out the way a person would say it, not as a database date.
+  const inEn = "Check-in Thu, 7 Jan 2027 · 2:00 PM";
+  const outEn = "Check-out Sun, 10 Jan 2027 · 12:00 PM";
   for (const [name, html] of [
     ["The team's email", render(b)],
     ["The guest's request email", renderGuest(b, "en")],
@@ -243,13 +245,13 @@ ck(
   const ar = text(renderGuest(b, "ar"));
   ck(
     "The Arabic email says it in Arabic, digits Latin like the site",
-    ar.includes("الوصول 2027-01-07 · 2:00 م") && ar.includes("المغادرة 2027-01-10 · 12:00 م"),
+    ar.includes("الوصول الخميس، 7 يناير 2027 · 2:00 م") &&
+      ar.includes("المغادرة الأحد، 10 يناير 2027 · 12:00 م"),
     ar.match(/الوصول[^م]*م/)?.[0],
   );
-  ck(
-    "…and the dates cannot be reordered right to left",
-    renderGuest(b, "ar").includes('<span dir="ltr">2027-01-07</span>'),
-  );
+  // A bare 2027-01-07 in a right-to-left line is the thing that gets
+  // scrambled; a date in words reads the same in either direction.
+  ck("…with no bare ISO date for right-to-left to reorder", !ar.includes("2027-01-07"));
 
   // A refusal or a cancellation is not a stay to turn up for.
   ck(
@@ -266,6 +268,74 @@ ck(
       .filter((l) => l.startsWith("Check"))
       .join(" | "),
   );
+}
+
+// ======================================== one design for every email sent
+// The confirmation once went out as plain text in a box while the code email
+// and the Resend template looked like Bizarri. Every message now goes through
+// the same layout, so this checks the brand on each one rather than on one.
+{
+  const codeEntry = new URL(
+    "../../backend/supabase/functions/send-email-code/index.ts",
+    import.meta.url,
+  ).pathname;
+  const codeBuilt = await build({
+    entryPoints: [codeEntry],
+    bundle: true,
+    write: false,
+    format: "esm",
+    platform: "neutral",
+    target: "es2022",
+  });
+  // That module calls Deno.serve too; keep the booking handler it would replace.
+  const bookingHandler = handler;
+  const { render: renderCode } = await import(
+    "data:text/javascript;base64," + Buffer.from(codeBuilt.outputFiles[0].text).toString("base64")
+  );
+  handler = bookingHandler;
+  ck("The code email's renderer was imported", typeof renderCode === "function");
+
+  const b = booking({ status: "accepted" });
+  const all = [
+    ["team", render(b)],
+    ["guest en", renderGuest(b, "en")],
+    ["guest ar", renderGuest(b, "ar")],
+    ...["accepted", "rejected", "cancelled", "pending"].flatMap((status) => [
+      [`${status} en`, renderDecision({ ...b, status }, "en")],
+      [`${status} ar`, renderDecision({ ...b, status }, "ar")],
+    ]),
+    ["code en", renderCode("004821", "en")],
+    ["code ar", renderCode("004821", "ar")],
+  ];
+  for (const [name, html] of all) {
+    ck(
+      `Branded: ${name}`,
+      html.includes("https://bizarri.com/email/bizarri-logo-white.png") &&
+        /Almail Group|مجموعة الميل/.test(html) &&
+        html.startsWith("<!DOCTYPE html>"),
+    );
+  }
+  ck(
+    "Arabic ones are right to left, English ones are not",
+    all.every(([name, html]) => html.includes('dir="rtl"') === name.endsWith(" ar")),
+  );
+  ck("The code keeps its leading zeros", renderCode("004821", "en").includes("004821"));
+
+  // Guests write their own name and notes; neither may become markup in an
+  // email the team opens.
+  const hostile = booking({ guest_name: "<img src=x onerror=alert(1)>", notes: "<b>hi</b>" });
+  for (const [name, html] of [
+    ["team", render(hostile)],
+    ["guest", renderGuest(hostile, "en")],
+    ["decision", renderDecision({ ...hostile, status: "accepted" }, "en")],
+  ]) {
+    ck(`Guest input is escaped (${name})`, !html.includes("<img src=x") && !html.includes("<b>hi"));
+  }
+
+  // The photo is the chalet's front, on the guest's copies; the team needs
+  // the details, not a picture of a building they own.
+  ck("The guest's email shows the chalet", renderGuest(b, "en").includes("/email/front.jpg"));
+  ck("The team's does not", !render(b).includes("/email/front.jpg"));
 }
 
 // ===================================== one failed send does not sink the rest

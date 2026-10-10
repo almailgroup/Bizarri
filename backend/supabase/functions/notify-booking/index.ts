@@ -27,6 +27,7 @@
  * failing.
  */
 import { corsHeaders, json } from "../_shared/http.ts";
+import { brandedEmail, escapeHtml, formatEmailDate, type EmailRow } from "../_shared/email.ts";
 
 interface WhatsAppRecipient {
   phone: string;
@@ -137,6 +138,18 @@ async function readSetting(key: string): Promise<unknown> {
  * but a guest starting the conversation needs no approval at all. So the
  * emails carry a tappable link rather than a number to copy out by hand.
  */
+/** The Instagram profile in Site Settings, for the emails' footer. */
+async function instagramUrl(): Promise<string> {
+  const contact = await readSetting("contact");
+  const raw =
+    contact && typeof contact === "object"
+      ? ((contact as Record<string, unknown>).instagram ?? "")
+      : "";
+  return String(raw) || DEFAULT_INSTAGRAM;
+}
+
+const DEFAULT_INSTAGRAM = "https://www.instagram.com/bizarri_chalet";
+
 async function guestWhatsAppNumber(): Promise<string> {
   const contact = await readSetting("contact");
   const raw =
@@ -145,16 +158,6 @@ async function guestWhatsAppNumber(): Promise<string> {
       : "";
   const digits = String(raw).replace(/\D/g, "");
   return digits || (Deno.env.get("CONTACT_WHATSAPP") ?? "96594040955");
-}
-
-/** A WhatsApp button, or nothing when there is no number to point it at. */
-function whatsAppButton(number: string, label: string): string {
-  if (!number) return "";
-  return `<p style="margin:24px 0 0">
-      <a href="https://wa.me/${esc(number)}"
-         style="display:inline-block;border:1px solid #ddd;padding:10px 18px;
-                font-size:13px;color:#111;text-decoration:none">${esc(label)}</a>
-    </p>`;
 }
 
 /** Editable from Site Settings, so an admin can change recipients without a
@@ -188,14 +191,6 @@ async function notifyWhatsAppFromSettings(): Promise<
   return recipients.length > 0 ? recipients : null;
 }
 
-function esc(s: string): string {
-  return s.replace(
-    /[<>&"]/g,
-    (c) =>
-      ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" })[c] as string,
-  );
-}
-
 /**
  * When to arrive and when to leave. The same rule the site shows (see
  * checkOutDay in frontend/src/lib/booking.ts): in at 2 PM on the first booked
@@ -222,47 +217,82 @@ export function formatHour(hour: number, lang: "en" | "ar"): string {
   );
 }
 
-/** Check-in and check-out as two email rows. The date is isolated
- *  left-to-right so an Arabic email does not reorder its digits. */
-function stayRows(b: BookingRecord, lang: "en" | "ar"): string {
+/** Check-in and check-out as two rows: a readable date and the hour. */
+function stayRows(b: BookingRecord, lang: "en" | "ar"): EmailRow[] {
   const label =
     lang === "ar"
       ? { in: "الوصول", out: "المغادرة" }
       : { in: "Check-in", out: "Check-out" };
-  const row = (l: string, date: string, hour: number) =>
-    `<tr><td style="padding:6px 16px 6px 0;color:#666">${esc(l)}</td>` +
-    `<td style="padding:6px 0;font-weight:500"><span dir="ltr">${esc(date)}</span>` +
-    ` · ${esc(formatHour(hour, lang))}</td></tr>`;
-  return (
-    row(label.in, b.start_date, CHECK_IN_HOUR) +
-    row(label.out, checkOutDate(b.end_date), CHECK_OUT_HOUR)
-  );
+  const value = (date: string, hour: number) =>
+    `${escapeHtml(formatEmailDate(date, lang))} &middot; ${escapeHtml(formatHour(hour, lang))}`;
+  return [
+    { label: label.in, valueHtml: value(b.start_date, CHECK_IN_HOUR) },
+    { label: label.out, valueHtml: value(checkOutDate(b.end_date), CHECK_OUT_HOUR) },
+  ];
 }
 
+function chaletName(b: BookingRecord, lang: "en" | "ar"): string {
+  return lang === "ar" ? `شاليه بيزاري ${b.chalet_id}` : `Bizarri Chalet ${b.chalet_id}`;
+}
+
+/** "KD 350" / "350 د.ك", as the website writes a price. */
+function money(b: BookingRecord, lang: "en" | "ar"): string {
+  const n = Number(b.total).toLocaleString("en-US", { maximumFractionDigits: 3 });
+  const kwd = (b.currency ?? "KWD").toUpperCase() === "KWD";
+  if (lang === "ar") return kwd ? `${n} د.ك` : `${n} ${b.currency}`;
+  return kwd ? `KD ${n}` : `${b.currency} ${n}`;
+}
+
+/** The stay as the guest sees it: chalet, in, out, guests. */
+function guestRows(b: BookingRecord, lang: "en" | "ar"): EmailRow[] {
+  const ar = lang === "ar";
+  return [
+    { label: ar ? "الشاليه" : "Chalet", valueHtml: escapeHtml(chaletName(b, lang)) },
+    ...stayRows(b, lang),
+    { label: ar ? "عدد الضيوف" : "Guests", valueHtml: escapeHtml(String(b.guests)) },
+  ];
+}
+
+const REFERENCE = { en: "Booking reference", ar: "رقم الحجز" } as const;
+const CHAT = { en: "Message us on WhatsApp", ar: "تواصل معنا عبر واتساب" } as const;
+
+/** "Dear Fatima," / "مرحباً فاطمة،", or nothing if there is no name. */
+function greeting(b: BookingRecord, lang: "en" | "ar"): string | undefined {
+  const name = (b.guest_name ?? "").trim();
+  if (!name) return undefined;
+  return lang === "ar" ? `مرحباً ${name}،` : `Dear ${name},`;
+}
+
+/** The link to the lookup page, with the reminder to keep the reference. */
+function lookupNote(lang: "en" | "ar", lead: string): string {
+  const url = `https://bizarri.com/reservation/${lang}`;
+  const link = `<a href="${url}" target="_blank" style="color:#0a0a0a; text-decoration:underline;">bizarri.com/reservation</a>`;
+  return lang === "ar"
+    ? `${escapeHtml(lead)} يمكنك الاستعلام عن حجزك في أي وقت عبر ${link} باستخدام رقم الحجز.`
+    : `${escapeHtml(lead)} You can check your booking any time at ${link} with your reference.`;
+}
+
+/** The team's alert: everything needed to decide, and the way to decide it. */
 export function render(b: BookingRecord): string {
-  const row = (label: string, value: string) =>
-    `<tr><td style="padding:6px 16px 6px 0;color:#666">${label}</td>` +
-    `<td style="padding:6px 0;font-weight:500">${esc(value)}</td></tr>`;
-  return `
-    <div style="font-family:system-ui,sans-serif;max-width:520px">
-      <p style="letter-spacing:.3em;text-transform:uppercase;font-size:11px;color:#888">
-        Bizarri Chalet</p>
-      <h2 style="font-weight:400;margin:4px 0 20px">New booking request</h2>
-      <p style="font-family:monospace;font-size:18px;margin:0 0 20px">${esc(b.ref)}</p>
-      <table style="border-collapse:collapse;font-size:14px">
-        ${row("Chalet", `Bizarri Chalet ${b.chalet_id}`)}
-        ${row("Dates", `${b.start_date} → ${b.end_date} (${b.days} days)`)}
-        ${stayRows(b, "en")}
-        ${row("Total", `${b.currency} ${b.total}`)}
-        ${row("Guest", b.guest_name)}
-        ${row("Phone", b.guest_phone)}
-        ${row("Email", b.guest_email)}
-        ${row("Guests", String(b.guests))}
-        ${b.notes ? row("Notes", b.notes) : ""}
-      </table>
-      <p style="margin-top:24px;font-size:13px;color:#888">
-        Accept or reject this request in the admin dashboard.</p>
-    </div>`;
+  const rows: EmailRow[] = [
+    { label: "Chalet", valueHtml: escapeHtml(chaletName(b, "en")) },
+    ...stayRows(b, "en"),
+    { label: "Days", valueHtml: escapeHtml(String(b.days)) },
+    { label: "Guests", valueHtml: escapeHtml(String(b.guests)) },
+    { label: "Guest", valueHtml: escapeHtml(b.guest_name) },
+    { label: "Phone", valueHtml: `<span dir="ltr">${escapeHtml(b.guest_phone)}</span>` },
+    { label: "Email", valueHtml: escapeHtml(b.guest_email) },
+  ];
+  if (b.notes) rows.push({ label: "Notes", valueHtml: escapeHtml(b.notes) });
+  return brandedEmail({
+    lang: "en",
+    title: "New booking request",
+    paragraphs: ["A new request has arrived. Accept or reject it in the admin dashboard."],
+    panel: { label: REFERENCE.en, value: b.ref },
+    rows,
+    total: { label: "Total", value: money(b, "en") },
+    button: { href: "https://bizarri.com/admin/en", label: "Open the dashboard" },
+  });
 }
 
 /**
@@ -275,60 +305,37 @@ export function renderGuest(
   b: BookingRecord,
   lang: "en" | "ar",
   whatsapp = "",
+  instagram = DEFAULT_INSTAGRAM,
 ): string {
   const ar = lang === "ar";
-  const t = ar
-    ? {
-        title: "استلمنا طلب حجزك",
-        ref: "رقم الحجز",
-        chalet: "الشاليه",
-        dates: "التواريخ",
-        total: "الإجمالي",
-        guests: "عدد الضيوف",
-        pending: "طلبك قيد المراجعة. سنتواصل معك قريباً لتأكيد الحجز.",
-        keep: "احتفظ برقم الحجز للاستعلام عن حالته في أي وقت.",
-        chat: "تواصل معنا عبر واتساب",
-      }
-    : {
-        title: "We have your booking request",
-        ref: "Booking reference",
-        chalet: "Chalet",
-        dates: "Dates",
-        total: "Total",
-        guests: "Guests",
-        pending:
-          "Your request is being reviewed. We will contact you shortly to confirm.",
-        keep: "Keep this reference to check the status of your booking at any time.",
-        chat: "Message us on WhatsApp",
-      };
-  const row = (label: string, value: string) =>
-    `<tr><td style="padding:6px 16px 6px 0;color:#666">${esc(label)}</td>` +
-    `<td style="padding:6px 0;font-weight:500">${esc(value)}</td></tr>`;
-  return `
-    <div style="font-family:system-ui,sans-serif;max-width:520px" ${ar ? 'dir="rtl"' : ""}>
-      <p style="letter-spacing:.3em;text-transform:uppercase;font-size:11px;color:#888">
-        Bizarri Chalet</p>
-      <h2 style="font-weight:400;margin:4px 0 8px">${esc(t.title)}</h2>
-      <p style="font-size:15px;color:#333;margin:0 0 20px">${esc(t.pending)}</p>
-      <p style="text-transform:uppercase;letter-spacing:.2em;font-size:11px;color:#888;margin:0">
-        ${esc(t.ref)}</p>
-      <p style="font-family:monospace;font-size:26px;margin:4px 0 24px" dir="ltr">${esc(b.ref)}</p>
-      <table style="border-collapse:collapse;font-size:14px">
-        ${row(t.chalet, `Bizarri Chalet ${b.chalet_id}`)}
-        ${row(t.dates, `${b.start_date} \u2192 ${b.end_date} (${b.days})`)}
-        ${stayRows(b, lang)}
-        ${row(t.total, `${b.currency} ${b.total}`)}
-        ${row(t.guests, String(b.guests))}
-      </table>
-      <p style="margin-top:24px;font-size:13px;color:#888">${esc(t.keep)}</p>
-      ${whatsAppButton(whatsapp, t.chat)}
-    </div>`;
+  return brandedEmail({
+    lang,
+    title: ar ? "استلمنا طلب حجزك" : "We have your booking request",
+    greeting: greeting(b, lang),
+    paragraphs: [
+      ar
+        ? "طلبك قيد المراجعة. سنتواصل معك قريباً لتأكيد الحجز."
+        : "Your request is being reviewed. We will contact you shortly to confirm.",
+    ],
+    panel: { label: REFERENCE[lang], value: b.ref },
+    rows: guestRows(b, lang),
+    total: { label: ar ? "الإجمالي" : "Total", value: money(b, lang) },
+    button: whatsapp ? { href: `https://wa.me/${whatsapp}`, label: CHAT[lang] } : undefined,
+    noteHtml: lookupNote(
+      lang,
+      ar ? "احتفظ برقم الحجز." : "Keep this reference.",
+    ),
+    photo: true,
+    signOff: true,
+    whatsapp,
+    instagram,
+  });
 }
 
 /**
  * What the guest is told once a decision is made.
  *
- * Three different messages, because "rejected" needs to read as an apology
+ * Four different messages, because "rejected" needs to read as an apology
  * with a way forward rather than as a status code. The internal admin note is
  * deliberately not included: the admin panel labels it internal and an admin
  * writing "haggled, gave discount" there does not expect the guest to read it.
@@ -337,14 +344,15 @@ export function renderDecision(
   b: BookingRecord,
   lang: "en" | "ar",
   whatsapp = "",
+  instagram = DEFAULT_INSTAGRAM,
 ): string {
   const ar = lang === "ar";
   const status = b.status ?? "";
-  const copy = ar
+  const copy: Record<string, { title: string; body: string }> = ar
     ? {
         accepted: {
           title: "تم تأكيد حجزك",
-          body: "يسعدنا تأكيد إقامتك. نتطلع لاستقبالك.",
+          body: "يسعدنا تأكيد إقامتك في شاليه بيزاري. نتطلع لاستقبالك.",
         },
         rejected: {
           title: "لم نتمكن من تأكيد حجزك",
@@ -358,22 +366,15 @@ export function renderDecision(
           title: "حجزك قيد المراجعة",
           body: "أعدنا طلبك إلى قائمة الانتظار بينما نراجع التفاصيل. سنتواصل معك قريباً بالتأكيد النهائي.",
         },
-        ref: "رقم الحجز",
-        chalet: "الشاليه",
-        dates: "التواريخ",
-        total: "الإجمالي",
-        guests: "عدد الضيوف",
-        contact: "لأي استفسار، تواصل معنا.",
-        chat: "تواصل معنا عبر واتساب",
       }
     : {
         accepted: {
           title: "Your booking is confirmed",
-          body: "We are glad to confirm your stay. We look forward to welcoming you.",
+          body: "We are glad to confirm your stay at Bizarri Chalet. We look forward to welcoming you.",
         },
         rejected: {
           title: "We could not confirm your booking",
-          body: "We are sorry \u2014 these dates are not available. Message us on WhatsApp and we will help you find another date.",
+          body: "We are sorry — these dates are not available. Message us on WhatsApp and we will help you find another date.",
         },
         cancelled: {
           title: "Your booking has been cancelled",
@@ -383,50 +384,30 @@ export function renderDecision(
           title: "Your booking is back under review",
           body: "We have put your request back on the waiting list while we check the details. We will be in touch shortly to confirm.",
         },
-        ref: "Booking reference",
-        chalet: "Chalet",
-        dates: "Dates",
-        total: "Total",
-        guests: "Guests",
-        contact: "Any questions, just get in touch.",
-        chat: "Message us on WhatsApp",
       };
-  const t =
-    (copy as unknown as Record<string, { title: string; body: string }>)[
-      status
-    ] ?? copy.accepted;
-
-  const row = (label: string, value: string) =>
-    `<tr><td style="padding:6px 16px 6px 0;color:#666">${esc(label)}</td>` +
-    `<td style="padding:6px 0;font-weight:500">${esc(value)}</td></tr>`;
+  const t = copy[status] ?? copy.accepted;
 
   // The stay is shown while it might still happen. A refusal or a
   // cancellation does not need the price of something that is not.
-  const details =
-    status === "accepted" || status === "pending"
-      ? `<table style="border-collapse:collapse;font-size:14px">
-        ${row(copy.chalet, `Bizarri Chalet ${b.chalet_id}`)}
-        ${row(copy.dates, `${b.start_date} \u2192 ${b.end_date} (${b.days})`)}
-        ${stayRows(b, lang)}
-        ${row(copy.total, `${b.currency} ${b.total}`)}
-        ${row(copy.guests, String(b.guests))}
-      </table>`
-      : "";
+  const live = status === "accepted" || status === "pending";
 
-  return `
-    <div style="font-family:system-ui,sans-serif;max-width:520px" ${ar ? 'dir="rtl"' : ""}>
-      <p style="letter-spacing:.3em;text-transform:uppercase;font-size:11px;color:#888">
-        Bizarri Chalet</p>
-      <h2 style="font-weight:400;margin:4px 0 8px">${esc(t.title)}</h2>
-      <p style="font-size:15px;color:#333;margin:0 0 20px">${esc(t.body)}</p>
-      <p style="text-transform:uppercase;letter-spacing:.2em;font-size:11px;color:#888;margin:0">
-        ${esc(copy.ref)}</p>
-      <p style="font-family:monospace;font-size:26px;margin:4px 0 24px" dir="ltr">${esc(b.ref)}</p>
-      ${details}
-      <p style="margin-top:24px;font-size:13px;color:#888" dir="${ar ? "rtl" : "ltr"}">
-        ${esc(copy.contact)}</p>
-      ${whatsAppButton(whatsapp, copy.chat)}
-    </div>`;
+  return brandedEmail({
+    lang,
+    title: t.title,
+    greeting: greeting(b, lang),
+    paragraphs: [t.body],
+    panel: { label: REFERENCE[lang], value: b.ref },
+    rows: live ? guestRows(b, lang) : undefined,
+    total: live ? { label: ar ? "الإجمالي" : "Total", value: money(b, lang) } : undefined,
+    button: whatsapp ? { href: `https://wa.me/${whatsapp}`, label: CHAT[lang] } : undefined,
+    noteHtml: live
+      ? lookupNote(lang, ar ? "لأي استفسار، تواصل معنا." : "Any questions, just get in touch.")
+      : escapeHtml(ar ? "لأي استفسار، تواصل معنا." : "Any questions, just get in touch."),
+    photo: live,
+    signOff: true,
+    whatsapp,
+    instagram,
+  });
 }
 
 /** Plain-text with WhatsApp's own emphasis markup (*bold*), not HTML. */
@@ -573,7 +554,7 @@ async function sendGuestEmail(booking: BookingRecord): Promise<DeliveryResult> {
           lang === "ar"
             ? `\u0637\u0644\u0628 \u0627\u0644\u062d\u062c\u0632 ${booking.ref} \u2014 \u0634\u0627\u0644\u064a\u0647 \u0628\u064a\u0632\u0627\u0631\u064a`
             : `Your booking request ${booking.ref} \u2014 Bizarri Chalet`,
-        html: renderGuest(booking, lang, whatsapp),
+        html: renderGuest(booking, lang, whatsapp, await instagramUrl()),
         ...(replyTo ? { reply_to: replyTo } : {}),
       }),
     });
@@ -623,7 +604,7 @@ async function sendDecisionEmail(
           lang === "ar"
             ? `${confirmed ? "\u062a\u0645 \u062a\u0623\u0643\u064a\u062f \u062d\u062c\u0632\u0643" : "\u062a\u062d\u062f\u064a\u062b \u0639\u0644\u0649 \u062d\u062c\u0632\u0643"} ${booking.ref}`
             : `${confirmed ? "Confirmed" : "Update"}: booking ${booking.ref} \u2014 Bizarri Chalet`,
-        html: renderDecision(booking, lang, whatsapp),
+        html: renderDecision(booking, lang, whatsapp, await instagramUrl()),
         ...(replyTo ? { reply_to: replyTo } : {}),
       }),
     });

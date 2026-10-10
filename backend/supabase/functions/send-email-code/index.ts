@@ -15,35 +15,34 @@
  * asking for a code that will never arrive.
  */
 import { corsHeaders, json } from "../_shared/http.ts";
+import { brandedEmail, escapeHtml } from "../_shared/email.ts";
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i;
 
-function esc(s: string): string {
-  return s.replace(
-    /[<>&"]/g,
-    (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" })[c] as string,
-  );
-}
-
-function render(code: string, lang: string): string {
+/**
+ * The code email, in the same branded layout as every other email the site
+ * sends. Short and practical: no photo, no sign-off -- the guest is waiting
+ * on the booking page for six digits.
+ */
+export function render(code: string, lang: string): string {
   const ar = lang === "ar";
-  const title = ar ? "رمز التأكيد" : "Your confirmation code";
-  const intro = ar
-    ? "أدخل هذا الرمز في صفحة الحجز لتأكيد بريدك الإلكتروني."
-    : "Enter this code on the booking page to confirm your email address.";
-  const expiry = ar
-    ? "ينتهي هذا الرمز خلال ١٠ دقائق. إذا لم تطلبه، يمكنك تجاهل هذه الرسالة."
-    : "This code expires in 10 minutes. If you did not ask for it, you can ignore this email.";
-  return `
-    <div style="font-family:system-ui,sans-serif;max-width:480px" ${ar ? 'dir="rtl"' : ""}>
-      <p style="letter-spacing:.3em;text-transform:uppercase;font-size:11px;color:#888">
-        Bizarri Chalet</p>
-      <h2 style="font-weight:400;margin:4px 0 20px">${esc(title)}</h2>
-      <p style="font-size:15px;color:#333;margin:0 0 20px">${esc(intro)}</p>
-      <p style="font-family:monospace;font-size:34px;letter-spacing:.3em;margin:0 0 24px"
-         dir="ltr">${esc(code)}</p>
-      <p style="font-size:13px;color:#888;margin:0">${esc(expiry)}</p>
-    </div>`;
+  return brandedEmail({
+    lang: ar ? "ar" : "en",
+    title: ar ? "رمز التأكيد" : "Your confirmation code",
+    paragraphs: [
+      ar
+        ? "أدخل هذا الرمز في صفحة الحجز لتأكيد بريدك الإلكتروني."
+        : "Enter this code on the booking page to confirm your email address.",
+    ],
+    panel: { label: ar ? "الرمز" : "Your code", value: code, large: true },
+    noteHtml: escapeHtml(
+      ar
+        ? "ينتهي هذا الرمز خلال 10 دقائق. إذا لم تطلبه، يمكنك تجاهل هذه الرسالة."
+        : "This code expires in 10 minutes. If you did not ask for it, you can ignore this email.",
+    ),
+    whatsapp: (Deno.env.get("CONTACT_WHATSAPP") ?? "96594040955").replace(/\D/g, ""),
+    instagram: "https://www.instagram.com/bizarri_chalet",
+  });
 }
 
 /** Ask the database for a code. It enforces its own rate limit, so a caller
