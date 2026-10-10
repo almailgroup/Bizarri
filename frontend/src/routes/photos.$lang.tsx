@@ -37,7 +37,6 @@ const CATEGORIES: Category[] = [
   { en: "Seating Area", ar: "منطقة الجلوس", photos: photosFor("seating") },
   { en: "Entrance", ar: "المدخل", photos: photosFor("entrance") },
   { en: "Beach Access", ar: "إطلالة الشاطئ", photos: photosFor("beach") },
-  { en: "Smart Home Features", ar: "ميزات المنزل الذكي", photos: [] },
   { en: "Entertainment", ar: "الترفيه", photos: [] },
   { en: "Views", ar: "الإطلالات", photos: [] },
   { en: "Parking", ar: "موقف السيارات", photos: [] },

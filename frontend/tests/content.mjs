@@ -254,6 +254,83 @@ for (const lang of ["en", "ar"]) {
   await ctx.close();
 }
 
+// ============================================== About, and every other page
+// The About page told the old story too. It now says what Facilities says;
+// and no page, in either language, may still describe the chalet that had
+// a smart home, 5G, a California King bed and Nespresso.
+{
+  const { ctx, p } = await page();
+  for (const [lang, facts] of [
+    [
+      "en",
+      [
+        "Al Khiran",
+        "7 bedrooms for 14 guests",
+        "dining table for 12",
+        "with heating",
+        "football pitch",
+        "parking for 9 cars",
+        "Almail Group",
+      ],
+    ],
+    [
+      "ar",
+      [
+        "الخيران",
+        "7 غرف نوم تكفي لعدد 14 شخص",
+        "طاولة طعام تكفي لعدد 12 شخص",
+        "خاصية التدفئة",
+        "ملعب كرة قدم",
+        "9 سيارات",
+        "مجموعة الميل",
+      ],
+    ],
+  ]) {
+    await p.goto(`${B}about/${lang}`, { waitUntil: "load" });
+    await p.waitForTimeout(800);
+    const text = await p.evaluate(() => document.querySelector("main").innerText);
+    const missing = facts.filter((f) => !text.includes(f));
+    ck(`About says what Facilities says (${lang})`, missing.length === 0, missing.join(", "));
+  }
+
+  const OLD =
+    /smart home|smart,|intelligent design|Nespresso|California King|5G|65"|sound ?bar|ذكي|نسبريسو|كاليفورنيا|الجيل الخامس|ساوند/i;
+  const stale = [];
+  for (const lang of ["en", "ar"]) {
+    for (const route of [
+      "",
+      "facilities",
+      "photos",
+      "offers",
+      "packages",
+      "booking",
+      "reservation",
+      "news",
+      "contact",
+      "rules",
+      "about",
+      "privacy",
+    ]) {
+      await p.goto(route ? `${B}${route}/${lang}` : `${B}${lang}`, { waitUntil: "load" });
+      await p.waitForTimeout(500);
+      const found = await p.evaluate((re) => {
+        const r = new RegExp(re, "i");
+        const meta =
+          document.querySelector('meta[name="description"]')?.getAttribute("content") ?? "";
+        const m = (document.body.innerText + " " + meta).match(r);
+        return m ? m[0] : null;
+      }, OLD.source);
+      if (found) stale.push(`/${route}/${lang}: "${found}"`);
+    }
+  }
+  ck(
+    "No page in either language still describes the old chalet",
+    stale.length === 0,
+    stale.join(" | "),
+  );
+  await ctx.close();
+}
+
 await b.close();
 console.log(`\n${fails} failing`);
 process.exit(fails ? 1 : 0);

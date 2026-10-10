@@ -11,8 +11,8 @@ function About() {
   usePageMeta(
     lang === "en" ? "About" : "عن الشاليه",
     lang === "en"
-      ? "About Bizarri Chalet, a private retreat by Almail Group in Kuwait."
-      : "عن شاليه بيزاري، ملاذ خاص من مجموعة الميل في الكويت.",
+      ? "About Bizarri Chalet, a private retreat by Almail Group in Al Khiran, Kuwait."
+      : "عن شاليه بيزاري، ملاذ خاص من مجموعة الميل في الخيران، الكويت.",
   );
   return (
     <PageShell>
@@ -27,15 +27,19 @@ function About() {
         >
           {lang === "en" ? (
             <>
+              {/* What the chalet has, from the Facilities page's list, so the
+                  two never describe different places. */}
               <p>
-                Bizarri Chalet is a private modern retreat in Kuwait, conceived for travelers who
-                appreciate discreet luxury, intelligent design, and the rare comfort of total
-                privacy.
+                Bizarri Chalet is a private retreat in Al Khiran, Kuwait, overlooking the lagoon —
+                made for families and groups who want space, comfort and total privacy.
               </p>
               <p>
-                Every detail — from the fully automated smart home and 5G connectivity to the
-                premium California King mattress and curated entertainment library — has been
-                considered to make each stay seamless, restful, and effortlessly elevated.
+                It has 7 bedrooms for 14 guests, 4 of them master bedrooms; a large living room
+                overlooking the swimming pool and the lagoon; a dining table for 12, a bar and
+                preparation counter, and a fully equipped kitchen; an electric lift, and balconies
+                in most rooms. Outside are a swimming pool with heating, seating and a swing right
+                on the lagoon, and a children&apos;s play area with a football pitch — with table
+                tennis and a foosball table too, and parking for 9 cars in front of the chalet.
               </p>
               <p>
                 A proud member of the Almail Group, Bizarri delivers a hospitality experience that
@@ -45,12 +49,15 @@ function About() {
           ) : (
             <>
               <p>
-                شاليه بيزاري هو ملاذ عصري خاص في الكويت، صُمّم لعشاق الفخامة الهادئة والتصميم الذكي
-                والخصوصية التامة.
+                شاليه بيزاري ملاذ خاص في الخيران بالكويت، مطل على الخور، صُمّم للعائلات والمجموعات
+                الباحثة عن المساحة والراحة والخصوصية التامة.
               </p>
               <p>
-                كل تفصيل — من نظام المنزل الذكي وشبكة الجيل الخامس إلى فراش كاليفورنيا كنغ ومكتبة
-                الترفيه المختارة بعناية — تم اختياره ليجعل إقامتكم سلسة ومريحة وفاخرة.
+                يضم الشاليه 7 غرف نوم تكفي لعدد 14 شخص، منها 4 غرف ماستر، وصالة كبيرة مطلة على حمام
+                السباحة والخور، وطاولة طعام تكفي لعدد 12 شخص، وبار وكاونتر تحضيري، ومطبخ مجهز
+                بالكامل، ومصعد كهربائي، وبلكونات في غالبية الغرف. وفي الخارج حمام سباحة مع خاصية
+                التدفئة، وجلسة وديرفه على الخور مباشرة، ومنطقة ألعاب للأطفال فيها ملعب كرة قدم، إلى
+                جانب تنس الطاولة وطاولة البيبي فوت، ومواقف تتسع لعدد 9 سيارات أمام الشاليه.
               </p>
               <p>
                 شاليه بيزاري عضو فخور في مجموعة الميل، نقدم تجربة ضيافة كويتية الطابع بمعايير

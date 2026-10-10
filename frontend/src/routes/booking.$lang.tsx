@@ -649,6 +649,12 @@ function Calendar({
   }, [activeDay, keyboardNav]);
 
   const onGridKeyDown = (e: React.KeyboardEvent) => {
+    // From the day that has focus, not from the remembered one. They differ
+    // as soon as a day is clicked, or focused by a screen reader: the first
+    // arrow then moved relative to today instead -- from Sunday the 11th,
+    // ArrowRight went to Sunday the 11th, because "today" was the 10th.
+    const focusedCell = (e.target as HTMLElement).closest<HTMLElement>("[data-day]");
+    const origin = focusedCell?.dataset.day ? parseDate(focusedCell.dataset.day) : activeDay;
     const steps: Record<string, number> = {
       ArrowRight: 1,
       ArrowLeft: -1,
@@ -659,7 +665,7 @@ function Calendar({
     };
     let target: Date;
     if (e.key in steps) {
-      target = addDays(activeDay, steps[e.key]);
+      target = addDays(origin, steps[e.key]);
     } else if (e.key === "Home") {
       target = new Date(month.getFullYear(), month.getMonth(), 1);
     } else if (e.key === "End") {
@@ -670,7 +676,7 @@ function Calendar({
     e.preventDefault();
     // Disabled days cannot hold focus, so keep going the same way until a
     // selectable one turns up rather than dead-ending on a booked week.
-    const dir = target >= activeDay ? 1 : -1;
+    const dir = target >= origin ? 1 : -1;
     for (let i = 0; i < 400 && (dayBlocked(target) || isPast(target)); i++) {
       target = addDays(target, dir);
     }
@@ -1071,6 +1077,11 @@ function Calendar({
                       aria-pressed={!!selected}
                       data-day={iso}
                       tabIndex={fmtDate(activeDay) === iso ? 0 : -1}
+                      // A day focused by a click or a screen reader becomes the
+                      // grid's one Tab stop, so Tab out and back returns to it.
+                      onFocus={() => {
+                        if (fmtDate(activeDay) !== iso) setFocusDay(d);
+                      }}
                       // The cell is square, so a full radius is a circle -- every
                       // cell, so reserved, chosen and in-between days are all the
                       // same shape and differ only in fill: black for taken, a

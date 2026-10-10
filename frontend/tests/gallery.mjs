@@ -104,7 +104,7 @@ const EXPECTED = {
   ck("The building comes first", grid[0]?.name === "Exterior", grid.map((g) => g.name).join(", "));
   ck(
     "Categories with no photography yet are listed as coming, not shown empty",
-    await p.getByText("Smart Home Features").isVisible(),
+    await p.getByText("Entertainment", { exact: true }).isVisible(),
   );
 
   // ============================================================= lightbox

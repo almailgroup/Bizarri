@@ -157,18 +157,28 @@ const focused = (p) =>
     .locator('[role="grid"] button:not([disabled]):not([aria-disabled="true"])')
     .first()
     .focus();
-  const start = await focused(p);
+  // By the date on the focused cell, and by how far it moved: "focus
+  // changed" passed for a whole month while the first arrow went the wrong
+  // way, because it moved from today rather than from the focused day.
+  const day = () => p.evaluate(() => document.activeElement?.getAttribute("data-day"));
+  const plus = (iso, n) => {
+    const d = new Date(`${iso}T00:00:00`);
+    d.setDate(d.getDate() + n);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+  const start = await day();
 
   await p.keyboard.press("ArrowRight");
-  const right = await focused(p);
-  ck("ArrowRight moves a day", right !== start, `${start} → ${right}`);
+  const right = await day();
+  ck("ArrowRight moves to the next day", right === plus(start, 1), `${start} → ${right}`);
 
   await p.keyboard.press("ArrowDown");
-  const down = await focused(p);
-  ck("ArrowDown moves a week", down !== right, `${right} → ${down}`);
+  const down = await day();
+  ck("ArrowDown moves a week on", down === plus(right, 7), `${right} → ${down}`);
 
   await p.keyboard.press("ArrowLeft");
-  ck("ArrowLeft moves back", (await focused(p)) !== down);
+  const left = await day();
+  ck("ArrowLeft moves back a day", left === plus(down, -1), `${down} → ${left}`);
 
   // Paging past the end of the month should follow, not dead-end.
   const monthBefore = await p.locator('[role="grid"]').getAttribute("aria-label");
