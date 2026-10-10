@@ -1,5 +1,5 @@
 -- ============================================================================
--- Part 5 of 15: booking_guards
+-- Part 5 of 16: booking_guards
 --
 -- Paste this whole file into the Supabase SQL editor and Run, then move on
 -- to the next part. Run them in order; each one is safe to run twice.

@@ -319,6 +319,28 @@ export const t: Dict = {
   stepDetails: { en: "Your details", ar: "بياناتك" },
   stepDone: { en: "Confirmed", ar: "التأكيد" },
   stepOf: { en: "Step", ar: "الخطوة" },
+
+  // Moving between the steps
+  nextLabel: { en: "Next", ar: "التالي" },
+  backLabel: { en: "Back", ar: "رجوع" },
+  bookAnother: { en: "Book another stay", ar: "احجز إقامة أخرى" },
+  backToStep: { en: "Back to {step}", ar: "العودة إلى {step}" },
+
+  // The refundable insurance deposit
+  bookingSubtotal: { en: "Booking subtotal", ar: "المجموع الفرعي للحجز" },
+  insuranceDeposit: { en: "Refundable insurance deposit", ar: "تأمين مسترد" },
+  depositNote: {
+    en: "A refundable insurance deposit of {n} KD is included in the total and will be fully refunded upon completion of your stay at the Chalet.",
+    ar: "يشمل الإجمالي تأميناً مسترداً بقيمة {n} د.ك، ويُعاد إليك بالكامل عند انتهاء إقامتك في الشاليه.",
+  },
+  depositNextStep: {
+    en: "A refundable {n} KD insurance deposit is added to this at the next step.",
+    ar: "يُضاف تأمين مسترد بقيمة {n} د.ك إلى هذا المبلغ في الخطوة التالية.",
+  },
+  includesDeposit: {
+    en: "includes a {n} KD refundable deposit",
+    ar: "يشمل تأميناً مسترداً بقيمة {n} د.ك",
+  },
   changeChalet: { en: "Change chalet", ar: "تغيير الشاليه" },
   ratesAtAGlance: { en: "Rates at a glance", ar: "الأسعار باختصار" },
   noPaymentNow: {

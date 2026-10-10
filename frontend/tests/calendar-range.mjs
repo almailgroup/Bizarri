@@ -129,7 +129,7 @@ async function calendar(
   // The same day again closes a one-day stay.
   await free.nth(3).click();
   await p.waitForTimeout(400);
-  ck("…and it can be booked", await p.getByRole("button", { name: /^Continue$/i }).isEnabled());
+  ck("…and it can be booked", await p.getByRole("button", { name: /^Next$/i }).isEnabled());
   ck("No minimum-stay complaint at one day", (await p.getByText(/Minimum stay/i).count()) === 0);
   await ctx.close();
 }
@@ -474,7 +474,7 @@ for (const [name, days] of [
   );
   ck(
     "…and it can be carried forward",
-    await p.getByRole("button", { name: /^Continue$/i }).isEnabled(),
+    await p.getByRole("button", { name: /^Next$/i }).isEnabled(),
   );
   await ctx.close();
 }
@@ -552,10 +552,7 @@ for (const [name, days] of [
   await clickDay(p, "Thursday");
   await p.waitForTimeout(500);
   ck("A weekend comes whole", await p.getByText("3 days selected").isVisible());
-  ck(
-    "…and can be carried forward",
-    await p.getByRole("button", { name: /^Continue$/i }).isEnabled(),
-  );
+  ck("…and can be carried forward", await p.getByRole("button", { name: /^Next$/i }).isEnabled());
 
   // Tapping its Friday selects the same three days rather than starting a
   // shorter one.
@@ -655,7 +652,7 @@ for (const [name, days] of [
   );
   ck(
     "…and no way forward that leads nowhere",
-    (await p.getByRole("button", { name: /^Continue$/i }).count()) === 0,
+    (await p.getByRole("button", { name: /^Next$/i }).count()) === 0,
   );
 
   await p.getByRole("button", { name: /^Weekend/i }).click();
@@ -743,15 +740,12 @@ for (const [name, days] of [
   // otherwise carry -- the same precedence the server applies.
   const total = await p.evaluate(() => {
     const el = [...document.querySelectorAll("div,p")].find((d) =>
-      /^TOTAL/i.test((d.innerText || "").trim()),
+      /^(BOOKING SUB)?TOTAL/i.test((d.innerText || "").trim()),
     );
     return el ? el.innerText.replace(/\n/g, " ") : "";
   });
   ck("…priced as the occasion, not as a weekend", /900/.test(total), total);
-  ck(
-    "…and can be carried forward",
-    await p.getByRole("button", { name: /^Continue$/i }).isEnabled(),
-  );
+  ck("…and can be carried forward", await p.getByRole("button", { name: /^Next$/i }).isEnabled());
   await ctx.close();
 }
 

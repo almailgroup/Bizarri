@@ -277,7 +277,7 @@ for (const [name, re, want] of [
     ck("…and a tap takes Sunday to Saturday", await p.getByText("7 days selected").isVisible());
     const total = await p.evaluate(() => {
       const el = [...document.querySelectorAll("div,p")].find((d) =>
-        /^TOTAL/i.test((d.innerText || "").trim()),
+        /^(BOOKING SUB)?TOTAL/i.test((d.innerText || "").trim()),
       );
       return el ? el.innerText.replace(/\n/g, " ") : "";
     });
@@ -338,12 +338,12 @@ for (const [name, re, source] of [
   ck("…from its first day", (await p.getByText(iso(occFrom)).count()) > 0);
   const total = await p.evaluate(() => {
     const el = [...document.querySelectorAll("div,p")].find((d) =>
-      /^TOTAL/i.test((d.innerText || "").trim()),
+      /^(BOOKING SUB)?TOTAL/i.test((d.innerText || "").trim()),
     );
     return el ? el.innerText.replace(/\n/g, " ") : "";
   });
   ck("…at its own price", /900/.test(total), total);
-  ck("…ready to continue", await p.getByRole("button", { name: /^Continue$/i }).isEnabled());
+  ck("…ready to continue", await p.getByRole("button", { name: /^Next$/i }).isEnabled());
   await ctx.close();
 }
 

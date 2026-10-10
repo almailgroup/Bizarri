@@ -1,5 +1,5 @@
 -- ============================================================================
--- Part 15 of 15: admin_create_booking
+-- Part 15 of 16: admin_create_booking
 --
 -- Paste this whole file into the Supabase SQL editor and Run, then move on
 -- to the next part. Run them in order; each one is safe to run twice.

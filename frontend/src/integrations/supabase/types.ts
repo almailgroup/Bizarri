@@ -97,6 +97,8 @@ export type BookingRow = {
   source: "guest" | "admin";
   /** Whether the guest was emailed when the booking was created. */
   notify_guest: boolean;
+  /** Refundable insurance deposit on top of total; the guest pays both. */
+  deposit: number;
 };
 
 export type NewsRow = {
@@ -251,21 +253,45 @@ export type Database = {
         Args: { p_ref: string };
         Returns: Pick<
           BookingRow,
-          "ref" | "status" | "chalet_id" | "start_date" | "end_date" | "days" | "total" | "currency"
+          | "ref"
+          | "status"
+          | "chalet_id"
+          | "start_date"
+          | "end_date"
+          | "days"
+          | "total"
+          | "currency"
+          | "deposit"
         >[];
       };
       lookup_booking_by_email: {
         Args: { p_email: string };
         Returns: Pick<
           BookingRow,
-          "ref" | "status" | "chalet_id" | "start_date" | "end_date" | "days" | "total" | "currency"
+          | "ref"
+          | "status"
+          | "chalet_id"
+          | "start_date"
+          | "end_date"
+          | "days"
+          | "total"
+          | "currency"
+          | "deposit"
         >[];
       };
       lookup_booking_by_phone: {
         Args: { p_phone: string };
         Returns: Pick<
           BookingRow,
-          "ref" | "status" | "chalet_id" | "start_date" | "end_date" | "days" | "total" | "currency"
+          | "ref"
+          | "status"
+          | "chalet_id"
+          | "start_date"
+          | "end_date"
+          | "days"
+          | "total"
+          | "currency"
+          | "deposit"
         >[];
       };
       verify_email_code: {

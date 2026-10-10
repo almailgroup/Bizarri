@@ -376,6 +376,8 @@ interface BookingRecord {
   source?: string | null;
   /** False when the admin asked for the guest not to be emailed. */
   notify_guest?: boolean | null;
+  /** Refundable insurance deposit on top of total; 0 or absent for none. */
+  deposit?: number | null;
 }
 
 interface WebhookPayload {
@@ -573,12 +575,57 @@ function chaletName(b: BookingRecord, lang: "en" | "ar"): string {
 }
 
 /** "KD 350" / "350 د.ك", as the website writes a price. */
-function money(b: BookingRecord, lang: "en" | "ar"): string {
-  const n = Number(b.total).toLocaleString("en-US", { maximumFractionDigits: 3 });
+function money(b: BookingRecord, lang: "en" | "ar", amount = Number(b.total)): string {
+  const n = amount.toLocaleString("en-US", { maximumFractionDigits: 3 });
   const kwd = (b.currency ?? "KWD").toUpperCase() === "KWD";
   if (lang === "ar") return kwd ? `${n} د.ك` : `${n} ${b.currency}`;
   return kwd ? `KD ${n}` : `${b.currency} ${n}`;
 }
+
+const depositOf = (b: BookingRecord) => Math.max(0, Number(b.deposit ?? 0) || 0);
+
+/**
+ * The price as the booking page showed it: the stay, the refundable deposit
+ * on top, and a total that includes both. Without a deposit (a booking made
+ * before there was one, or one the admin waived) it is the stay alone.
+ */
+function priceRows(
+  b: BookingRecord,
+  lang: "en" | "ar",
+): { rows: EmailRow[]; total: { label: string; value: string } } {
+  const ar = lang === "ar";
+  const deposit = depositOf(b);
+  const total = { label: ar ? "الإجمالي" : "Total", value: money(b, lang, Number(b.total) + deposit) };
+  if (!deposit) return { rows: [], total };
+  return {
+    rows: [
+      { label: ar ? "المجموع الفرعي للحجز" : "Booking subtotal", valueHtml: escapeHtml(money(b, lang)) },
+      {
+        label: ar ? "تأمين مسترد" : "Refundable insurance deposit",
+        valueHtml: escapeHtml(money(b, lang, deposit)),
+      },
+    ],
+    total,
+  };
+}
+
+/** The same sentence the booking page puts under its total. */
+function depositNote(b: BookingRecord, lang: "en" | "ar"): string {
+  const deposit = depositOf(b);
+  if (!deposit) return "";
+  const n = deposit.toLocaleString("en-US", { maximumFractionDigits: 3 });
+  return escapeHtml(
+    lang === "ar"
+      ? `يشمل الإجمالي تأميناً مسترداً بقيمة ${n} د.ك، ويُعاد إليك بالكامل عند انتهاء إقامتك في الشاليه.`
+      : `A refundable insurance deposit of ${n} KD is included in the total and will be fully refunded upon completion of your stay at the Chalet.`,
+  );
+}
+
+/** The deposit sentence, then whatever else the note says. */
+const withDepositNote = (b: BookingRecord, lang: "en" | "ar", rest: string) => {
+  const note = depositNote(b, lang);
+  return note ? `${note}<br><br>${rest}` : rest;
+};
 
 /** The stay as the guest sees it: chalet, in, out, guests. */
 function guestRows(b: BookingRecord, lang: "en" | "ar"): EmailRow[] {
@@ -621,13 +668,14 @@ export function render(b: BookingRecord): string {
     { label: "Email", valueHtml: escapeHtml(b.guest_email) },
   ];
   if (b.notes) rows.push({ label: "Notes", valueHtml: escapeHtml(b.notes) });
+  const price = priceRows(b, "en");
   return brandedEmail({
     lang: "en",
     title: "New booking request",
     paragraphs: ["A new request has arrived. Accept or reject it in the admin dashboard."],
     panel: { label: REFERENCE.en, value: b.ref },
-    rows,
-    total: { label: "Total", value: money(b, "en") },
+    rows: [...rows, ...price.rows],
+    total: price.total,
     button: { href: "https://bizarri.com/admin/en", label: "Open the dashboard" },
   });
 }
@@ -645,6 +693,7 @@ export function renderGuest(
   instagram = DEFAULT_INSTAGRAM,
 ): string {
   const ar = lang === "ar";
+  const price = priceRows(b, lang);
   return brandedEmail({
     lang,
     title: ar ? "استلمنا طلب حجزك" : "We have your booking request",
@@ -655,12 +704,13 @@ export function renderGuest(
         : "Your request is being reviewed. We will contact you shortly to confirm.",
     ],
     panel: { label: REFERENCE[lang], value: b.ref },
-    rows: guestRows(b, lang),
-    total: { label: ar ? "الإجمالي" : "Total", value: money(b, lang) },
+    rows: [...guestRows(b, lang), ...price.rows],
+    total: price.total,
     button: whatsapp ? { href: `https://wa.me/${whatsapp}`, label: CHAT[lang] } : undefined,
-    noteHtml: lookupNote(
+    noteHtml: withDepositNote(
+      b,
       lang,
-      ar ? "احتفظ برقم الحجز." : "Keep this reference.",
+      lookupNote(lang, ar ? "احتفظ برقم الحجز." : "Keep this reference."),
     ),
     photo: true,
     signOff: true,
@@ -727,6 +777,7 @@ export function renderDecision(
   // The stay is shown while it might still happen. A refusal or a
   // cancellation does not need the price of something that is not.
   const live = status === "accepted" || status === "pending";
+  const price = priceRows(b, lang);
 
   return brandedEmail({
     lang,
@@ -734,11 +785,15 @@ export function renderDecision(
     greeting: greeting(b, lang),
     paragraphs: [t.body],
     panel: { label: REFERENCE[lang], value: b.ref },
-    rows: live ? guestRows(b, lang) : undefined,
-    total: live ? { label: ar ? "الإجمالي" : "Total", value: money(b, lang) } : undefined,
+    rows: live ? [...guestRows(b, lang), ...price.rows] : undefined,
+    total: live ? price.total : undefined,
     button: whatsapp ? { href: `https://wa.me/${whatsapp}`, label: CHAT[lang] } : undefined,
     noteHtml: live
-      ? lookupNote(lang, ar ? "لأي استفسار، تواصل معنا." : "Any questions, just get in touch.")
+      ? withDepositNote(
+          b,
+          lang,
+          lookupNote(lang, ar ? "لأي استفسار، تواصل معنا." : "Any questions, just get in touch."),
+        )
       : escapeHtml(ar ? "لأي استفسار، تواصل معنا." : "Any questions, just get in touch."),
     photo: live,
     signOff: true,
@@ -756,7 +811,13 @@ export function renderWhatsApp(b: BookingRecord): string {
     `Dates: ${b.start_date} → ${b.end_date} (${b.days} days)`,
     `Check-in: ${b.start_date} ${formatHour(CHECK_IN_HOUR, "en")}`,
     `Check-out: ${checkOutDate(b.end_date)} ${formatHour(CHECK_OUT_HOUR, "en")}`,
-    `Total: ${b.currency} ${b.total}`,
+    ...(depositOf(b)
+      ? [
+          `Stay: ${b.currency} ${b.total}`,
+          `Deposit (refundable): ${b.currency} ${depositOf(b)}`,
+          `Total: ${b.currency} ${Number(b.total) + depositOf(b)}`,
+        ]
+      : [`Total: ${b.currency} ${b.total}`]),
     `Guest: ${b.guest_name}`,
     `Phone: ${b.guest_phone}`,
     `Email: ${b.guest_email}`,

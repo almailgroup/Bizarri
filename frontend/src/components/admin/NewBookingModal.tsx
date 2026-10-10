@@ -8,6 +8,7 @@ import {
   useBlockedDates,
   useBookings,
   useChalets,
+  useInsuranceDeposit,
   useQuote,
 } from "@/lib/api";
 import type { BookingRow } from "@/integrations/supabase/types";
@@ -113,6 +114,14 @@ export function NewBookingModal({
   const conflict = form.status === "accepted" && (!!clash || closedInRange);
 
   const quote = useQuote(form.chaletId, form.checkIn, lastNight, !errors.dates);
+  // The database adds the same deposit to the row it creates.
+  const deposit = useInsuranceDeposit();
+  const stayPrice =
+    form.total.trim() !== "" && Number(form.total) >= 0
+      ? Number(form.total)
+      : quote.data && !errors.dates
+        ? quote.data.total
+        : null;
 
   const fieldError = (k: string) => (tried && errors[k] ? t(errors[k]!) : undefined);
   const invalid = Object.keys(errors).length > 0;
@@ -372,6 +381,20 @@ export function NewBookingModal({
                       ? formatMoney(quote.data.total, lang)
                       : "—"}
               </p>
+              {deposit > 0 && (
+                <p className="mt-1 text-xs text-muted-foreground" data-testid="quote-deposit">
+                  {t("plusDeposit", { amount: formatMoney(deposit, lang) })}
+                  {stayPrice !== null && (
+                    <>
+                      {" · "}
+                      {t("totalDue")}{" "}
+                      <span className="font-medium text-foreground">
+                        {formatMoney(stayPrice + deposit, lang)}
+                      </span>
+                    </>
+                  )}
+                </p>
+              )}
             </div>
             <Field label={t("overrideTotal")} hint={t("overrideHint")} error={fieldError("total")}>
               {(a) => (

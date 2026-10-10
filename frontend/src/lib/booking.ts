@@ -326,6 +326,15 @@ export function formatMoney(amount: number, lang: "en" | "ar"): string {
 }
 
 /**
+ * The refundable insurance deposit added on top of every stay.
+ *
+ * The real amount is settings.insurance_deposit, which the database also
+ * records on each booking; this is only what the page shows before the
+ * settings have loaded, and it matches the database's own fallback.
+ */
+export const INSURANCE_DEPOSIT = 100;
+
+/**
  * Arrival and departure times.
  *
  * A booked day is a night at the chalet, and its stay ends the morning after

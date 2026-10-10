@@ -558,7 +558,7 @@ const bg = (loc) => loc.evaluate((el) => getComputedStyle(el).backgroundColor);
   await p.waitForTimeout(250);
   await dayCell(p, thuA).click();
   await p.waitForTimeout(250);
-  await p.getByRole("button", { name: /^Continue$/i }).click();
+  await p.getByRole("button", { name: /^Next$/i }).click();
   await p.waitForTimeout(400);
 
   ck(
@@ -1082,7 +1082,7 @@ async function adminPage(state, tab) {
   await p.waitForTimeout(200);
   await dayCell(p, thuA).click();
   await p.waitForTimeout(200);
-  await p.getByRole("button", { name: /^Continue$/i }).click();
+  await p.getByRole("button", { name: /^Next$/i }).click();
   await p.waitForTimeout(400);
 
   await p.getByLabel("Full Name").fill("Returning Guest");
@@ -1094,7 +1094,7 @@ async function adminPage(state, tab) {
   // Changing your mind about the dates must not cost you the form.
   await p.getByRole("button", { name: /^Back$/i }).click();
   await p.waitForTimeout(400);
-  await p.getByRole("button", { name: /^Continue$/i }).click();
+  await p.getByRole("button", { name: /^Next$/i }).click();
   await p.waitForTimeout(400);
 
   ck(
@@ -1186,9 +1186,9 @@ async function adminPage(state, tab) {
   ck("The bar carries the dates", barText.includes(iso(thuA)), barText.replace(/\n/g, " | "));
   ck(
     "The bar can move the guest forward",
-    await bar.getByRole("button", { name: /^Continue$/i }).isVisible(),
+    await bar.getByRole("button", { name: /^Next$/i }).isVisible(),
   );
-  await bar.getByRole("button", { name: /^Continue$/i }).click();
+  await bar.getByRole("button", { name: /^Next$/i }).click();
   await p.waitForTimeout(400);
   ck("…and it actually advances", await p.getByText("Civil ID image").first().isVisible());
   await ctx.close();
@@ -1225,7 +1225,7 @@ async function adminPage(state, tab) {
   await p.waitForTimeout(200);
   await dayCell(p, thuA).click();
   await p.waitForTimeout(200);
-  await p.getByRole("button", { name: /^Continue$/i }).click();
+  await p.getByRole("button", { name: /^Next$/i }).click();
   await p.waitForTimeout(400);
   ck(
     "The form explains why a Civil ID is needed",
@@ -1293,7 +1293,7 @@ async function adminPage(state, tab) {
   await p.waitForTimeout(200);
   await dayCell(p, thuA).click();
   await p.waitForTimeout(200);
-  await p.getByRole("button", { name: /^Continue$/i }).click();
+  await p.getByRole("button", { name: /^Next$/i }).click();
   await p.waitForTimeout(400);
 
   const waForm = p.getByRole("link", { name: /whatsapp/i }).first();
@@ -1410,7 +1410,7 @@ async function adminPage(state, tab) {
   ck(
     "…and it is immediately bookable",
     await p
-      .getByRole("button", { name: /^Continue$/i })
+      .getByRole("button", { name: /^Next$/i })
       .first()
       .isEnabled(),
   );
@@ -1426,7 +1426,7 @@ async function adminPage(state, tab) {
   await p.waitForTimeout(200);
   await dayCell(p, thuA).click();
   await p.waitForTimeout(200);
-  await p.getByRole("button", { name: /^Continue$/i }).click();
+  await p.getByRole("button", { name: /^Next$/i }).click();
   await p.waitForTimeout(400);
 
   ck(
@@ -1478,7 +1478,7 @@ async function adminPage(state, tab) {
   await p.waitForTimeout(200);
   await dayCell(p, addDays(thuA, 21)).click();
   await p.waitForTimeout(200);
-  await p.getByRole("button", { name: /^Continue$/i }).click();
+  await p.getByRole("button", { name: /^Next$/i }).click();
   await p.waitForTimeout(500);
 
   ck(
@@ -1559,7 +1559,7 @@ const leaks = (text) => {
   await p.waitForTimeout(200);
   await dayCell(p, thuA).click();
   await p.waitForTimeout(200);
-  await p.getByRole("button", { name: /^Continue$/i }).click();
+  await p.getByRole("button", { name: /^Next$/i }).click();
   await p.waitForTimeout(400);
   const form = leaks(await p.locator("body").innerText());
   ck("No raw i18n keys on the checkout form", form.length === 0, form.join(", "));

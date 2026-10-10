@@ -364,6 +364,61 @@ ck(
   ck("The team's does not", !render(b).includes("/email/front.jpg"));
 }
 
+// ===================================== the refundable insurance deposit
+// The emails say what the booking page said: the stay, the deposit on top,
+// a total that includes it, and that the deposit comes back.
+{
+  const flat = (html) =>
+    html
+      .replace(/<\/td>/g, " ")
+      .replace(/<br\s*\/?>/g, " ")
+      .replace(/<[^>]+>/g, "")
+      .replace(/&middot;/g, "·")
+      .replace(/\s+/g, " ");
+  const withDeposit = booking({ status: "accepted", deposit: 100 });
+  const NOTE =
+    "A refundable insurance deposit of 100 KD is included in the total and will be fully refunded upon completion of your stay at the Chalet.";
+  for (const [name, html] of [
+    ["The guest's request email", renderGuest(withDeposit, "en")],
+    ["The confirmation", renderDecision(withDeposit, "en")],
+  ]) {
+    const t = flat(html);
+    ck(
+      `${name} breaks the price down`,
+      t.includes("Booking subtotal KD 350") &&
+        t.includes("Refundable insurance deposit KD 100") &&
+        t.includes("Total KD 450"),
+    );
+    ck(`…and says the deposit comes back`, t.includes(NOTE));
+  }
+  const team = flat(render(withDeposit));
+  ck(
+    "The team's email shows it too",
+    team.includes("Refundable insurance deposit KD 100") && team.includes("Total KD 450"),
+  );
+  ck(
+    "…and so does the team's WhatsApp",
+    renderWhatsApp(withDeposit).includes("Deposit (refundable): KWD 100") &&
+      renderWhatsApp(withDeposit).includes("Total: KWD 450"),
+  );
+  const ar = flat(renderGuest(withDeposit, "ar"));
+  ck(
+    "The Arabic email says it in Arabic",
+    ar.includes("تأمين مسترد 100 د.ك") &&
+      ar.includes("الإجمالي 450 د.ك") &&
+      ar.includes("يشمل الإجمالي تأميناً مسترداً بقيمة 100 د.ك"),
+  );
+  const none = flat(renderGuest(booking({ status: "accepted", deposit: 0 }), "en"));
+  ck(
+    "A booking without one (older, or waived) is the stay alone",
+    none.includes("Total KD 350") && !none.includes("deposit"),
+  );
+  ck(
+    "A refusal names no price, deposit or otherwise",
+    !flat(renderDecision({ ...withDeposit, status: "rejected" }, "en")).includes("deposit"),
+  );
+}
+
 // ===================================== one failed send does not sink the rest
 // The team's email let a network error escape: it rejected the Promise.all
 // in the handler, the delivery became a 500, and the guest's copy went with

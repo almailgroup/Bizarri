@@ -144,7 +144,7 @@ const focused = (p) =>
   );
   ck(
     "Tab reaches the controls past the calendar",
-    seen.some((l) => /clear|continue/i.test(l)),
+    seen.some((l) => /clear|next/i.test(l)),
     seen.slice(-4).join(" | "),
   );
   await ctx.close();
@@ -253,7 +253,7 @@ const focused = (p) =>
         .first()
         .click();
       await p.waitForTimeout(400);
-      return p.getByRole("button", { name: /^Continue$/i }).isEnabled();
+      return p.getByRole("button", { name: /^Next$/i }).isEnabled();
     })(),
   );
   await ctx.close();

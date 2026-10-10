@@ -281,9 +281,17 @@ export function BookingLookup({ heading = true }: { heading?: boolean }) {
               {formatSpan(parseDate(b.start_date), parseDate(b.end_date), lang)}
             </p>
             <p className="mt-1 text-sm text-muted-foreground">
-              {b.days} {tr("nightsLabel")} · {formatMoney(Number(b.total), lang)} · {tr("chaletNo")}{" "}
+              {b.days} {tr("nightsLabel")} ·{" "}
+              {formatMoney(Number(b.total) + Number(b.deposit ?? 0), lang)} · {tr("chaletNo")}{" "}
               {b.chalet_id}
             </p>
+            {/* What the guest pays, so the deposit is named wherever the
+                total is: the same figure the booking page showed them. */}
+            {Number(b.deposit ?? 0) > 0 && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                {tr("includesDeposit").replace("{n}", String(Number(b.deposit)))}
+              </p>
+            )}
           </div>
         ))}
       </div>

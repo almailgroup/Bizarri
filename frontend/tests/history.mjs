@@ -164,7 +164,7 @@ async function fillForm(p) {
 const submitBtn = (p) => p.getByRole("button", { name: /submit booking request/i });
 const dialogOpen = async (p) => (await p.locator('[role="dialog"]').count()) > 0;
 
-const continueBtn = (p) => p.getByRole("button", { name: /^Continue$/i });
+const continueBtn = (p) => p.getByRole("button", { name: /^Next$/i });
 const onDates = async (p) =>
   (await p.getByRole("heading", { name: /Select your dates/i }).count()) > 0;
 const onDetails = async (p) =>
@@ -361,14 +361,19 @@ const forward = async (p) => {
   await p.waitForTimeout(1000);
   ck("An unknown step is ignored", await onDates(p), path(p));
 
-  // A reload mid-flow: the stay was this visit's, so it is the start again
-  // rather than a form for no dates.
+  // A reload mid-flow keeps the stay. It used to start again from the dates,
+  // and on a phone that is not rare: the guest leaves the tab to find a photo
+  // of their Civil ID, the browser reclaims it, and coming back reloads it.
   await chooseWeekend(p);
   await continueBtn(p).click();
   await p.waitForTimeout(700);
   await p.reload({ waitUntil: "load" });
-  await p.waitForTimeout(1000);
-  ck("A reload on the details starts from the dates", await onDates(p), path(p));
+  await p.waitForTimeout(1500);
+  ck(
+    "A reload on the details keeps the stay and the step",
+    (await onDetails(p)) && path(p) === "/booking/en?step=details",
+    path(p),
+  );
   await ctx.close();
 }
 

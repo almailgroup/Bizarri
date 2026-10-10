@@ -30,7 +30,8 @@ select 'migrations' as area, * from (values
   ('12 weekend rule',     (to_regprocedure('public.weekend_is_whole(date,date)')         is not null)),
   ('13 function lockdown', (not has_function_privilege('anon','public.start_email_verification(text)','execute'))),
   ('14 Kuwait today',     (to_regprocedure('public.local_today(timestamptz)')            is not null)),
-  ('15 admin bookings',   (to_regprocedure('public.admin_create_booking(smallint,date,date,text,text,text,smallint,public.booking_status,numeric,text,text,text,boolean)') is not null))
+  ('15 admin bookings',   (to_regprocedure('public.admin_create_booking(smallint,date,date,text,text,text,smallint,public.booking_status,numeric,text,text,text,boolean)') is not null)),
+  ('16 insurance deposit', (to_regprocedure('public.insurance_deposit()')              is not null))
 ) t(item, ok)
 union all
 select 'pricing', * from (values
@@ -74,6 +75,12 @@ select 'guest access', * from (values
 union all
 select 'settings', * from (values
   ('Email gate is on',    ((select value = 'true'::jsonb from public.settings where key='require_email_verification'))),
+  ('Deposit is set',      (public.insurance_deposit() >= 0
+                           and exists (select 1 from public.settings where key='insurance_deposit'))),
+  ('New bookings take it', ((select column_default like '%insurance_deposit()%'
+                              from information_schema.columns
+                             where table_schema='public' and table_name='bookings'
+                               and column_name='deposit'))),
   ('Contact details set', (exists (select 1 from public.settings where key='contact'))),
   ('An admin exists',     (exists (select 1 from public.admins)))
 ) t(item, ok);

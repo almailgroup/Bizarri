@@ -31,12 +31,14 @@ export function EditBookingModal({
     notes: booking.notes ?? "",
     admin_note: booking.admin_note ?? "",
     total: String(booking.total),
+    deposit: String(booking.deposit ?? 0),
   });
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     const guests = Number(form.guests);
     const total = Number(form.total);
+    const deposit = Number(form.deposit);
     update.mutate(
       {
         id: booking.id,
@@ -48,6 +50,7 @@ export function EditBookingModal({
           notes: form.notes.trim() || null,
           admin_note: form.admin_note.trim() || null,
           total: Number.isFinite(total) && total >= 0 ? total : booking.total,
+          deposit: Number.isFinite(deposit) && deposit >= 0 ? deposit : booking.deposit,
         },
       },
       {
@@ -148,6 +151,23 @@ export function EditBookingModal({
             )}
           </Field>
         </div>
+
+        <Field
+          label={`${t("deposit")} (${booking.currency})`}
+          hint={t("depositWaiveHint")}
+          className="sm:max-w-[calc(50%-0.5rem)]"
+        >
+          {(a) => (
+            <input
+              {...a}
+              type="number"
+              min={0}
+              value={form.deposit}
+              onChange={(e) => setForm({ ...form, deposit: e.target.value })}
+              className={inputClass}
+            />
+          )}
+        </Field>
 
         <Field label={tr("notes")}>
           {(a) => (

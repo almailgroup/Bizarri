@@ -19,7 +19,13 @@ import type {
   SettingRow,
   SpecialOccasionRow,
 } from "@/integrations/supabase/types";
-import { DEFAULT_RATES, fmtDate, type Occasion, type Rates } from "@/lib/booking";
+import {
+  DEFAULT_RATES,
+  INSURANCE_DEPOSIT,
+  fmtDate,
+  type Occasion,
+  type Rates,
+} from "@/lib/booking";
 
 /* ------------------------------------------------------------------- keys */
 
@@ -281,7 +287,10 @@ export function useVerifyEmailCode() {
 export type FoundBooking = Pick<
   BookingRow,
   "ref" | "status" | "chalet_id" | "start_date" | "end_date" | "days" | "total" | "currency"
->;
+> & {
+  /** Absent on a database that predates the deposit; treat as none. */
+  deposit?: number;
+};
 
 /** The three things a guest might still have. */
 export type LookupBy = "ref" | "email" | "phone";
@@ -725,6 +734,19 @@ export function useSettings() {
   });
 }
 
+/**
+ * The refundable insurance deposit a new booking carries, from settings.
+ *
+ * The database records the same setting on each booking it creates, so what
+ * the page adds to the total is what the booking will hold. Anything that is
+ * not a non-negative number falls back to the default, as the database does.
+ */
+export function useInsuranceDeposit(): number {
+  const { data } = useSettings();
+  const v = data?.insurance_deposit;
+  return typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : INSURANCE_DEPOSIT;
+}
+
 /** Contact details for the public site (Footer, /contact), with sane
  *  defaults so nothing renders blank before the settings row has loaded or
  *  if it's never been edited. */
@@ -800,7 +822,14 @@ export function useUpdateBookingDetails() {
       patch: Partial<
         Pick<
           BookingRow,
-          "guest_name" | "guest_phone" | "guest_email" | "guests" | "notes" | "admin_note" | "total"
+          | "guest_name"
+          | "guest_phone"
+          | "guest_email"
+          | "guests"
+          | "notes"
+          | "admin_note"
+          | "total"
+          | "deposit"
         >
       >;
     }) => {

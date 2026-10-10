@@ -1,5 +1,5 @@
 -- ============================================================================
--- Part 1 of 15: core_schema
+-- Part 1 of 16: core_schema
 --
 -- Paste this whole file into the Supabase SQL editor and Run, then move on
 -- to the next part. Run them in order; each one is safe to run twice.

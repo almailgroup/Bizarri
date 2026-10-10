@@ -347,7 +347,7 @@ async function toCheckout(p) {
   }
   await dayCell(p, thu).click();
   await p.waitForTimeout(350);
-  await p.getByRole("button", { name: /^Continue$/i }).click();
+  await p.getByRole("button", { name: /^Next$/i }).click();
   await p.waitForTimeout(700);
 }
 

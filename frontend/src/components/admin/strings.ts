@@ -80,6 +80,20 @@ const s = {
   changeStatus: { en: "Status", ar: "الحالة" },
   delete: { en: "Delete", ar: "حذف" },
 
+  // deposit
+  deposit: { en: "Refundable deposit", ar: "التأمين المسترد" },
+  plusDeposit: { en: "+ {amount} refundable deposit", ar: "+ تأمين مسترد {amount}" },
+  totalDue: { en: "Guest pays", ar: "يدفع الضيف" },
+  depositSetting: { en: "Refundable insurance deposit", ar: "التأمين المسترد" },
+  depositSettingHint: {
+    en: "Added on top of every new booking and refunded after the stay. Existing bookings keep the amount they were made with.",
+    ar: "يُضاف إلى كل حجز جديد ويُعاد بعد الإقامة. الحجوزات الحالية تحتفظ بالمبلغ الذي أُنشئت به.",
+  },
+  depositWaiveHint: {
+    en: "Set to 0 to waive it for this booking.",
+    ar: "اجعله 0 لإعفاء هذا الحجز منه.",
+  },
+
   // calendar
   calendarTitle: { en: "Calendar", ar: "التقويم" },
   calendarHint: {

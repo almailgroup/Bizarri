@@ -150,7 +150,7 @@ async function toDetails(p) {
     .first()
     .click();
   await p.waitForTimeout(400);
-  await p.getByRole("button", { name: /^Continue$/i }).click();
+  await p.getByRole("button", { name: /^Next$/i }).click();
   await p.waitForTimeout(700);
 }
 
@@ -202,7 +202,7 @@ async function submitWithCode(p, state) {
     .nth(3)
     .click();
   await p.waitForTimeout(400);
-  await p.getByRole("button", { name: /^Continue$/i }).click();
+  await p.getByRole("button", { name: /^Next$/i }).click();
   await p.waitForTimeout(700);
   const sentBefore = state.sendCount;
   await p.getByRole("button", { name: /submit booking request/i }).click();

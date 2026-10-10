@@ -111,6 +111,7 @@ export function RequestsPanel({
         "Check-out": `${fmtDate(checkOutDay(parseDate(b.end_date)))} 12:00`,
         Days: b.days,
         [`Total (${b.currency})`]: Number(b.total),
+        [`Deposit (${b.currency})`]: Number(b.deposit ?? 0),
         Package: packageName(b.package_key),
         Name: b.guest_name,
         Phone: b.guest_phone,
@@ -129,6 +130,7 @@ export function RequestsPanel({
       { wch: 16 },
       { wch: 16 },
       { wch: 6 },
+      { wch: 12 },
       { wch: 12 },
       { wch: 20 },
       { wch: 22 },
@@ -276,6 +278,13 @@ export function RequestsPanel({
                       <p className="text-xl font-semibold tabular-nums">
                         {formatMoney(Number(b.total), lang)}
                       </p>
+                      {/* The stay is the revenue; the deposit goes back. Shown
+                          apart so neither is mistaken for the other. */}
+                      {Number(b.deposit ?? 0) > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          {t("plusDeposit", { amount: formatMoney(Number(b.deposit), lang) })}
+                        </p>
+                      )}
                       {b.package_key && (
                         <p className="text-xs text-muted-foreground">
                           {packageName(b.package_key)}

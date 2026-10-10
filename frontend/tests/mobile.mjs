@@ -530,7 +530,7 @@ for (const [name, vp] of [
   ck("The calendar is long enough to scroll away from", before > 600, `${before}px`);
 
   await p
-    .getByRole("button", { name: /^Continue$/i })
+    .getByRole("button", { name: /^Next$/i })
     .first()
     .click();
   await p.waitForTimeout(700);

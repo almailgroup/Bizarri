@@ -1,5 +1,5 @@
 -- ============================================================================
--- Part 10 of 15: lookup_three_ways
+-- Part 10 of 16: lookup_three_ways
 --
 -- Paste this whole file into the Supabase SQL editor and Run, then move on
 -- to the next part. Run them in order; each one is safe to run twice.

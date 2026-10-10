@@ -1,5 +1,5 @@
 -- ============================================================================
--- Part 6 of 15: audit_edits
+-- Part 6 of 16: audit_edits
 --
 -- Paste this whole file into the Supabase SQL editor and Run, then move on
 -- to the next part. Run them in order; each one is safe to run twice.

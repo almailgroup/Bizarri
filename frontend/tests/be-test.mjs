@@ -232,7 +232,9 @@ const day = (n) =>
 const total = () =>
   p.evaluate(() => {
     const el = [...document.querySelectorAll("div")].find((d) =>
-      d.querySelector("p")?.textContent?.includes("Total"),
+      // "Booking subtotal": the stay's price, before the deposit the next
+      // step adds.
+      /total/i.test(d.querySelector("p")?.textContent ?? ""),
     );
     return el ? el.querySelectorAll("p")[1].textContent.trim() : null;
   });
@@ -277,7 +279,7 @@ await p.getByRole("button", { name: /^Clear$/i }).click();
 await shape("Weekend");
 await day(W.thu.getDate()).click();
 await p.waitForTimeout(300);
-await p.getByRole("button", { name: /^Continue$/i }).click();
+await p.getByRole("button", { name: /^Next$/i }).click();
 await p.waitForTimeout(400);
 await p.locator("input[type=text]").first().fill("Aisha Al-Sabah");
 await p.locator("input[type=tel]").fill("+96594040955");

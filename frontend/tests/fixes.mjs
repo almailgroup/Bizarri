@@ -149,7 +149,7 @@ await p
 await p.waitForTimeout(400);
 await p.locator('[role="grid"] button:not([disabled]):not([aria-disabled="true"])').first().click();
 await p.waitForTimeout(400);
-await p.getByRole("button", { name: /^Continue$/i }).click();
+await p.getByRole("button", { name: /^Next$/i }).click();
 await p.waitForTimeout(400);
 await p.locator("input[type=text]").first().fill("Test Guest");
 await p.locator("input[type=tel]").fill("+96594040955");

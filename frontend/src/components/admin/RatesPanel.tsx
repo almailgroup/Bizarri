@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { RotateCcw, Save } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { DEFAULT_RATES, type Rates } from "@/lib/booking";
-import { useRates, useSaveRates } from "@/lib/api";
+import { useInsuranceDeposit, useRates, useSaveRates, useSaveSetting } from "@/lib/api";
 import { useAdminT } from "./strings";
 import { errorText, useToast } from "./toast";
 import { Btn, Card, PanelHeader, cx, inputClass } from "./ui";
@@ -142,6 +142,71 @@ export function RatesPanel() {
           {tr("reset")}
         </Btn>
       </div>
+
+      <DepositSetting />
     </section>
+  );
+}
+
+/**
+ * The refundable insurance deposit every new booking carries. One number in
+ * settings: the booking page adds it to the total, and the database records
+ * it on each booking as it is made, so an old booking keeps what it was
+ * booked with when this changes.
+ */
+function DepositSetting() {
+  const { tr, lang } = useI18n();
+  const t = useAdminT();
+  const toast = useToast();
+  const current = useInsuranceDeposit();
+  const save = useSaveSetting();
+  const [draft, setDraft] = useState<string | null>(null);
+  const value = draft ?? String(current);
+  const n = Number(value);
+  const valid = value.trim() !== "" && Number.isFinite(n) && n >= 0;
+
+  return (
+    <Card className="mt-8 p-5 sm:p-6">
+      <h3 className="text-lg font-semibold">{t("depositSetting")}</h3>
+      <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{t("depositSettingHint")}</p>
+      <div className="mt-4 flex flex-wrap items-end gap-3">
+        <label className="block w-40">
+          <span className="sr-only">{t("depositSetting")}</span>
+          <div className="relative">
+            <input
+              type="number"
+              min={0}
+              value={value}
+              aria-invalid={!valid}
+              onChange={(e) => setDraft(e.target.value)}
+              className={cx(inputClass, "pe-12 text-lg font-semibold tabular-nums")}
+            />
+            <span className="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+              {lang === "en" ? "KD" : "د.ك"}
+            </span>
+          </div>
+        </label>
+        <Btn
+          variant="primary"
+          disabled={!valid || n === current}
+          busy={save.isPending}
+          icon={<Save className="h-4 w-4" aria-hidden="true" />}
+          onClick={() =>
+            save.mutate(
+              { key: "insurance_deposit", value: Math.round(n * 1000) / 1000 },
+              {
+                onSuccess: () => {
+                  setDraft(null);
+                  toast.success(t("saved"));
+                },
+                onError: (err) => toast.error(errorText(err)),
+              },
+            )
+          }
+        >
+          {tr("save")}
+        </Btn>
+      </div>
+    </Card>
   );
 }

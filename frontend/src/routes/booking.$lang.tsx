@@ -1,7 +1,15 @@
 import { requireLang } from "@/lib/lang-route";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, ChevronLeft, ChevronRight, Paperclip, ShieldCheck } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Paperclip,
+  ShieldCheck,
+} from "lucide-react";
 import { PageShell } from "@/components/PageShell";
 import { CodeDialog } from "@/components/EmailVerify";
 import { rememberBookingRef } from "@/components/BookingLookup";
@@ -32,6 +40,7 @@ import {
   uploadCivilId,
   useAvailability,
   useChalets,
+  useInsuranceDeposit,
   useRates,
   useRequestBooking,
   useSpecialOccasions,
@@ -152,6 +161,64 @@ interface GuestDetails {
 
 const BLANK_DETAILS: GuestDetails = { name: "", phone: "+965 ", email: "", guests: "2", notes: "" };
 
+/**
+ * The booking in progress, kept for this tab.
+ *
+ * Moving between the steps already keeps everything: the dates and the
+ * details live in Calendar, which stays mounted. What it did not survive was
+ * the page itself going away -- and on a phone it does, routinely: the guest
+ * leaves to find a photo of their Civil ID, the browser reclaims the tab, and
+ * coming back reloads it onto the dates with nothing chosen and the form
+ * empty. sessionStorage is per tab and gone when the tab is closed, so this
+ * is not a profile, only a bookmark in the middle of one booking.
+ *
+ * The Civil ID file is not kept (a File cannot be), and a stay that has been
+ * taken in the meantime is not restored -- see Calendar.
+ */
+const DRAFT_KEY = "bizarri:booking-draft";
+const DRAFT_TTL_MS = 6 * 60 * 60_000;
+
+interface Draft {
+  chaletId: number;
+  filter: DateFilter;
+  start?: string;
+  end?: string;
+  details?: GuestDetails;
+  at: number;
+}
+
+function readDraft(): Draft | null {
+  try {
+    const raw = sessionStorage.getItem(DRAFT_KEY);
+    if (!raw) return null;
+    const d = JSON.parse(raw) as Draft;
+    if (!d || typeof d.at !== "number" || Date.now() - d.at > DRAFT_TTL_MS) return null;
+    if (!FILTERS.includes(d.filter) || typeof d.chaletId !== "number") return null;
+    return d;
+  } catch {
+    return null;
+  }
+}
+
+function writeDraft(d: Omit<Draft, "at">) {
+  try {
+    sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ ...d, at: Date.now() }));
+  } catch {
+    // Private browsing and blocked storage throw; the booking carries on.
+  }
+}
+
+function clearDraft() {
+  try {
+    sessionStorage.removeItem(DRAFT_KEY);
+  } catch {
+    // As above.
+  }
+}
+
+/** "100", or "100.5": the deposit as the sentences around it write it. */
+const amountText = (n: number) => String(Number.isInteger(n) ? n : Number(n.toFixed(3)));
+
 function Booking() {
   const { tr, lang } = useI18n();
   usePageMeta(
@@ -163,7 +230,10 @@ function Booking() {
 
   const { step, shape, occasion } = Route.useSearch();
   const navigate = Route.useNavigate();
-  const [chaletId, setChaletId] = useState(1);
+  // A booking already under way in this tab, unless the guest has just
+  // arrived with an offer chosen, which is a fresh start by definition.
+  const [draft] = useState(() => (shape || occasion ? null : readDraft()));
+  const [chaletId, setChaletId] = useState(() => draft?.chaletId ?? 1);
 
   // Chalet 1 to start with, but only while it is on offer. Guests see active
   // chalets only, and the picker hides itself when one is left -- so with
@@ -186,6 +256,7 @@ function Booking() {
   // the chalets. A fresh arrival starts at the top, so let it.
   const [offer] = useState(() => ({ shape, occasion }));
   useEffect(() => {
+    if (shape || occasion) clearDraft();
     if (shape || occasion) navigate({ search: {}, replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -232,8 +303,10 @@ function Booking() {
             showForm={step === "details"}
             initialShape={offer.shape}
             initialOccasion={offer.occasion}
+            restore={draft}
             onDone={(b) => {
               rememberBookingRef(b.ref);
+              clearDraft();
               setConfirmed(b);
               // In place of the details entry, not on top of it: Back from
               // the confirmation must not land on a form that has already
@@ -245,7 +318,9 @@ function Booking() {
           />
         )}
 
-        {done && confirmed && <Confirmation booking={confirmed} />}
+        {done && confirmed && (
+          <Confirmation booking={confirmed} onBookAnother={() => navigate({ search: {} })} />
+        )}
       </section>
     </PageShell>
   );
@@ -270,8 +345,13 @@ function StayTimes({ start, end }: { start: Date; end: Date }) {
   );
 }
 
-/** Where the guest is in the flow, so the page never feels open-ended. */
-function Steps({ current }: { current: 1 | 2 | 3 }) {
+/**
+ * Where the guest is in the flow, so the page never feels open-ended.
+ *
+ * A step already done is a way back to it, not only a tick: on the details,
+ * "Dates" is a button, and it keeps the stay chosen just as Back does.
+ */
+function Steps({ current, onBack }: { current: 1 | 2 | 3; onBack?: () => void }) {
   const { tr } = useI18n();
   const labels = [tr("stepDates"), tr("stepDetails"), tr("stepDone")];
   return (
@@ -280,32 +360,96 @@ function Steps({ current }: { current: 1 | 2 | 3 }) {
         const n = (i + 1) as 1 | 2 | 3;
         const done = n < current;
         const active = n === current;
+        const badge = (
+          <span
+            className={`flex h-7 w-7 shrink-0 items-center justify-center border text-xs ${
+              active
+                ? "border-foreground bg-foreground text-background"
+                : done
+                  ? "border-foreground/40 text-foreground/60"
+                  : "border-border"
+            }`}
+          >
+            {done ? <Check className="h-3 w-3" aria-hidden="true" /> : n}
+          </span>
+        );
+        // Only the dates can be gone back to: the confirmation has no way
+        // back into a request that has already been sent.
+        const canGoBack = done && n === 1 && current === 2 && onBack;
         return (
           <li key={label} className="flex items-center gap-3">
-            <span
-              aria-current={active ? "step" : undefined}
-              className={`flex items-center gap-2 ${
-                active ? "text-foreground" : "text-muted-foreground"
-              }`}
-            >
+            {canGoBack ? (
+              <button
+                type="button"
+                onClick={onBack}
+                aria-label={tr("backToStep").replace("{step}", label)}
+                className="-mx-2 flex min-h-11 items-center gap-2 px-2 text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
+              >
+                {badge}
+                {label}
+              </button>
+            ) : (
               <span
-                className={`flex h-7 w-7 items-center justify-center border text-xs ${
-                  active
-                    ? "border-foreground bg-foreground text-background"
-                    : done
-                      ? "border-foreground/40 text-foreground/60"
-                      : "border-border"
+                aria-current={active ? "step" : undefined}
+                className={`flex min-h-11 items-center gap-2 ${
+                  active ? "text-foreground" : "text-muted-foreground"
                 }`}
               >
-                {done ? <Check className="h-3 w-3" /> : n}
+                {badge}
+                {label}
               </span>
-              {label}
-            </span>
+            )}
             {n < 3 && <span aria-hidden="true" className="h-px w-5 bg-border" />}
           </li>
         );
       })}
     </ol>
+  );
+}
+
+/**
+ * What the stay costs, what is added on top, and what that comes to.
+ *
+ * The deposit is named and explained right where the total is, not in small
+ * print a step later: a total that is 100 KD more than the calendar said, with
+ * no reason beside it, reads as a mistake or a trick.
+ */
+function PriceBreakdown({ subtotal, deposit }: { subtotal: number; deposit: number }) {
+  const { tr, lang } = useI18n();
+  return (
+    <div className="border border-border" data-testid="price-breakdown">
+      <dl className="text-sm">
+        <div className="flex items-baseline justify-between gap-4 px-4 py-3">
+          <dt>{tr("bookingSubtotal")}</dt>
+          <dd className="tabular-nums" data-testid="subtotal">
+            {formatMoney(subtotal, lang)}
+          </dd>
+        </div>
+        {deposit > 0 && (
+          <div className="flex items-baseline justify-between gap-4 border-t border-border px-4 py-3">
+            <dt>{tr("insuranceDeposit")}</dt>
+            <dd className="tabular-nums" data-testid="deposit">
+              + {formatMoney(deposit, lang)}
+            </dd>
+          </div>
+        )}
+        <div className="flex items-baseline justify-between gap-4 bg-foreground px-4 py-3 text-background">
+          <dt className="text-xs font-semibold uppercase tracking-widest">{tr("total")}</dt>
+          <dd className="text-lg font-semibold tabular-nums" data-testid="total">
+            {formatMoney(subtotal + deposit, lang)}
+          </dd>
+        </div>
+      </dl>
+      {deposit > 0 && (
+        <p
+          className="flex items-start gap-2 border-t border-border px-4 py-3 text-sm text-muted-foreground"
+          data-testid="deposit-note"
+        >
+          <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-foreground" aria-hidden="true" />
+          <span>{tr("depositNote").replace("{n}", amountText(deposit))}</span>
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -426,10 +570,13 @@ function Calendar({
   showForm,
   initialShape,
   initialOccasion,
+  restore,
   onDone,
 }: {
   chaletId: number;
   setChaletId: (id: number) => void;
+  /** A booking this tab had under way before it was reloaded. */
+  restore: Draft | null;
   /** The shape to open on, when an offer was chosen on the Offers page. */
   initialShape?: DateFilter;
   /** …and, for a holiday, which occasion: its stay is chosen outright. */
@@ -450,7 +597,7 @@ function Calendar({
   const [error, setError] = useState("");
   // A day at a time is the least committing of the three, so it is where the
   // calendar opens.
-  const [filter, setFilter] = useState<DateFilter>(initialShape ?? "day");
+  const [filter, setFilter] = useState<DateFilter>(initialShape ?? restore?.filter ?? "day");
   // Whether this visit put the details step into history itself. When it did,
   // the page's own Back button is the browser's Back -- the entry behind is
   // the dates -- so the two can never disagree, and pressing one after the
@@ -465,15 +612,20 @@ function Calendar({
 
   // Held here, not in BookingForm: stepping back to change dates used to
   // unmount the form and silently discard everything the guest had typed.
-  const [details, setDetails] = useState<GuestDetails>(BLANK_DETAILS);
+  const [details, setDetails] = useState<GuestDetails>(() => restore?.details ?? BLANK_DETAILS);
   const [recognised, setRecognised] = useState(false);
+  const deposit = useInsuranceDeposit();
 
-  // localStorage is not readable during SSR, so fill in after mount.
+  // localStorage is not readable during SSR, so fill in after mount. What the
+  // guest typed in this tab wins over what a past booking left behind.
   useEffect(() => {
+    if (restore?.details) return;
     const saved = readGuest();
     if (!saved) return;
     setDetails((d) => ({ ...d, ...saved }));
     setRecognised(true);
+    // Once, on arrival: `restore` is fixed for the life of the page.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [civilId, setCivilId] = useState<File | null>(null);
   const [terms, setTerms] = useState(false);
@@ -788,6 +940,42 @@ function Calendar({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [calendar, occasions]);
+  // Putting back a stay this tab had chosen before it was reloaded, once
+  // availability is in -- and only if every day of it is still free and still
+  // ahead, since somebody else may have booked it in the meantime. Until then
+  // the details step waits rather than sending the guest back to the dates.
+  const [restoring, setRestoring] = useState(() => !!restore?.start && !!restore?.end);
+  const { verify } = Route.useSearch();
+  useEffect(() => {
+    if (!restoring || !calendar) return;
+    setRestoring(false);
+    const s = parseDate(restore!.start!);
+    const e = parseDate(restore!.end!);
+    const free =
+      s >= today && e >= s && eachDay(s, e).every((d) => !dayBlocked(d)) && weekendIsWhole(s, e);
+    if (!free) return;
+    userPaged.current = true;
+    setJumped(false);
+    setMonth(startOfMonth(s));
+    setStart(s);
+    setEnd(e);
+    // A reload with the code dialog open would mail a new code by itself;
+    // come back to the form instead, and let Submit ask when it is wanted.
+    if (showForm && verify) navigate({ search: { step: "details" }, replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calendar, restoring]);
+
+  useEffect(() => {
+    if (restoring) return; // not before the saved stay has been put back
+    writeDraft({
+      chaletId,
+      filter,
+      start: start ? fmtDate(start) : undefined,
+      end: end ? fmtDate(end) : undefined,
+      details,
+    });
+  }, [restoring, chaletId, filter, start, end, details]);
+
   const tooShort = current !== null && current.days < minStay;
   // Thu–Sat is one product, so a stay may not take a slice of it. Checked
   // here as well as on the tap: a selection can also arrive from a quick
@@ -847,13 +1035,17 @@ function Calendar({
   // page whose dates are gone -- has nothing to fill in, so it is the dates.
   // Replaced, not pushed, so Back does not return to the empty step.
   useEffect(() => {
-    if (showForm && (!start || !end)) navigate({ search: {}, replace: true });
-  }, [showForm, start, end, navigate]);
+    if (showForm && !restoring && (!start || !end)) navigate({ search: {}, replace: true });
+  }, [showForm, restoring, start, end, navigate]);
 
   const backToDates = () => {
     if (pushedForm.current) router.history.back();
     else navigate({ search: {}, replace: true });
   };
+
+  if (showForm && restoring) {
+    return <div className="min-h-[60vh]" aria-busy="true" />;
+  }
 
   if (showForm && start && end && current) {
     return (
@@ -862,6 +1054,7 @@ function Calendar({
         start={start}
         end={end}
         total={current.total}
+        deposit={deposit}
         details={details}
         setDetails={setDetails}
         recognised={recognised}
@@ -1219,7 +1412,7 @@ function Calendar({
                 }`}
               >
                 <p className="text-xs uppercase tracking-widest opacity-70">
-                  {tr("total")}
+                  {tr("bookingSubtotal")}
                   {current ? ` · ${current.days} ${tr("nightsLabel")}` : ""}
                 </p>
                 <p className="mt-1 font-display text-xl">
@@ -1227,6 +1420,18 @@ function Calendar({
                 </p>
               </div>
             </div>
+
+            {/* Said before the guest commits to the next step, so the total
+                there is no surprise. */}
+            {current && !tooShort && deposit > 0 && (
+              <p
+                className="mt-3 flex items-start gap-2 text-sm text-muted-foreground"
+                data-testid="deposit-next-step"
+              >
+                <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                {tr("depositNextStep").replace("{n}", amountText(deposit))}
+              </p>
+            )}
 
             {current && !tooShort && current.occasion && (
               <p className="mt-3 text-sm text-muted-foreground">
@@ -1265,23 +1470,28 @@ function Calendar({
               </p>
             )}
 
-            <div className="mt-8 flex flex-wrap gap-3">
+            {/* The way forward, end side; Clear is the quieter way out of a
+                selection, not a step. 48px tall, the full width on a phone. */}
+            <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
               <button
-                onClick={goToForm}
-                disabled={!ready}
-                className="bg-black px-8 py-4 text-sm uppercase tracking-widest text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-30"
-              >
-                {tr("continueLabel")}
-              </button>
-              <button
+                type="button"
                 onClick={() => {
                   setStart(null);
                   setEnd(null);
                   setError("");
                 }}
-                className="border border-border px-8 py-4 text-sm uppercase tracking-widest hover:bg-secondary"
+                className="min-h-12 border border-border px-8 text-sm uppercase tracking-widest transition-colors hover:bg-secondary"
               >
                 {tr("clear")}
+              </button>
+              <button
+                type="button"
+                onClick={goToForm}
+                disabled={!ready}
+                className="inline-flex min-h-12 items-center justify-center gap-3 bg-black px-10 text-sm uppercase tracking-widest text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-30"
+              >
+                {tr("nextLabel")}
+                <ArrowRight className="h-4 w-4 rtl:rotate-180" aria-hidden="true" />
               </button>
             </div>
           </>
@@ -1324,11 +1534,13 @@ function Calendar({
               </p>
             </div>
             <button
+              type="button"
               onClick={goToForm}
               disabled={!ready}
-              className="shrink-0 bg-black px-6 py-3 text-xs uppercase tracking-widest text-white disabled:opacity-30"
+              className="inline-flex min-h-12 shrink-0 items-center gap-2 bg-black px-6 text-xs uppercase tracking-widest text-white disabled:opacity-30"
             >
-              {tr("continueLabel")}
+              {tr("nextLabel")}
+              <ArrowRight className="h-4 w-4 rtl:rotate-180" aria-hidden="true" />
             </button>
           </div>
         </div>
@@ -1342,6 +1554,7 @@ function BookingForm({
   start,
   end,
   total,
+  deposit,
   details,
   setDetails,
   recognised,
@@ -1357,7 +1570,10 @@ function BookingForm({
   chaletId: number;
   start: Date;
   end: Date;
+  /** The stay's price, before the deposit. */
   total: number;
+  /** The refundable insurance deposit added on top. */
+  deposit: number;
   details: GuestDetails;
   setDetails: (d: GuestDetails) => void;
   /** Their details came back from a previous booking on this device. */
@@ -1528,9 +1744,27 @@ function BookingForm({
    * checked first and the code is the last thing between the guest and the
    * request -- which is also the first moment it is worth sending one.
    */
+  const formRef = useRef<HTMLFormElement>(null);
+
+  // The first thing to fix, brought into view and focused. With Submit
+  // pinned to the foot of a phone's screen it can be pressed from anywhere in
+  // a long form, and an error message 900px above the thumb is no answer.
+  const showFirstError = () =>
+    setTimeout(() => {
+      const el = formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]');
+      if (!el) return;
+      // The Civil ID input is visually hidden; its label is what is seen.
+      const seen = el.classList.contains("sr-only") ? (el.parentElement ?? el) : el;
+      seen.scrollIntoView({ block: "center" });
+      el.focus({ preventScroll: true });
+    }, 0);
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validate() || !civilId) return;
+    if (!validate() || !civilId) {
+      showFirstError();
+      return;
+    }
     if (!emailVerified) {
       openCode();
       return;
@@ -1557,251 +1791,311 @@ function BookingForm({
   };
 
   const busy = uploading || request.isPending;
+  const submitLabel = uploading
+    ? tr("civilIdUploading")
+    : request.isPending
+      ? lang === "en"
+        ? "Sending…"
+        : "جارٍ الإرسال…"
+      : tr("submit");
 
   return (
     // noValidate: the browser's own bubbles fire first and are unlocalised,
     // so validate() owns the messages instead.
-    <form onSubmit={submit} noValidate className="animate-fade-up space-y-6">
-      <Steps current={2} />
-      <h1 className="mb-4 font-display text-4xl md:text-5xl">
-        {lang === "en" ? "Guest Information" : "معلومات الضيف"}
-      </h1>
+    //
+    // The animation is on the inner wrapper, not the form: animate-fade-up
+    // leaves a transform behind, and a transformed ancestor would pin the
+    // phone's action bar to the form instead of the screen.
+    <form ref={formRef} onSubmit={submit} noValidate className="pb-28 lg:pb-0">
+      <div className="animate-fade-up space-y-6">
+        <Steps current={2} onBack={onBack} />
+        <h1 className="mb-4 font-display text-4xl md:text-5xl">
+          {lang === "en" ? "Guest Information" : "معلومات الضيف"}
+        </h1>
 
-      <div className="space-y-1 border border-border bg-secondary p-4 text-sm">
-        <p className="mb-2 text-xs uppercase tracking-widest text-muted-foreground">
-          {tr("yourStay")}
-        </p>
-        <p>
-          <span className="font-medium">Bizarri Chalet {chaletId}</span>
-        </p>
-        <p dir="ltr">
-          {fmtDate(start)} → {fmtDate(end)} ({daysBetween(start, end)} {tr("nightsLabel")})
-        </p>
-        <StayTimes start={start} end={end} />
-        <p className="pt-1 text-base font-semibold">{formatMoney(total, lang)}</p>
-      </div>
+        <div className="space-y-1 border border-border bg-secondary p-4 text-sm">
+          <p className="mb-2 text-xs uppercase tracking-widest text-muted-foreground">
+            {tr("yourStay")}
+          </p>
+          <p>
+            <span className="font-medium">Bizarri Chalet {chaletId}</span>
+          </p>
+          <p dir="ltr">
+            {fmtDate(start)} → {fmtDate(end)} ({daysBetween(start, end)} {tr("nightsLabel")})
+          </p>
+          <StayTimes start={start} end={end} />
+        </div>
 
-      {recognised && <p className="text-sm text-muted-foreground">{tr("welcomeBack")}</p>}
+        <PriceBreakdown subtotal={total} deposit={deposit} />
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        {fields.map((f) => (
-          <label key={f.key} className="block">
-            <span className="text-xs uppercase tracking-widest text-muted-foreground">
-              {f.label}
-            </span>
+        {recognised && <p className="text-sm text-muted-foreground">{tr("welcomeBack")}</p>}
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          {fields.map((f) => (
+            <label key={f.key} className="block">
+              <span className="text-xs uppercase tracking-widest text-muted-foreground">
+                {f.label}
+              </span>
+              <input
+                required
+                type={f.type || "text"}
+                autoComplete={f.autoComplete}
+                inputMode={f.key === "phone" ? "tel" : undefined}
+                min={f.key === "guests" ? 1 : undefined}
+                max={f.key === "guests" ? 20 : undefined}
+                value={details[f.key]}
+                aria-invalid={!!errors[f.key]}
+                aria-describedby={errors[f.key] ? `err-${f.key}` : undefined}
+                onChange={(e) => set(f.key, e.target.value)}
+                className={`mt-2 w-full border bg-secondary px-4 py-3 outline-none focus:border-foreground ${
+                  errors[f.key] ? "border-destructive" : "border-border"
+                }`}
+              />
+              {errors[f.key] && (
+                <span id={`err-${f.key}`} className="mt-1 block text-sm text-destructive">
+                  {errors[f.key]}
+                </span>
+              )}
+            </label>
+          ))}
+        </div>
+
+        <div>
+          <span className="text-xs uppercase tracking-widest text-muted-foreground">
+            {tr("guests")}
+          </span>
+          <div className="mt-2 flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => stepGuests(-1)}
+              disabled={guests <= 1}
+              aria-label={lang === "en" ? "Fewer guests" : "عدد أقل من الضيوف"}
+              className="h-12 w-12 border border-border text-lg transition-colors hover:bg-secondary disabled:opacity-30"
+            >
+              −
+            </button>
             <input
-              required
-              type={f.type || "text"}
-              autoComplete={f.autoComplete}
-              inputMode={f.key === "phone" ? "tel" : undefined}
-              min={f.key === "guests" ? 1 : undefined}
-              max={f.key === "guests" ? 20 : undefined}
-              value={details[f.key]}
-              aria-invalid={!!errors[f.key]}
-              aria-describedby={errors[f.key] ? `err-${f.key}` : undefined}
-              onChange={(e) => set(f.key, e.target.value)}
-              className={`mt-2 w-full border bg-secondary px-4 py-3 outline-none focus:border-foreground ${
-                errors[f.key] ? "border-destructive" : "border-border"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={20}
+              value={details.guests}
+              aria-label={tr("guests")}
+              aria-invalid={!!errors.guests}
+              onChange={(e) => set("guests", e.target.value)}
+              className={`h-12 w-20 border bg-secondary text-center outline-none focus:border-foreground ${
+                errors.guests ? "border-destructive" : "border-border"
               }`}
             />
-            {errors[f.key] && (
-              <span id={`err-${f.key}`} className="mt-1 block text-sm text-destructive">
-                {errors[f.key]}
-              </span>
-            )}
-          </label>
-        ))}
-      </div>
-
-      <div>
-        <span className="text-xs uppercase tracking-widest text-muted-foreground">
-          {tr("guests")}
-        </span>
-        <div className="mt-2 flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => stepGuests(-1)}
-            disabled={guests <= 1}
-            aria-label={lang === "en" ? "Fewer guests" : "عدد أقل من الضيوف"}
-            className="h-12 w-12 border border-border text-lg transition-colors hover:bg-secondary disabled:opacity-30"
-          >
-            −
-          </button>
-          <input
-            type="number"
-            inputMode="numeric"
-            min={1}
-            max={20}
-            value={details.guests}
-            aria-label={tr("guests")}
-            aria-invalid={!!errors.guests}
-            onChange={(e) => set("guests", e.target.value)}
-            className={`h-12 w-20 border bg-secondary text-center outline-none focus:border-foreground ${
-              errors.guests ? "border-destructive" : "border-border"
-            }`}
-          />
-          <button
-            type="button"
-            onClick={() => stepGuests(1)}
-            disabled={guests >= 20}
-            aria-label={lang === "en" ? "More guests" : "عدد أكبر من الضيوف"}
-            className="h-12 w-12 border border-border text-lg transition-colors hover:bg-secondary disabled:opacity-30"
-          >
-            +
-          </button>
-        </div>
-        {errors.guests && (
-          <span className="mt-1 block text-sm text-destructive">{errors.guests}</span>
-        )}
-      </div>
-
-      <label className="block">
-        <span className="text-xs uppercase tracking-widest text-muted-foreground">
-          {tr("notes")} · {tr("optionalLabel")}
-        </span>
-        <textarea
-          rows={3}
-          value={details.notes}
-          onChange={(e) => set("notes", e.target.value)}
-          className="mt-2 w-full border border-border bg-secondary px-4 py-3 outline-none focus:border-foreground"
-        />
-      </label>
-
-      {/* Civil ID — mandatory for checkout. */}
-      <div>
-        <span className="text-xs uppercase tracking-widest text-muted-foreground">
-          {tr("civilId")} · {tr("requiredLabel")}
-        </span>
-        <p className="mt-1 text-sm text-muted-foreground">{tr("whyCivilId")}</p>
-        <p className="mt-1 text-xs text-muted-foreground">{tr("civilIdHint")}</p>
-        <label
-          className={`mt-2 flex cursor-pointer items-center gap-3 border bg-secondary px-4 py-3 transition-colors hover:border-foreground/50 ${
-            errors.civilId ? "border-destructive" : "border-border"
-          }`}
-        >
-          <Paperclip className="h-4 w-4 shrink-0" />
-          <span className="truncate text-sm">{civilId ? civilId.name : tr("civilIdChoose")}</span>
-          <input
-            type="file"
-            accept={ID_TYPES.join(",")}
-            aria-label={tr("civilId")}
-            aria-invalid={!!errors.civilId}
-            onChange={(e) => {
-              setCivilId(e.target.files?.[0] ?? null);
-              if (errors.civilId) setErrors({ ...errors, civilId: undefined });
-            }}
-            className="sr-only"
-          />
-        </label>
-        {preview && (
-          <img src={preview} alt="" className="mt-3 max-h-40 border border-border object-contain" />
-        )}
-        {errors.civilId && (
-          <span className="mt-1 block text-sm text-destructive">{errors.civilId}</span>
-        )}
-      </div>
-
-      {/* Terms — mandatory for checkout. */}
-      <div>
-        <label className="flex items-start gap-3">
-          <input
-            type="checkbox"
-            checked={terms}
-            aria-invalid={!!errors.terms}
-            onChange={(e) => {
-              setTerms(e.target.checked);
-              if (errors.terms) setErrors({ ...errors, terms: undefined });
-            }}
-            className="mt-1 h-4 w-4 shrink-0 accent-black"
-          />
-          <span className="text-sm">
-            {tr("acceptTerms")}{" "}
-            <Link
-              to="/rules/$lang"
-              params={{ lang }}
-              target="_blank"
-              className="underline underline-offset-4 hover:opacity-70"
+            <button
+              type="button"
+              onClick={() => stepGuests(1)}
+              disabled={guests >= 20}
+              aria-label={lang === "en" ? "More guests" : "عدد أكبر من الضيوف"}
+              className="h-12 w-12 border border-border text-lg transition-colors hover:bg-secondary disabled:opacity-30"
             >
-              {tr("readTerms")}
-            </Link>
+              +
+            </button>
+          </div>
+          {errors.guests && (
+            <span className="mt-1 block text-sm text-destructive">{errors.guests}</span>
+          )}
+        </div>
+
+        <label className="block">
+          <span className="text-xs uppercase tracking-widest text-muted-foreground">
+            {tr("notes")} · {tr("optionalLabel")}
           </span>
+          <textarea
+            rows={3}
+            value={details.notes}
+            onChange={(e) => set("notes", e.target.value)}
+            className="mt-2 w-full border border-border bg-secondary px-4 py-3 outline-none focus:border-foreground"
+          />
         </label>
-        {errors.terms && (
-          <span className="mt-1 block text-sm text-destructive">{errors.terms}</span>
-        )}
-      </div>
 
-      <div className="flex items-start gap-3 border border-border p-4 text-sm text-muted-foreground">
-        <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
-        <span>
-          {tr("noPaymentNow")} {tr("weReplyIn")}
-        </span>
-      </div>
+        {/* Civil ID — mandatory for checkout. */}
+        <div>
+          <span className="text-xs uppercase tracking-widest text-muted-foreground">
+            {tr("civilId")} · {tr("requiredLabel")}
+          </span>
+          <p className="mt-1 text-sm text-muted-foreground">{tr("whyCivilId")}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{tr("civilIdHint")}</p>
+          <label
+            className={`mt-2 flex cursor-pointer items-center gap-3 border bg-secondary px-4 py-3 transition-colors hover:border-foreground/50 ${
+              errors.civilId ? "border-destructive" : "border-border"
+            }`}
+          >
+            <Paperclip className="h-4 w-4 shrink-0" />
+            <span className="truncate text-sm">{civilId ? civilId.name : tr("civilIdChoose")}</span>
+            <input
+              type="file"
+              accept={ID_TYPES.join(",")}
+              aria-label={tr("civilId")}
+              aria-invalid={!!errors.civilId}
+              onChange={(e) => {
+                setCivilId(e.target.files?.[0] ?? null);
+                if (errors.civilId) setErrors({ ...errors, civilId: undefined });
+              }}
+              className="sr-only"
+            />
+          </label>
+          {preview && (
+            <img
+              src={preview}
+              alt=""
+              className="mt-3 max-h-40 border border-border object-contain"
+            />
+          )}
+          {errors.civilId && (
+            <span className="mt-1 block text-sm text-destructive">{errors.civilId}</span>
+          )}
+        </div>
 
-      <p className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-        {tr("whatsappHelp")}
-        <WhatsAppLink
-          context={{ chaletId, start, end }}
-          className="-my-2 inline-flex items-center gap-2 py-2 underline underline-offset-4 hover:text-foreground"
-          label="WhatsApp"
-        />
-      </p>
+        {/* Terms — mandatory for checkout. */}
+        <div>
+          <label className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              checked={terms}
+              aria-invalid={!!errors.terms}
+              onChange={(e) => {
+                setTerms(e.target.checked);
+                if (errors.terms) setErrors({ ...errors, terms: undefined });
+              }}
+              className="mt-1 h-4 w-4 shrink-0 accent-black"
+            />
+            <span className="text-sm">
+              {tr("acceptTerms")}{" "}
+              <Link
+                to="/rules/$lang"
+                params={{ lang }}
+                target="_blank"
+                className="underline underline-offset-4 hover:opacity-70"
+              >
+                {tr("readTerms")}
+              </Link>
+            </span>
+          </label>
+          {errors.terms && (
+            <span className="mt-1 block text-sm text-destructive">{errors.terms}</span>
+          )}
+        </div>
 
-      {/* Server-side rejections (dates taken since you picked them, rate limit) */}
-      {request.isError && (
-        <p className="border border-destructive p-4 text-sm text-destructive">
-          {(request.error as Error).message}
+        <div className="flex items-start gap-3 border border-border p-4 text-sm text-muted-foreground">
+          <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            {tr("noPaymentNow")} {tr("weReplyIn")}
+          </span>
+        </div>
+
+        <p className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+          {tr("whatsappHelp")}
+          <WhatsAppLink
+            context={{ chaletId, start, end }}
+            className="-my-2 inline-flex items-center gap-2 py-2 underline underline-offset-4 hover:text-foreground"
+            label="WhatsApp"
+          />
         </p>
-      )}
 
-      {/* Opened by Submit, never before. Everything else on the form has
+        {/* Server-side rejections (dates taken since you picked them, rate limit) */}
+        {request.isError && (
+          <p className="border border-destructive p-4 text-sm text-destructive">
+            {(request.error as Error).message}
+          </p>
+        )}
+
+        {/* Opened by Submit, never before. Everything else on the form has
           already been checked by the time this appears, so the only thing
           left between the guest and their request is the code. */}
-      {verify && !emailVerified && (
-        <CodeDialog
-          email={details.email}
-          onClose={() => closeCode()}
-          onVerified={(e) => {
-            setVerified({ email: e, at: Date.now() });
-            setErrors((prev) => ({ ...prev, email: undefined }));
-            // Off the dialog's entry before the request goes, so that the
-            // confirmation replaces the form's entry rather than the
-            // dialog's: Back from "Confirmed" must not reach a form that has
-            // already been sent.
-            closeCode(() => void sendRequest());
-          }}
-        />
-      )}
+        {verify && !emailVerified && (
+          <CodeDialog
+            email={details.email}
+            onClose={() => closeCode()}
+            onVerified={(e) => {
+              setVerified({ email: e, at: Date.now() });
+              setErrors((prev) => ({ ...prev, email: undefined }));
+              // Off the dialog's entry before the request goes, so that the
+              // confirmation replaces the form's entry rather than the
+              // dialog's: Back from "Confirmed" must not reach a form that has
+              // already been sent.
+              closeCode(() => void sendRequest());
+            }}
+          />
+        )}
 
-      <div className="flex flex-wrap gap-3">
-        <button
-          type="submit"
-          disabled={busy}
-          className="bg-black px-10 py-4 text-sm uppercase tracking-widest text-white hover:opacity-90 disabled:opacity-50"
-        >
-          {uploading
-            ? tr("civilIdUploading")
-            : request.isPending
-              ? lang === "en"
-                ? "Sending…"
-                : "جارٍ الإرسال…"
-              : tr("submit")}
-        </button>
-        <button
-          type="button"
-          onClick={onBack}
-          disabled={busy}
-          className="border border-border px-8 py-4 text-sm uppercase tracking-widest hover:bg-secondary disabled:opacity-50"
-        >
-          {lang === "en" ? "Back" : "رجوع"}
-        </button>
+        {/* Back on the start side, the way forward on the end side, the same
+          as the dates. On a wide screen they close the form; on a phone they
+          ride along at the foot of the screen instead (below). */}
+        <div className="hidden items-center justify-between gap-3 lg:flex">
+          <BackButton onClick={onBack} disabled={busy} />
+          <SubmitButton busy={busy} label={submitLabel} />
+        </div>
+      </div>
+
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 px-4 py-3 backdrop-blur lg:hidden">
+        <div className="mx-auto flex max-w-xl items-center gap-3">
+          <BackButton onClick={onBack} disabled={busy} />
+          <SubmitButton
+            busy={busy}
+            label={submitLabel}
+            total={formatMoney(total + deposit, lang)}
+          />
+        </div>
       </div>
     </form>
   );
 }
 
-function Confirmation({ booking }: { booking: BookingRow }) {
+/** One step back, keeping everything chosen. 48px tall, on every screen. */
+function BackButton({ onClick, disabled }: { onClick: () => void; disabled?: boolean }) {
+  const { tr } = useI18n();
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 border border-border px-5 text-sm uppercase tracking-widest transition-colors hover:bg-secondary disabled:opacity-50 sm:px-8"
+    >
+      <ArrowLeft className="h-4 w-4 rtl:rotate-180" aria-hidden="true" />
+      {tr("backLabel")}
+    </button>
+  );
+}
+
+/** Sends the request: the details step's way forward. */
+function SubmitButton({ busy, label, total }: { busy: boolean; label: string; total?: string }) {
+  return (
+    <button
+      type="submit"
+      disabled={busy}
+      className="inline-flex min-h-12 flex-1 items-center justify-center gap-3 bg-black px-4 text-xs uppercase tracking-widest text-white transition-opacity hover:opacity-90 disabled:opacity-50 sm:text-sm lg:flex-none lg:px-10"
+    >
+      <span className="flex flex-col items-center leading-tight">
+        <span>{label}</span>
+        {total && (
+          <span
+            className="mt-0.5 text-[11px] normal-case tracking-normal opacity-75"
+            aria-hidden="true"
+          >
+            {total}
+          </span>
+        )}
+      </span>
+      <ArrowRight className="h-4 w-4 shrink-0 rtl:rotate-180" aria-hidden="true" />
+    </button>
+  );
+}
+
+function Confirmation({
+  booking,
+  onBookAnother,
+}: {
+  booking: BookingRow;
+  onBookAnother: () => void;
+}) {
   const { tr, lang } = useI18n();
+  const deposit = Number(booking.deposit ?? 0);
   return (
     <div className="animate-fade-up py-12 text-center">
       <Steps current={3} />
@@ -1819,11 +2113,16 @@ function Confirmation({ booking }: { booking: BookingRow }) {
             showed the previous day for anyone behind UTC. */}
         <span dir="ltr">
           {booking.start_date} → {booking.end_date}
-        </span>{" "}
-        · {formatMoney(Number(booking.total), lang)}
+        </span>
       </p>
       <div className="mt-3 text-sm text-muted-foreground">
         <StayTimes start={parseDate(booking.start_date)} end={parseDate(booking.end_date)} />
+      </div>
+
+      {/* The same breakdown the guest agreed to on the details: what the
+          server recorded, deposit and all. */}
+      <div className="mx-auto mt-8 max-w-md text-start">
+        <PriceBreakdown subtotal={Number(booking.total)} deposit={deposit} />
       </div>
 
       <div className="mx-auto mt-10 max-w-md border border-border p-6 text-start">
@@ -1842,15 +2141,22 @@ function Confirmation({ booking }: { booking: BookingRow }) {
         </ol>
       </div>
 
-      <p className="mt-8 text-sm">
+      <div className="mx-auto mt-8 flex max-w-md flex-col gap-3 sm:flex-row">
         <Link
           to="/reservation/$lang"
           params={{ lang }}
-          className="underline underline-offset-4 text-muted-foreground hover:text-foreground"
+          className="inline-flex min-h-12 flex-1 items-center justify-center border border-border px-6 text-sm uppercase tracking-widest transition-colors hover:bg-secondary"
         >
           {tr("yourReservation")}
         </Link>
-      </p>
+        <button
+          type="button"
+          onClick={onBookAnother}
+          className="inline-flex min-h-12 flex-1 items-center justify-center bg-black px-6 text-sm uppercase tracking-widest text-white transition-opacity hover:opacity-90"
+        >
+          {tr("bookAnother")}
+        </button>
+      </div>
     </div>
   );
 }
