@@ -117,7 +117,7 @@ for (const lang of ["en", "ar"]) {
   ck(`…four contact cards, two by two (${lang})`, main.cards === 4, String(main.cards));
   ck(
     `…and the Instagram card names the account its link opens (${lang})`,
-    /@bizarri_chalet/.test(main.text) && !/@bizarri\.chalet/.test(main.text),
+    /@bizarri\.chalet/.test(main.text) && !/@bizarri_chalet/.test(main.text),
   );
   await ctx.close();
 }
@@ -170,7 +170,7 @@ for (const lang of ["en", "ar"]) {
   );
   ck(
     "…and the Instagram account",
-    (await p.locator('main a[href*="instagram.com/bizarri_chalet"]').count()) === 1,
+    (await p.locator('main a[href*="instagram.com/bizarri.chalet"]').count()) === 1,
   );
   await ctx.close();
 }

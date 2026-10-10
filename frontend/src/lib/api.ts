@@ -615,9 +615,9 @@ const DEFAULT_CONTACT: ContactInfo = {
   phone: "+96594040955",
   whatsapp: "96594040955",
   email: "sales@bizarri.com",
-  // As the owner gives it: "انستغرام: bizarri_chalet". An Instagram URL set
-  // in the admin's Site Settings takes precedence over this.
-  instagram: "https://www.instagram.com/bizarri_chalet",
+  // The account's real handle has a dot, not an underscore. An Instagram URL
+  // set in the admin's Site Settings takes precedence over this.
+  instagram: "https://www.instagram.com/bizarri.chalet",
   maps: "https://maps.app.goo.gl/5wjw1skfpqdnDhFa6",
 };
 

@@ -363,7 +363,7 @@ export function render(code: string, lang: string): string {
         : "This code expires in 10 minutes. If you did not ask for it, you can ignore this email.",
     ),
     whatsapp: (Deno.env.get("CONTACT_WHATSAPP") ?? "96594040955").replace(/\D/g, ""),
-    instagram: "https://www.instagram.com/bizarri_chalet",
+    instagram: "https://www.instagram.com/bizarri.chalet",
   });
 }
 

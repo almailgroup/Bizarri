@@ -148,7 +148,7 @@ async function instagramUrl(): Promise<string> {
   return String(raw) || DEFAULT_INSTAGRAM;
 }
 
-const DEFAULT_INSTAGRAM = "https://www.instagram.com/bizarri_chalet";
+const DEFAULT_INSTAGRAM = "https://www.instagram.com/bizarri.chalet";
 
 async function guestWhatsAppNumber(): Promise<string> {
   const contact = await readSetting("contact");
