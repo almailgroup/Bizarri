@@ -106,6 +106,11 @@ export function useAvailability(chaletId: number, from: Date, to: Date, enabled 
       return (data ?? []) as CalendarDay[];
     },
     staleTime: 30_000,
+    // Another guest's request, or the admin's decision, changes what can be
+    // chosen. Asked again every minute and whenever the tab comes back into
+    // view, so a page left open does not keep offering days already taken.
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
   });
 }
 

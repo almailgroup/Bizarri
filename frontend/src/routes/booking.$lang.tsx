@@ -648,16 +648,27 @@ function Calendar({
   const { data: occasions } = useSpecialOccasions();
 
   const byDay = useMemo(() => {
-    const map = new Map<string, { blocked: boolean; price: number; custom: boolean }>();
+    const map = new Map<
+      string,
+      { blocked: boolean; price: number; custom: boolean; pending: boolean }
+    >();
     for (const d of calendar ?? []) {
-      map.set(d.day, { blocked: d.blocked, price: Number(d.price), custom: d.custom });
+      map.set(d.day, {
+        blocked: d.blocked,
+        price: Number(d.price),
+        custom: d.custom,
+        pending: d.pending === true,
+      });
     }
     return map;
   }, [calendar]);
 
   // Days outside the fetched window count as unavailable rather than
   // optimistically bookable.
+  // Blocked covers a pending request as well as a reserved stay: neither can
+  // be chosen. dayPending tells the two apart for drawing, grey from black.
   const dayBlocked = (d: Date) => byDay.get(fmtDate(d))?.blocked ?? true;
+  const dayPending = (d: Date) => byDay.get(fmtDate(d))?.pending === true;
   const isPast = (d: Date) => d < today;
 
   const customPrices = useMemo(() => {
@@ -976,6 +987,21 @@ function Calendar({
     });
   }, [restoring, chaletId, filter, start, end, details]);
 
+  // The calendar is asked again every minute and on returning to the tab. If
+  // what the guest has selected was taken in the meantime -- requested by
+  // someone else, or confirmed for them -- let go of it and say why, rather
+  // than leave a selection the server will refuse at the very end. Only on the
+  // dates: on the form, Submit's own refusal says the same thing in context.
+  useEffect(() => {
+    if (showForm || restoring || !start || !end || !calendar) return;
+    if (eachDay(start, end).some((d) => dayBlocked(d))) {
+      setStart(null);
+      setEnd(null);
+      setError(tr("datesJustTaken"));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [byDay]);
+
   const tooShort = current !== null && current.days < minStay;
   // Thu–Sat is one product, so a stay may not take a slice of it. Checked
   // here as well as on the tap: a selection can also arrive from a quick
@@ -1245,7 +1271,12 @@ function Calendar({
                   // A future day the server refuses is held by a booking or blocked
                   // by the admin — that is what black means. Past days are simply
                   // gone, and are faded instead.
-                  const reserved = !past && dayBlocked(d);
+                  // Three ways a day can be spoken for, in order of firmness:
+                  // reserved (an accepted stay, or closed by the admin) is
+                  // black; a request awaiting approval is grey; neither can
+                  // be chosen by anyone else. Past days are simply faded.
+                  const pending = !past && dayPending(d);
+                  const reserved = !past && dayBlocked(d) && !pending;
                   const offPackage = !windows.has(iso);
                   // Off-shape days are aria-disabled rather than disabled: a
                   // disabled button cannot take focus, and with "one day" as the
@@ -1256,7 +1287,7 @@ function Calendar({
                   // returns when a day is in no window. Past and reserved days
                   // are genuinely gone rather than merely out of shape, and stay
                   // disabled.
-                  const disabled = past || reserved;
+                  const disabled = past || reserved || pending;
                   const selected = isEdge(d);
                   const within = inRange(d);
                   const priced = byDay.get(iso)?.custom === true;
@@ -1267,22 +1298,27 @@ function Calendar({
                     month: "long",
                   });
 
+                  // Grey means one thing only -- awaiting approval -- so the
+                  // guest's own selection is white, and hovering a free day
+                  // draws a ring rather than a grey fill.
                   const tone = reserved
                     ? "bg-black text-white cursor-not-allowed"
-                    : past
-                      ? "cursor-not-allowed text-muted-foreground/30"
-                      : selected
-                        ? // An outlined circle, not a filled one: the ring marks the
-                          // day without hiding its number under a solid block, and
-                          // ring-inset keeps it inside the cell so nothing shifts.
-                          "bg-background font-semibold text-foreground ring-2 ring-inset ring-foreground"
-                        : within
-                          ? "bg-secondary text-foreground"
-                          : offPackage
-                            ? "cursor-not-allowed text-muted-foreground/30"
-                            : occ
-                              ? "ring-1 ring-inset ring-foreground/25 hover:bg-secondary"
-                              : "hover:bg-secondary";
+                    : pending
+                      ? "bg-neutral-200 text-neutral-500 cursor-not-allowed"
+                      : past
+                        ? "cursor-not-allowed text-muted-foreground/30"
+                        : selected
+                          ? // An outlined circle, not a filled one: the ring marks the
+                            // day without hiding its number under a solid block, and
+                            // ring-inset keeps it inside the cell so nothing shifts.
+                            "bg-background font-semibold text-foreground ring-2 ring-inset ring-foreground"
+                          : within
+                            ? "bg-background font-medium text-foreground ring-1 ring-inset ring-foreground/40"
+                            : offPackage
+                              ? "cursor-not-allowed text-muted-foreground/30"
+                              : occ
+                                ? "ring-1 ring-inset ring-foreground/25 hover:ring-foreground/60"
+                                : "hover:ring-1 hover:ring-inset hover:ring-foreground/40";
 
                   return (
                     <button
@@ -1292,10 +1328,21 @@ function Calendar({
                       aria-disabled={offPackage || undefined}
                       onClick={() => selectDay(d)}
                       aria-label={`${dayLabel}${reserved ? ` — ${tr("reservedLabel")}` : ""}${
-                        occ ? ` — ${lang === "en" ? occ.nameEn : occ.nameAr || occ.nameEn}` : ""
-                      }`}
+                        pending ? ` — ${tr("pendingLabel")}` : ""
+                      }${occ ? ` — ${lang === "en" ? occ.nameEn : occ.nameAr || occ.nameEn}` : ""}`}
                       aria-pressed={!!selected}
                       data-day={iso}
+                      data-state={
+                        reserved
+                          ? "reserved"
+                          : pending
+                            ? "pending"
+                            : selected || within
+                              ? "selected"
+                              : past
+                                ? "past"
+                                : "free"
+                      }
                       tabIndex={fmtDate(activeDay) === iso ? 0 : -1}
                       // A day focused by a click or a screen reader becomes the
                       // grid's one Tab stop, so Tab out and back returns to it.
@@ -1303,14 +1350,15 @@ function Calendar({
                         if (fmtDate(activeDay) !== iso) setFocusDay(d);
                       }}
                       // The cell is square, so a full radius is a circle -- every
-                      // cell, so reserved, chosen and in-between days are all the
-                      // same shape and differ only in fill: black for taken, a
-                      // ring for the two ends of the stay, grey for the days
-                      // between. The focus outline follows the radius.
+                      // cell, so all the states are the same shape and differ
+                      // only in fill: black for reserved, grey for awaiting
+                      // approval, white with a ring for the guest's own stay
+                      // (a heavier ring at its two ends). The focus outline
+                      // follows the radius.
                       className={`relative flex aspect-square flex-col items-center justify-center rounded-full text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-current ${tone}`}
                     >
                       {d.getDate()}
-                      {priced && !reserved && !past && (
+                      {priced && !reserved && !pending && !past && (
                         <span
                           className="absolute bottom-1 h-1 w-1 rounded-full bg-foreground/50"
                           aria-hidden="true"
@@ -1356,12 +1404,11 @@ function Calendar({
                   <span className="h-3 w-3 rounded-full bg-black" /> {tr("reservedLabel")}
                 </span>
                 <span className="flex items-center gap-2">
-                  <span className="h-3 w-3 rounded-full ring-2 ring-inset ring-foreground" />{" "}
-                  {tr("selectedLabel")}
+                  <span className="h-3 w-3 rounded-full bg-neutral-200" /> {tr("pendingLabel")}
                 </span>
                 <span className="flex items-center gap-2">
-                  <span className="h-3 w-3 rounded-full border border-border bg-secondary" />{" "}
-                  {lang === "en" ? "In stay" : "ضمن الإقامة"}
+                  <span className="h-3 w-3 rounded-full bg-background ring-2 ring-inset ring-foreground" />{" "}
+                  {tr("selectedLabel")}
                 </span>
                 <span className="flex items-center gap-2">
                   <span className="h-3 w-3 rounded-full ring-1 ring-inset ring-foreground/25" />{" "}

@@ -134,9 +134,15 @@ export type AuditRow = {
 /** One row per day from availability_calendar(). */
 export type CalendarDay = {
   day: string;
+  /** Cannot be chosen: past, closed, reserved, or held by a pending request. */
   blocked: boolean;
   price: number;
   custom: boolean;
+  /**
+   * Of the blocked days, held only by a request awaiting the admin: drawn grey
+   * rather than black. Absent from a database older than migration 17.
+   */
+  pending?: boolean;
 };
 
 export type QuoteRow = {

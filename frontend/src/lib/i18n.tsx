@@ -203,6 +203,11 @@ export const t: Dict = {
   customPricing: { en: "Custom pricing", ar: "تسعير مخصص" },
   bookingRef: { en: "Booking reference", ar: "رقم الحجز" },
   reservedLabel: { en: "Reserved", ar: "محجوز" },
+  pendingLabel: { en: "Awaiting approval", ar: "بانتظار الموافقة" },
+  datesJustTaken: {
+    en: "Those dates have just been requested by someone else. Please choose others.",
+    ar: "طلب شخص آخر هذه التواريخ للتو. يرجى اختيار تواريخ أخرى.",
+  },
   filterByDay: { en: "By day", ar: "بالأيام" },
   // Sun-Wed, not "one day at a time": a single day can only be a weekday now,
   // because Thu-Sat is sold whole. Saying which days saves a guest tapping a

@@ -35,7 +35,9 @@ select 'migrations' as area, * from (values
   ('13 function lockdown', (not has_function_privilege('anon','public.start_email_verification(text)','execute'))),
   ('14 Kuwait today',     (to_regprocedure('public.local_today(timestamptz)')            is not null)),
   ('15 admin bookings',   (to_regprocedure('public.admin_create_booking(smallint,date,date,text,text,text,smallint,public.booking_status,numeric,text,text,text,boolean)') is not null)),
-  ('16 insurance deposit', (to_regprocedure('public.insurance_deposit()')              is not null))
+  ('16 insurance deposit', (to_regprocedure('public.insurance_deposit()')              is not null)),
+  ('17 pending holds dates', (exists (select 1 from pg_trigger where tgname = 'guard_guest_overlap'
+                                     and tgrelid = 'public.bookings'::regclass)))
 ) t(item, ok)
 union all
 -- Expected from the rates as they stand, not from the defaults: the owner
@@ -96,6 +98,7 @@ select 'weekend rule', * from (values
 union all
 select 'guest access', * from (values
   ('Guests cannot insert bookings', (not has_table_privilege('anon','public.bookings','insert'))),
+  ('Guests can read availability', (has_function_privilege('anon','public.availability_calendar(smallint,date,date)','execute'))),
   ('…and book through the RPC',     (has_function_privilege('anon','public.request_booking(smallint,date,date,text,text,text,smallint,text,text,boolean,text)','execute'))),
   ('Code minting is server-only',   (not has_function_privilege('anon','public.start_email_verification(text)','execute'))),
   ('Verified-check is server-only', (not has_function_privilege('anon','public.is_email_verified(text)','execute'))),

@@ -116,12 +116,15 @@ begin
     perform pg_temp.ok('Exclusion constraint blocks overlapping accepted rows', true, 'exclusion_violation');
   end;
 
-  -- pending requests MAY overlap: several guests can ask for the same week
+  -- A guest's request may not overlap anything now (suite 11), but the admin
+  -- may still record one over a stay, to be refused on acceptance below.
+  perform set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
   insert into public.bookings (ref, chalet_id, start_date, end_date, total,
     guest_name, guest_phone, guest_email, guests, status)
   values ('BZR-PEND01', 1, '2026-10-13', '2026-10-15', 300,
           'Waiting Guest', '+9650000', 'w@example.com', 2, 'pending');
-  perform pg_temp.ok('Pending requests may overlap (waiting list works)', true);
+  perform set_config('request.jwt.claim.sub', '', true);
+  perform pg_temp.ok('An admin may still record an overlapping pending request', true);
 end $$;
 
 -- ====================== admin acceptance conflict ============================

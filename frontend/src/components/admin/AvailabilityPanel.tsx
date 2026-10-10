@@ -126,7 +126,9 @@ export function AvailabilityPanel({
         booking,
         // The server says it is held, by neither a closure nor a booking we
         // can see: a booking, then, that the list did not bring back.
-        heldUnknown: !booking && !isClosed && !past && !!c?.blocked,
+        // A day held only by a pending request is blocked to guests too; it
+        // is drawn from the request itself (the amber dot), not as booked.
+        heldUnknown: !booking && !isClosed && !past && !!c?.blocked && !c?.pending,
         pending: covering.filter((b) => b.status === "pending"),
         price: c ? Number(c.price) : null,
         custom: !!c?.custom,
