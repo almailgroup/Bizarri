@@ -4,7 +4,7 @@ import { PageShell } from "@/components/PageShell";
 import { useI18n } from "@/lib/i18n";
 import { usePageMeta } from "@/hooks/use-page-meta";
 import { instagramHandle, useContactInfo } from "@/lib/api";
-import { Phone, Mail, Instagram, MessageCircle } from "lucide-react";
+import { ArrowUpRight, Instagram, Mail, MapPin, MessageCircle, Phone } from "lucide-react";
 
 export const Route = createFileRoute("/contact/$lang")({
   component: Contact,
@@ -91,6 +91,39 @@ function Contact() {
             </a>
           ))}
         </div>
+
+        {/* Where the chalet is, as one broad button under the four ways to
+            reach us: the whole bar is the target, the address says what it
+            opens, and "Open in Google Maps" says where it goes. */}
+        <a
+          href={contact.maps}
+          target="_blank"
+          rel="noopener noreferrer"
+          data-testid="location-button"
+          className="group mt-px flex min-h-24 w-full flex-col gap-5 bg-black p-6 text-white transition-colors hover:bg-black/85 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black sm:flex-row sm:items-center sm:justify-between sm:p-8 animate-fade-up"
+          style={{ animationDelay: `${items.length * 60}ms` }}
+        >
+          <span className="flex items-start gap-4">
+            <MapPin className="mt-1 h-7 w-7 shrink-0" aria-hidden="true" />
+            <span>
+              <span className="block text-xs uppercase tracking-widest opacity-70">
+                {tr("location")}
+              </span>
+              <span className="mt-2 block font-display text-2xl">
+                {lang === "en"
+                  ? "Al Khiran Al Bahri, Road 278, Phase 3"
+                  : "الخيران البحري، طريق 278، المرحلة الثالثة"}
+              </span>
+              <span className="mt-1 block text-sm opacity-70">
+                {lang === "en" ? "Bizarri Chalet · Kuwait" : "شاليه بيزاري · الكويت"}
+              </span>
+            </span>
+          </span>
+          <span className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 border border-white/40 px-6 text-sm uppercase tracking-widest transition-colors group-hover:bg-white group-hover:text-black">
+            {lang === "en" ? "Open in Google Maps" : "افتح في خرائط Google"}
+            <ArrowUpRight className="h-4 w-4 rtl:-scale-x-100" aria-hidden="true" />
+          </span>
+        </a>
       </section>
     </PageShell>
   );

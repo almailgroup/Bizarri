@@ -108,11 +108,23 @@ for (const lang of ["en", "ar"]) {
       const g = document.querySelector("main .grid");
       return g ? g.getBoundingClientRect().height : 0;
     })(),
+    gridW: document.querySelector("main .grid")?.getBoundingClientRect().width ?? 0,
+    location: (() => {
+      const r = document.querySelector('[data-testid="location-button"]')?.getBoundingClientRect();
+      return r ? { w: Math.round(r.width), h: Math.round(r.height) } : null;
+    })(),
   }));
+  // It was taken off once, and asked back for, broad and clear: one link,
+  // the whole width of the cards above, saying where it goes.
   ck(
-    `Contact has no maps location (${lang})`,
-    main.maps === 0 && !/Open in Maps|فتح في الخرائط/.test(main.text),
+    `Contact has one clear location button (${lang})`,
+    main.maps === 1 && /Open in Google Maps|افتح في خرائط Google/i.test(main.text),
     `${main.maps} maps links`,
+  );
+  ck(
+    `…as broad as the cards above it, and easy to tap (${lang})`,
+    main.location && main.location.w >= main.gridW - 2 && main.location.h >= 48,
+    JSON.stringify(main.location),
   );
   ck(`…four contact cards, two by two (${lang})`, main.cards === 4, String(main.cards));
   ck(
