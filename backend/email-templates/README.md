@@ -6,7 +6,9 @@ layout for Bizarri's emails, made for Resend's template editor
 
 Images are served by the website, so the site must be deployed for them to
 show: `https://bizarri.com/email/bizarri-logo-white.png` and
-`https://bizarri.com/email/hero.jpg` (from `frontend/public/email/`).
+`https://bizarri.com/email/front.jpg`, the front of the chalet (from
+`frontend/public/email/`; `hero.jpg` is the same photo, for copies pasted
+before it was renamed).
 
 ## Variables
 
