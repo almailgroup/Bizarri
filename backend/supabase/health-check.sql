@@ -5,10 +5,14 @@
 -- read true. A false row names what is missing; re-running the matching part
 -- from schema-parts/ is always the fix, and is safe even if it already ran.
 --
--- The dates are October 2026, chosen because the 4th is a Sunday: the 8th-10th
--- is a Thu-Sat weekend and the 11th-17th a full Sun-Sat week. They are only
--- arithmetic -- prices and weekdays -- so whether they have passed does not
--- matter, and nothing is inserted, so this is safe to run against production.
+-- The dates start in October 2026, chosen because the 4th is a Sunday: the
+-- 8th-10th is a Thu-Sat weekend and the 11th-17th a full Sun-Sat week. They
+-- are only arithmetic -- prices and weekdays -- so whether they have passed
+-- does not matter, and nothing is inserted, so this is safe to run against
+-- production. The pricing rows compare against the rates as they stand, on
+-- the first fortnight with no custom price or occasion, so an owner who has
+-- changed a rate or priced a day still sees true; a false one says what the
+-- price came out as.
 --
 -- What it cannot tell you is anything outside Postgres: whether the Edge
 -- Functions are deployed, whether the booking webhooks are wired, or whether
@@ -34,14 +38,47 @@ select 'migrations' as area, * from (values
   ('16 insurance deposit', (to_regprocedure('public.insurance_deposit()')              is not null))
 ) t(item, ok)
 union all
-select 'pricing', * from (values
-  ('One weekday = 75',          ((select total from public.quote_stay(1::smallint,'2026-10-05','2026-10-05')) = 75)),
-  ('Sun-Wed = 300',             ((select total from public.quote_stay(1::smallint,'2026-10-04','2026-10-07')) = 300)),
-  ('Thu-Sat = 350',             ((select total from public.quote_stay(1::smallint,'2026-10-08','2026-10-10')) = 350)),
-  ('Wed-Sat = 75 + 350',        ((select total from public.quote_stay(1::smallint,'2026-10-07','2026-10-10')) = 425)),
-  ('Sun-Sat = 600 full week',   ((select total from public.quote_stay(1::smallint,'2026-10-11','2026-10-17')) = 600)),
-  ('Two weekends = 2 x 350',    ((select total from public.quote_stay(1::smallint,'2026-10-08','2026-10-17')) = 1000))
-) t(item, ok)
+-- Expected from the rates as they stand, not from the defaults: the owner
+-- edits them under Package Rates, and a check that assumed 350 for a weekend
+-- read false the moment the weekend rate changed. The dates are the first
+-- Sun-Sat fortnight with no custom day price and no special occasion on
+-- chalet 1, so what is measured is the rates alone. A false row says what
+-- it got.
+select 'pricing', t.item, t.ok
+from (select * from public.rates where id) r
+cross join lateral (
+  select s::date as sun
+  from generate_series(date '2026-10-04', date '2026-10-04' + 7 * 104, interval '7 days') s
+  where not exists (select 1 from public.day_prices dp
+                     where dp.chalet_id = 1 and dp.day between s::date and s::date + 13)
+    and not exists (select 1 from public.special_occasions o
+                     where o.active and o.start_date <= s::date + 13 and o.end_date >= s::date)
+  order by 1
+  limit 1
+) f
+cross join lateral (
+  select
+    (select total from public.quote_stay(1::smallint, f.sun + 1, f.sun + 1))  as one_weekday,
+    (select total from public.quote_stay(1::smallint, f.sun,     f.sun + 3))  as sun_wed,
+    (select total from public.quote_stay(1::smallint, f.sun + 4, f.sun + 6))  as thu_sat,
+    (select total from public.quote_stay(1::smallint, f.sun + 3, f.sun + 6))  as wed_sat,
+    (select total from public.quote_stay(1::smallint, f.sun,     f.sun + 6))  as sun_sat,
+    (select total from public.quote_stay(1::smallint, f.sun + 4, f.sun + 13)) as two_weekends
+) q
+cross join lateral (values
+  ('One weekday = daily weekday rate',          q.one_weekday,  r.daily_weekday),
+  ('Sun-Wed = weekday package',                 q.sun_wed,      r.weekday),
+  ('Thu-Sat = weekend rate',                    q.thu_sat,      r.weekend),
+  ('Wed-Sat = one weekday + weekend',           q.wed_sat,      r.daily_weekday + r.weekend),
+  ('Sun-Sat = full week',                       q.sun_sat,      r.full_week),
+  ('Two weekends = 2 weekends + 4 weekdays',    q.two_weekends, 2 * r.weekend + 4 * r.daily_weekday)
+) v(label, got, expected)
+cross join lateral (select
+  format('%s (%s%s, week of %s)', v.label, trim_scale(v.expected),
+         case when v.got = v.expected then '' else format(', got %s', trim_scale(v.got)) end,
+         to_char(f.sun, 'DD Mon YYYY')) as item,
+  v.got = v.expected as ok
+) t
 union all
 select 'weekend rule', * from (values
   ('A lone Friday is refused',      (not public.weekend_is_whole('2026-10-09','2026-10-09'))),
