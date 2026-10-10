@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="x-apple-disable-message-reformatting">
+<meta name="color-scheme" content="light">
+<meta name="supported-color-schemes" content="light">
+<title>Bizarri Chalet</title>
+<style>
+  @media only screen and (max-width: 620px) {
+    .px { padding-left: 24px !important; padding-right: 24px !important; }
+    .h1 { font-size: 26px !important; line-height: 32px !important; }
+    .ref { font-size: 24px !important; }
+    .btn a { display: block !important; text-align: center !important; }
+  }
+</style>
+</head>
+<body style="margin:0; padding:0; background-color:#f3f2ef; -webkit-text-size-adjust:100%;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f3f2ef" style="background-color:#f3f2ef;">
+  <tr>
+    <td align="center" style="padding:32px 12px;">
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%; max-width:600px; background-color:#ffffff;">
+
+        <!-- Header: the logo on black, as on the website -->
+        <tr>
+          <td align="center" bgcolor="#0a0a0a" style="background-color:#0a0a0a; padding:36px 24px 32px;">
+            <a href="https://bizarri.com/en" target="_blank" style="text-decoration:none;">
+              <img src="https://bizarri.com/email/bizarri-logo-white.png" width="168" height="61" alt="Bizarri Chalet" style="display:block; width:168px; height:auto; border:0; outline:none; color:#ffffff; font-family:Helvetica, Arial, sans-serif; font-size:24px;">
+            </a>
+          </td>
+        </tr>
+
+        <!-- The pool at sunset -->
+        <tr>
+          <td style="line-height:0; font-size:0;">
+            <img src="https://bizarri.com/email/hero.jpg" width="600" alt="The pool at Bizarri Chalet at sunset" style="display:block; width:100%; max-width:600px; height:auto; border:0;">
+          </td>
+        </tr>
+
+        <!-- Message -->
+        <tr>
+          <td class="px" style="padding:44px 48px 0; font-family:'Helvetica Neue', Helvetica, Arial, sans-serif; color:#1a1a1a;">
+            <p style="margin:0 0 14px; font-size:11px; letter-spacing:3px; text-transform:uppercase; color:#8a8a8a;">Bizarri Chalet &middot; Al Khiran</p>
+            <h1 class="h1" style="margin:0 0 24px; font-size:30px; line-height:36px; font-weight:700; color:#0a0a0a;">{{{TITLE}}}</h1>
+            <p style="margin:0 0 16px; font-size:16px; line-height:26px;">Dear {{{GUEST_NAME}}},</p>
+            <p style="margin:0; font-size:16px; line-height:26px; color:#3a3a3a;">{{{MESSAGE}}}</p>
+          </td>
+        </tr>
+
+        <!-- Booking reference -->
+        <tr>
+          <td class="px" style="padding:32px 48px 0;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f3f2ef" style="background-color:#f3f2ef; border-left:3px solid #0a0a0a;">
+              <tr>
+                <td style="padding:20px 24px; font-family:'Helvetica Neue', Helvetica, Arial, sans-serif;">
+                  <p style="margin:0 0 6px; font-size:11px; letter-spacing:3px; text-transform:uppercase; color:#8a8a8a;">Booking reference</p>
+                  <p class="ref" style="margin:0; font-family:'SFMono-Regular', Menlo, Consolas, 'Courier New', monospace; font-size:28px; letter-spacing:2px; color:#0a0a0a;">{{{BOOKING_REF}}}</p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- Stay details -->
+        <tr>
+          <td class="px" style="padding:28px 48px 0;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-family:'Helvetica Neue', Helvetica, Arial, sans-serif; font-size:15px; line-height:22px; color:#1a1a1a;">
+              <tr>
+                <td style="padding:12px 0; border-bottom:1px solid #e6e4df; color:#8a8a8a; width:38%;">Chalet</td>
+                <td style="padding:12px 0; border-bottom:1px solid #e6e4df; font-weight:600;">{{{CHALET}}}</td>
+              </tr>
+              <tr>
+                <td style="padding:12px 0; border-bottom:1px solid #e6e4df; color:#8a8a8a;">Check-in</td>
+                <td style="padding:12px 0; border-bottom:1px solid #e6e4df; font-weight:600;">{{{CHECK_IN}}} &middot; 2:00 PM</td>
+              </tr>
+              <tr>
+                <td style="padding:12px 0; border-bottom:1px solid #e6e4df; color:#8a8a8a;">Check-out</td>
+                <td style="padding:12px 0; border-bottom:1px solid #e6e4df; font-weight:600;">{{{CHECK_OUT}}} &middot; 12:00 PM</td>
+              </tr>
+              <tr>
+                <td style="padding:12px 0; border-bottom:1px solid #e6e4df; color:#8a8a8a;">Guests</td>
+                <td style="padding:12px 0; border-bottom:1px solid #e6e4df; font-weight:600;">{{{GUESTS}}}</td>
+              </tr>
+              <tr>
+                <td style="padding:14px 0 0; color:#8a8a8a;">Total</td>
+                <td style="padding:14px 0 0; font-size:20px; font-weight:700; color:#0a0a0a;">{{{TOTAL}}}</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- Button -->
+        <tr>
+          <td class="px" style="padding:40px 48px 0;">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" class="btn" style="width:auto;">
+              <tr>
+                <td bgcolor="#0a0a0a" style="background-color:#0a0a0a;">
+                  <a href="https://wa.me/96594040955" target="_blank" style="display:inline-block; padding:16px 34px; font-family:'Helvetica Neue', Helvetica, Arial, sans-serif; font-size:13px; letter-spacing:2px; text-transform:uppercase; color:#ffffff; text-decoration:none;">Message us on WhatsApp</a>
+                </td>
+              </tr>
+            </table>
+            <p style="margin:18px 0 0; font-family:'Helvetica Neue', Helvetica, Arial, sans-serif; font-size:13px; line-height:20px; color:#8a8a8a;">You can check your booking any time at <a href="https://bizarri.com/reservation/en" target="_blank" style="color:#0a0a0a; text-decoration:underline;">bizarri.com/reservation</a> with your reference.</p>
+          </td>
+        </tr>
+
+        <!-- Sign-off -->
+        <tr>
+          <td class="px" style="padding:36px 48px 48px; font-family:'Helvetica Neue', Helvetica, Arial, sans-serif; font-size:15px; line-height:24px; color:#1a1a1a;">
+            Warm regards,<br>
+            <strong>The Bizarri Chalet team</strong>
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td class="px" bgcolor="#0a0a0a" style="background-color:#0a0a0a; padding:36px 48px; font-family:'Helvetica Neue', Helvetica, Arial, sans-serif;">
+            <p style="margin:0 0 12px; font-size:12px; letter-spacing:3px; text-transform:uppercase; color:#ffffff;">Bizarri Chalet</p>
+            <p style="margin:0 0 16px; font-size:13px; line-height:21px; color:#a3a3a3;">Al Khiran Al Bahri, Road 278, Phase 3, Kuwait</p>
+            <p style="margin:0 0 20px; font-size:13px; line-height:21px; color:#a3a3a3;">
+              <a href="https://wa.me/96594040955" target="_blank" style="color:#ffffff; text-decoration:none;">WhatsApp&nbsp;+965&nbsp;94040955</a>
+              &nbsp;&middot;&nbsp;
+              <a href="https://www.instagram.com/bizarri_chalet" target="_blank" style="color:#ffffff; text-decoration:none;">Instagram&nbsp;@bizarri_chalet</a>
+              &nbsp;&middot;&nbsp;
+              <a href="https://bizarri.com/en" target="_blank" style="color:#ffffff; text-decoration:none;">bizarri.com</a>
+            </p>
+            <p style="margin:0; font-size:11px; line-height:18px; color:#6b6b6b;">A member of Almail Group &middot; &copy; 2026 Bizarri Chalet</p>
+          </td>
+        </tr>
+
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>
