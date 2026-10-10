@@ -52,8 +52,24 @@ for f in supabase/migrations/*.sql; do
 done
 echo "migrations applied"
 
+# "Today" for the booking rules is public.local_today(). 00_ tests the real
+# one; everything after runs with it pinned to Wednesday 30 September 2026,
+# the day the fixtures were written for. Dates like "Thu 8 October 2026" are
+# then always in the future, instead of the suite failing one fixture at a
+# time as the real calendar overtakes them.
+pin_today() {
+  "${PSQL[@]}" -d "$DB" -c "set role app_owner;" -c "
+    create or replace function public.local_today(p_at timestamptz default now())
+    returns date language sql stable as \$\$ select date '2026-09-30' \$\$;" > /dev/null
+}
+
 fail=0
+pinned=0
 for f in supabase/tests/[0-9]*.sql; do
+  case "$(basename "$f")" in
+    00_*) ;;
+    *) if [ "$pinned" -eq 0 ]; then pin_today; pinned=1; echo "(today pinned to 2026-09-30)"; fi ;;
+  esac
   echo "── $(basename "$f")"
   if out=$(psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$DB" -q -f "$f" 2>&1); then
     echo "$out" | sed 's/^psql:[^ ]* //; s/^NOTICE:  //' | grep -E '^(PASS|FAIL)' || true

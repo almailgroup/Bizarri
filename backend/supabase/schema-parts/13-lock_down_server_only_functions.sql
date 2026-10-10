@@ -1,5 +1,5 @@
 -- ============================================================================
--- Part 13 of 13: lock_down_server_only_functions
+-- Part 13 of 14: lock_down_server_only_functions
 --
 -- Paste this whole file into the Supabase SQL editor and Run, then move on
 -- to the next part. Run them in order; each one is safe to run twice.

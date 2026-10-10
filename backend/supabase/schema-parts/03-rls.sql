@@ -1,5 +1,5 @@
 -- ============================================================================
--- Part 3 of 13: rls
+-- Part 3 of 14: rls
 --
 -- Paste this whole file into the Supabase SQL editor and Run, then move on
 -- to the next part. Run them in order; each one is safe to run twice.

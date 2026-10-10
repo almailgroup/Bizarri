@@ -1,5 +1,5 @@
 -- ============================================================================
--- Part 8 of 13: email_verification_and_phone_lookup
+-- Part 8 of 14: email_verification_and_phone_lookup
 --
 -- Paste this whole file into the Supabase SQL editor and Run, then move on
 -- to the next part. Run them in order; each one is safe to run twice.

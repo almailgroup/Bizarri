@@ -6,8 +6,9 @@
 -- from schema-parts/ is always the fix, and is safe even if it already ran.
 --
 -- The dates are October 2026, chosen because the 4th is a Sunday: the 8th-10th
--- is a Thu-Sat weekend and the 11th-17th a full Sun-Sat week. They are in the
--- future and nothing is inserted, so this is safe to run against production.
+-- is a Thu-Sat weekend and the 11th-17th a full Sun-Sat week. They are only
+-- arithmetic -- prices and weekdays -- so whether they have passed does not
+-- matter, and nothing is inserted, so this is safe to run against production.
 --
 -- What it cannot tell you is anything outside Postgres: whether the Edge
 -- Functions are deployed, whether the booking webhooks are wired, or whether
@@ -27,7 +28,8 @@ select 'migrations' as area, * from (values
   ('10 three-way lookup', (to_regprocedure('public.lookup_booking_by_email(text)')       is not null)),
   ('11 latin digits',     ((select bool_and(name_ar !~ '[٠-٩]') from public.chalets))),
   ('12 weekend rule',     (to_regprocedure('public.weekend_is_whole(date,date)')         is not null)),
-  ('13 function lockdown', (not has_function_privilege('anon','public.start_email_verification(text)','execute')))
+  ('13 function lockdown', (not has_function_privilege('anon','public.start_email_verification(text)','execute'))),
+  ('14 Kuwait today',     (to_regprocedure('public.local_today(timestamptz)')            is not null))
 ) t(item, ok)
 union all
 select 'pricing', * from (values
@@ -45,7 +47,12 @@ select 'weekend rule', * from (values
   ('Sun-Thu is refused',            (not public.weekend_is_whole('2026-10-04','2026-10-08'))),
   ('A whole Thu-Sat is allowed',    (public.weekend_is_whole('2026-10-08','2026-10-10'))),
   ('A single weekday is allowed',   (public.weekend_is_whole('2026-10-05','2026-10-05'))),
-  ('Sun-Wed is allowed',            (public.weekend_is_whole('2026-10-04','2026-10-07')))
+  ('Sun-Wed is allowed',            (public.weekend_is_whole('2026-10-04','2026-10-07'))),
+  -- "Past" means past in Kuwait, not on the server's UTC clock, which runs
+  -- three hours behind and used to keep the day that had just ended open.
+  ('Today is Kuwait''s today',      (public.local_today() = (now() at time zone 'Asia/Kuwait')::date)),
+  ('…and availability goes by it',  (pg_get_functiondef('public.is_range_available(smallint,date,date)'::regprocedure) like '%local_today%'
+                                     and pg_get_functiondef('public.availability_calendar(smallint,date,date)'::regprocedure) like '%local_today%'))
 ) t(item, ok)
 union all
 select 'guest access', * from (values

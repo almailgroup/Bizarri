@@ -165,6 +165,16 @@ function Booking() {
   const navigate = Route.useNavigate();
   const [chaletId, setChaletId] = useState(1);
 
+  // Chalet 1 to start with, but only while it is on offer. Guests see active
+  // chalets only, and the picker hides itself when one is left -- so with
+  // chalet 1 switched off in the admin, the page used to stay on it: a
+  // calendar for a chalet nobody can book, and a request that failed at the
+  // very end, after the Civil ID and the email code, with "Unknown chalet".
+  const { data: chalets } = useChalets();
+  useEffect(() => {
+    if (chalets?.length && !chalets.some((c) => c.id === chaletId)) setChaletId(chalets[0].id);
+  }, [chalets, chaletId]);
+
   // The offer chosen on the Offers page, read as the calendar first opens and
   // then dropped from the address -- replaced, so Back still returns to the
   // offers -- leaving the guest free to choose something else from there.
@@ -307,7 +317,13 @@ function RatesStrip() {
   if (!rates) return null;
 
   const today = fmtDate(new Date());
-  const upcoming = (occasions ?? []).filter((o) => o.end >= today).slice(0, 2);
+  // The next two that can still be booked: from their first day, as on the
+  // Holiday card and the Offers page, and nearest first rather than in
+  // whatever order the database returned them.
+  const upcoming = (occasions ?? [])
+    .filter((o) => o.start >= today)
+    .sort((a, b) => a.start.localeCompare(b.start))
+    .slice(0, 2);
 
   const items = [
     { label: tr("weekdayPkg"), price: rates.weekday },
@@ -461,6 +477,12 @@ function Calendar({
   }, []);
   const [civilId, setCivilId] = useState<File | null>(null);
   const [terms, setTerms] = useState(false);
+  // The address the guest proved, and when. Here rather than in the form, for
+  // the same reason as everything above: the form unmounts when the guest
+  // goes back to change the dates -- the usual next move after "those dates
+  // are no longer available" -- and with it went the confirmation, so the
+  // next Submit mailed a new code the server did not need.
+  const [verified, setVerified] = useState<{ email: string; at: number } | null>(null);
 
   // A year of availability in one request, so paging months is instant and the
   // blocked set always comes from the server rather than the browser.
@@ -565,8 +587,11 @@ function Calendar({
   const holidays = useMemo(() => {
     const iso = fmtDate(today);
     const horizon = fmtDate(windowEnd);
+    // From its first day, not its last: a holiday is sold whole, so one
+    // already under way cannot be booked -- windowsIn() leaves it out -- and
+    // naming it on the card offered something no tap could choose.
     return (occasions ?? [])
-      .filter((o) => o.end >= iso && o.start <= horizon)
+      .filter((o) => o.start >= iso && o.start <= horizon)
       .sort((a, b) => a.start.localeCompare(b.start));
   }, [occasions, today, windowEnd]);
   const holidaysAhead = holidays.length > 0;
@@ -844,6 +869,8 @@ function Calendar({
         setCivilId={setCivilId}
         terms={terms}
         setTerms={setTerms}
+        verified={verified}
+        setVerified={setVerified}
         onBack={backToDates}
         onDone={onDone}
       />
@@ -1322,6 +1349,8 @@ function BookingForm({
   setCivilId,
   terms,
   setTerms,
+  verified,
+  setVerified,
   onBack,
   onDone,
 }: {
@@ -1337,6 +1366,8 @@ function BookingForm({
   setCivilId: (f: File | null) => void;
   terms: boolean;
   setTerms: (v: boolean) => void;
+  verified: { email: string; at: number } | null;
+  setVerified: (v: { email: string; at: number } | null) => void;
   onBack: () => void;
   onDone: (b: BookingRow) => void;
 }) {
@@ -1348,8 +1379,13 @@ function BookingForm({
   // The address that was actually proved, not a boolean: editing the field
   // after confirming has to drop the confirmation, and comparing the two is
   // the only way to notice.
-  const [verifiedEmail, setVerifiedEmail] = useState<string | null>(null);
-  const emailVerified = verifiedEmail !== null && verifiedEmail === details.email.trim();
+  // Confirmed for this address, and recently enough: the server honours a
+  // confirmation for an hour, so past 55 minutes ask again rather than send
+  // a request it will turn down.
+  const emailVerified =
+    verified !== null &&
+    verified.email === details.email.trim() &&
+    Date.now() - verified.at < 55 * 60_000;
   const [uploading, setUploading] = useState(false);
   const [errors, setErrors] = useState<
     Partial<Record<keyof GuestDetails | "civilId" | "terms", string>>
@@ -1421,19 +1457,31 @@ function BookingForm({
       setUploading(false);
     }
 
-    const booking = await request.mutateAsync({
-      chaletId,
-      start,
-      end,
-      name: details.name,
-      phone: details.phone,
-      email: details.email,
-      guests: Number(details.guests),
-      notes: details.notes,
-      civilIdPath,
-      termsAccepted: terms,
-      lang,
-    });
+    // A refusal -- dates taken a minute ago, a throttle -- is shown under the
+    // form from the mutation's own state (request.isError). It used to be
+    // thrown as well, from a call nothing awaited, which surfaced as an
+    // unhandled promise rejection on every refusal.
+    let booking: BookingRow;
+    try {
+      booking = await request.mutateAsync({
+        chaletId,
+        start,
+        end,
+        name: details.name,
+        phone: details.phone,
+        email: details.email,
+        guests: Number(details.guests),
+        notes: details.notes,
+        civilIdPath,
+        termsAccepted: terms,
+        lang,
+      });
+    } catch (err) {
+      // The server's confirmation lapsed (it lasts an hour): forget ours too,
+      // so the next Submit asks for a fresh code instead of failing again.
+      if (/confirm your email/i.test((err as Error).message)) setVerified(null);
+      return;
+    }
     rememberGuest({ name: details.name, phone: details.phone, email: details.email });
     onDone(booking);
   };
@@ -1714,7 +1762,7 @@ function BookingForm({
           email={details.email}
           onClose={() => closeCode()}
           onVerified={(e) => {
-            setVerifiedEmail(e);
+            setVerified({ email: e, at: Date.now() });
             setErrors((prev) => ({ ...prev, email: undefined }));
             // Off the dialog's entry before the request goes, so that the
             // confirmation replaces the form's entry rather than the

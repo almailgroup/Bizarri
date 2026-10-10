@@ -45,7 +45,7 @@ begin
 
   -- a stay starting today
   begin
-    b := public.request_booking(1::smallint, current_date, current_date + 3,
+    b := public.request_booking(1::smallint, public.local_today(), public.local_today() + 3,
           'Same Day', '+96599999999', 'today@example.com', 2::smallint, null, 'ids/today.jpg', true);
     perform pg_temp.ok('Stay starting today is allowed', b.ref is not null, b.ref);
   exception when others then
@@ -54,7 +54,7 @@ begin
 
   -- a stay starting yesterday
   begin
-    b := public.request_booking(1::smallint, current_date - 1, current_date + 3,
+    b := public.request_booking(1::smallint, public.local_today() - 1, public.local_today() + 3,
           'Past Start', '+96599999999', 'past@example.com', 2::smallint, null, 'ids/past.jpg', true);
     perform pg_temp.ok('Stay starting in the past rejected', false, 'accepted');
   exception when others then
@@ -120,7 +120,7 @@ do $$
 declare n integer;
 begin
   begin
-    select count(*) into n from public.availability_calendar(1::smallint, current_date, current_date + 5);
+    select count(*) into n from public.availability_calendar(1::smallint, public.local_today(), public.local_today() + 5);
     perform pg_temp.ok('availability_calendar survives (rates present)', n = 6, format('%s rows', n));
   exception when others then
     perform pg_temp.ok('availability_calendar survives', false, left(sqlerrm, 60));

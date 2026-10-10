@@ -1,5 +1,5 @@
 -- ============================================================================
--- Part 12 of 13: weekend_is_one_product
+-- Part 12 of 14: weekend_is_one_product
 --
 -- Paste this whole file into the Supabase SQL editor and Run, then move on
 -- to the next part. Run them in order; each one is safe to run twice.

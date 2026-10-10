@@ -32,10 +32,12 @@ function Offers() {
       : "أسعار خاصة في شاليه بيزاري للأعياد والعطل الرسمية والمناسبات.",
   );
   const { data: occasions, isLoading } = useSpecialOccasions();
-  // Past windows are noise on an offers page; only what can still be booked.
+  // Only what can still be booked: a holiday is sold whole, so one that has
+  // already begun is gone, not "on" -- listing it led to a booking page with
+  // nothing in it to choose.
   const today = fmtDate(new Date());
   const upcoming = (occasions ?? [])
-    .filter((o) => o.end >= today)
+    .filter((o) => o.start >= today)
     .sort((a, b) => a.start.localeCompare(b.start));
 
   const [chosen, setChosen] = useState<string | null>(null);

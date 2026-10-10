@@ -116,11 +116,27 @@ begin
   perform pg_temp.ok('Clear range is available',
     public.is_range_available(1::smallint, date '2026-10-11', date '2026-10-17'));
   perform pg_temp.ok('Past range is unavailable',
-    not public.is_range_available(1::smallint, current_date - 5, current_date - 1));
+    not public.is_range_available(1::smallint, public.local_today() - 5, public.local_today() - 1));
   perform pg_temp.ok('Blocking chalet 1 does not block chalet 2',
     public.is_range_available(2::smallint, date '2026-10-04', date '2026-10-07'));
 end $$;
 delete from public.blocked_dates where day = '2026-10-06';
+
+-- "Past" is decided by public.local_today() -- Kuwait's date -- not by the
+-- server's UTC current_date. run.sh pins it to 2026-09-30, so these hold
+-- only if both functions really ask it.
+do $$
+declare y boolean; t boolean;
+begin
+  perform pg_temp.ok('Yesterday in Kuwait cannot be booked',
+    not public.is_range_available(2::smallint, date '2026-09-29', date '2026-09-29'));
+  perform pg_temp.ok('Today in Kuwait can',
+    public.is_range_available(2::smallint, date '2026-09-30', date '2026-09-30'));
+  select blocked into y from public.availability_calendar(2::smallint, date '2026-09-29', date '2026-09-30') where day = date '2026-09-29';
+  select blocked into t from public.availability_calendar(2::smallint, date '2026-09-29', date '2026-09-30') where day = date '2026-09-30';
+  perform pg_temp.ok('The calendar shows Kuwait''s yesterday as gone and today as open',
+    y and not t, format('yesterday blocked=%s, today blocked=%s', y, t));
+end $$;
 
 do $$
 declare n integer; blocked integer;
