@@ -440,8 +440,9 @@ export function renderDecision(
         chat: "Message us on WhatsApp",
       };
   const t =
-    (copy as Record<string, { title: string; body: string }>)[status] ??
-    copy.accepted;
+    (copy as unknown as Record<string, { title: string; body: string }>)[
+      status
+    ] ?? copy.accepted;
 
   const row = (label: string, value: string) =>
     `<tr><td style="padding:6px 16px 6px 0;color:#666">${esc(label)}</td>` +
@@ -553,30 +554,39 @@ async function sendEmail(booking: BookingRecord): Promise<DeliveryResult> {
   const from =
     Deno.env.get("NOTIFY_FROM") ?? "Bizarri Chalet <onboarding@resend.dev>";
 
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${key}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from,
-      to,
-      subject: `New booking ${booking.ref} — Chalet ${booking.chalet_id}`,
-      html: render(booking),
-      reply_to: booking.guest_email,
-    }),
-  });
+  // Caught here like the guest's and the decision emails: a network error
+  // reaching Resend used to escape, reject the Promise.all in the handler,
+  // and turn the whole delivery into a 500 -- taking the guest's copy down
+  // with the team's, though the two are meant to be independent.
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from,
+        to,
+        subject: `New booking ${booking.ref} — Chalet ${booking.chalet_id}`,
+        html: render(booking),
+        reply_to: booking.guest_email,
+      }),
+    });
 
-  if (!res.ok) {
-    console.error(
-      "notify-booking: resend failed",
-      res.status,
-      await res.text(),
-    );
+    if (!res.ok) {
+      console.error(
+        "notify-booking: resend failed",
+        res.status,
+        await res.text(),
+      );
+      return { attempted: true, delivered: false };
+    }
+    return { attempted: true, delivered: true };
+  } catch (e) {
+    console.error("notify-booking: team email error", e);
     return { attempted: true, delivered: false };
   }
-  return { attempted: true, delivered: true };
 }
 
 /**

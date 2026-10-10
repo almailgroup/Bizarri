@@ -36,7 +36,11 @@ const built = await build({
 
 // The module calls Deno.serve at the top level, so importing it starts a
 // server unless Deno is stubbed. Nothing here needs a real one.
-globalThis.Deno = { serve: () => {}, env: { get: () => undefined } };
+// The handler is captured rather than discarded, so the delivery as a whole
+// can be exercised too; env is a map a test can fill in.
+let handler = null;
+const env = {};
+globalThis.Deno = { serve: (h) => (handler = h), env: { get: (k) => env[k] } };
 
 const { classify, renderDecision, renderGuest, render, renderWhatsApp, checkOutDate } =
   await import(
@@ -261,6 +265,53 @@ ck(
       .split("\n")
       .filter((l) => l.startsWith("Check"))
       .join(" | "),
+  );
+}
+
+// ===================================== one failed send does not sink the rest
+// The team's email let a network error escape: it rejected the Promise.all
+// in the handler, the delivery became a 500, and the guest's copy went with
+// it. Each send now fails alone.
+{
+  ck("The handler was captured", typeof handler === "function");
+  env.RESEND_API_KEY = "re_test";
+  const sent = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    const body = JSON.parse(init?.body ?? "{}");
+    // The team's copy goes to the notification list, the guest's to them.
+    if (String(url).includes("resend.com") && !body.to?.includes("guest@example.com")) {
+      throw new TypeError("error sending request: connection reset");
+    }
+    sent.push(body.to);
+    return new Response(JSON.stringify({ id: "x" }), { status: 200 });
+  };
+  const res = await handler(
+    new Request("http://local/", {
+      method: "POST",
+      body: JSON.stringify({
+        type: "INSERT",
+        table: "bookings",
+        record: booking(),
+        old_record: null,
+      }),
+    }),
+  );
+  const out = await res.json();
+  globalThis.fetch = realFetch;
+  delete env.RESEND_API_KEY;
+  ck(
+    "A failed team email does not fail the delivery",
+    res.status === 200,
+    `${res.status} ${JSON.stringify(out)}`,
+  );
+  ck(
+    "…and the guest's copy still goes",
+    out.guestEmail?.delivered === true && sent.some((t) => t?.includes("guest@example.com")),
+  );
+  ck(
+    "…with the team's reported as not delivered",
+    out.email?.attempted === true && out.email?.delivered === false,
   );
 }
 
