@@ -186,6 +186,20 @@ async function fromOffers(p, pick, from = "offers") {
     "Nothing is chosen until the guest chooses",
     (await p.locator('main button[aria-pressed="true"]').count()) === 0,
   );
+  // The full week used to wear a heavy black border before anyone chose it,
+  // which read as already picked. Unchosen, the three look the same.
+  const borders = await p
+    .locator("main .grid button[aria-pressed]")
+    .evaluateAll((els) =>
+      els.map(
+        (el) => `${getComputedStyle(el).borderTopWidth} ${getComputedStyle(el).borderTopColor}`,
+      ),
+    );
+  ck(
+    "…and no package is singled out before then",
+    borders.length === 3 && new Set(borders).size === 1,
+    borders.join(" | "),
+  );
   const plain = new URL((await cta(p).getAttribute("href")) ?? "", B);
   ck(
     "…and the button then goes to a plain booking page",

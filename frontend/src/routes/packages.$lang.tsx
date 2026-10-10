@@ -49,7 +49,6 @@ function Packages() {
       length: tr("days7"),
       span: lang === "en" ? "Sunday → Saturday" : "الأحد → السبت",
       price: rates.fullWeek,
-      feature: true,
     },
     {
       key: "weekday" as const,
@@ -57,7 +56,6 @@ function Packages() {
       length: tr("days4"),
       span: lang === "en" ? "Sunday → Wednesday" : "الأحد → الأربعاء",
       price: rates.weekday,
-      feature: false,
     },
     {
       key: "weekend" as const,
@@ -65,7 +63,6 @@ function Packages() {
       length: tr("days3"),
       span: lang === "en" ? "Thursday → Saturday" : "الخميس → السبت",
       price: rates.weekend,
-      feature: false,
     },
   ];
 
@@ -95,8 +92,8 @@ function Packages() {
               <Reveal key={p.key} delay={i * 80}>
                 {/* A choice, not a poster: the chosen card turns light grey
                   with a dark border and a tick -- grey rather than black,
-                  which read as heavy on a phone. The featured package keeps a
-                  heavier border, so it stands out without looking picked. */}
+                  which read as heavy on a phone. Unchosen, every package
+                  looks the same: none is singled out before the guest picks. */}
                 <button
                   type="button"
                   onClick={() => choose({ shape: p.key })}
@@ -104,9 +101,7 @@ function Packages() {
                   className={`relative flex h-full w-full flex-col justify-between border p-8 text-start transition-colors ${
                     on
                       ? "border-foreground bg-secondary"
-                      : p.feature
-                        ? "border-2 border-foreground hover:bg-secondary/50"
-                        : "border-border hover:border-foreground/50"
+                      : "border-border hover:border-foreground/50"
                   }`}
                 >
                   {on && (
