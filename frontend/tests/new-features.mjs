@@ -729,7 +729,7 @@ async function adminPage(state, tab) {
 // ================================================ admin: occasions panel
 {
   const state = makeState();
-  const { p, ctx } = await adminPage(state, /Special Occasions/i);
+  const { p, ctx } = await adminPage(state, /^Occasions$/i);
   ck(
     "Occasions tab lists the existing window",
     await p.getByText("Eid Al-Fitr").first().isVisible(),
@@ -1587,7 +1587,7 @@ const leaks = (text) => {
 }
 
 for (const [label, tab] of [
-  ["Special Occasions", /Special Occasions/i],
+  ["Occasions", /^Occasions$/i],
   ["Booking Requests", /Booking Requests/i],
   ["Overview", /Overview/i],
 ]) {

@@ -326,7 +326,11 @@ for (const [name, re, source] of [
 {
   const { ctx, p } = await page();
   await fromOffers(p, () => p.getByRole("button", { name: /National Day/i }).click());
-  ck("A holiday opens on the Holiday shape", (await shapeOn(p)) === "HOLIDAY", await shapeOn(p));
+  ck(
+    "An occasion opens on the Occasions shape",
+    (await shapeOn(p)) === "OCCASIONS",
+    await shapeOn(p),
+  );
   ck(
     "…on its month",
     ((await p.locator('[role="grid"]').getAttribute("aria-label")) ?? "").includes(

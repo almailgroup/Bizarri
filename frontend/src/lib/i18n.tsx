@@ -219,17 +219,20 @@ export const t: Dict = {
   filterWeekdayNote: { en: "Sun – Wed · 4 days", ar: "الأحد – الأربعاء · 4 أيام" },
   // The card only appears when an occasion is coming up, and names it; the
   // note is the fallback for the moment before the occasions have loaded.
-  filterHoliday: { en: "Holiday", ar: "العطلات" },
-  filterHolidayNote: { en: "Eid & public holidays", ar: "الأعياد والعطل الرسمية" },
+  // Shown as "Occasions": the same windows the admin enters under Occasions.
+  // The keys keep their old names, as does the shape's value in the address,
+  // so links already shared still open on it.
+  filterHoliday: { en: "Occasions", ar: "المناسبات" },
+  filterHolidayNote: { en: "Eid & national days", ar: "الأعياد والمناسبات الوطنية" },
   noHolidaysTitle: {
-    en: "No holiday dates are open yet",
-    ar: "لا توجد مواعيد عطلات متاحة للحجز حالياً",
+    en: "No occasion dates are open yet",
+    ar: "لا توجد مناسبات متاحة للحجز حالياً",
   },
   noHolidaysBody: {
-    en: "Holiday stays open for booking as each holiday is announced, each at its own price. Message us on WhatsApp and we will tell you as soon as the next one opens.",
-    ar: "تُفتح إقامات العطلات للحجز عند الإعلان عن كل عطلة، ولكل منها سعرها الخاص. راسلنا عبر واتساب وسنبلغك فور فتح الحجز للعطلة القادمة.",
+    en: "Occasion stays open for booking as each occasion is announced, each at its own price. Message us on WhatsApp and we will tell you as soon as the next one opens.",
+    ar: "تُفتح إقامات المناسبات للحجز عند الإعلان عن كل مناسبة، ولكل منها سعرها الخاص. راسلنا عبر واتساب وسنبلغك فور فتح الحجز للمناسبة القادمة.",
   },
-  askAboutHolidays: { en: "Ask about holidays", ar: "اسأل عن العطلات" },
+  askAboutHolidays: { en: "Ask about occasions", ar: "اسأل عن المناسبات" },
   filterWeekend: { en: "Weekend", ar: "نهاية الأسبوع" },
   filterWeekendNote: { en: "Thu – Sat · 3 days", ar: "الخميس – السبت · 3 أيام" },
   filterHint: {
@@ -244,8 +247,8 @@ export const t: Dict = {
     en: "No complete stay of this type is left in this month.",
     ar: "لا توجد إقامة كاملة من هذا النوع متبقية في هذا الشهر.",
   },
-  specialPkg: { en: "Special occasion", ar: "مناسبة خاصة" },
-  specialOccasions: { en: "Special Occasions", ar: "المناسبات الخاصة" },
+  specialPkg: { en: "Occasion", ar: "مناسبة" },
+  specialOccasions: { en: "Occasions", ar: "المناسبات" },
   occasionsHint: {
     en: "Premium windows such as Eid. The price is a flat total for the whole window, and it replaces the normal package rate.",
     ar: "فترات مميزة مثل الأعياد. السعر إجمالي ثابت للفترة كاملة، ويحل محل سعر الباقة المعتاد.",
@@ -257,7 +260,7 @@ export const t: Dict = {
   occasionName: { en: "Occasion", ar: "المناسبة" },
   occasionNameAr: { en: "Occasion (Arabic)", ar: "المناسبة (بالعربية)" },
   addOccasion: { en: "Add occasion", ar: "إضافة مناسبة" },
-  noOccasions: { en: "No special occasions yet.", ar: "لا توجد مناسبات خاصة بعد." },
+  noOccasions: { en: "No occasions yet.", ar: "لا توجد مناسبات بعد." },
   occasionOverlaps: {
     en: "Those dates overlap another active occasion. Adjust the dates or deactivate the other one.",
     ar: "هذه التواريخ تتداخل مع مناسبة أخرى مفعّلة. عدّل التواريخ أو عطّل الأخرى.",

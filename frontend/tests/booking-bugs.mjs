@@ -241,15 +241,15 @@ async function submitWithCode(p, state) {
   );
   await p.goto(`${B}booking/en`, { waitUntil: "load" });
   await p.waitForTimeout(900);
-  await p.getByRole("button", { name: /^Holiday/i }).click();
+  await p.getByRole("button", { name: /^Occasions/i }).click();
   await p.waitForTimeout(500);
   ck(
-    "…nor named on the booking page's Holiday card",
+    "…nor named on the booking page's Occasions card",
     (await p.getByText("Running Holiday").count()) === 0,
   );
   ck(
-    "…which says no holiday is open, rather than showing one that cannot be chosen",
-    await p.getByText("No holiday dates are open yet").isVisible(),
+    "…which says no occasion is open, rather than showing one that cannot be chosen",
+    await p.getByText("No occasion dates are open yet").isVisible(),
   );
   await ctx.close();
 }
