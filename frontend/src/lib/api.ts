@@ -567,6 +567,50 @@ export function useSetDayPrices() {
   });
 }
 
+/**
+ * Move a booking: other dates, the other chalet, or both. Goes through
+ * admin_update_booking(), which checks an accepted booking does not land on
+ * another or on a closed day, and prices the new dates if asked to.
+ */
+export function useAdminUpdateBooking() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      id: string;
+      chaletId: number;
+      start: string;
+      end: string;
+      reprice: boolean;
+    }): Promise<BookingRow> => {
+      const { data, error } = await supabase.rpc("admin_update_booking", {
+        p_id: input.id,
+        p_chalet_id: input.chaletId,
+        p_start: input.start,
+        p_end: input.end,
+        p_reprice: input.reprice,
+      });
+      if (error) fail("Could not move the booking", error);
+      return data as unknown as BookingRow;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.bookings });
+      qc.invalidateQueries({ queryKey: ["calendar"] });
+    },
+  });
+}
+
+/** The shortest stay the site will take, in days (rates.min_stay_days). */
+export function useSaveMinStay() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (days: number) => {
+      const { error } = await supabase.from("rates").update({ min_stay_days: days }).eq("id", true);
+      if (error) fail("Could not save the minimum stay", error);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.rates }),
+  });
+}
+
 export function useSaveRates() {
   const qc = useQueryClient();
   return useMutation({
@@ -835,6 +879,7 @@ export function useUpdateBookingDetails() {
           | "admin_note"
           | "total"
           | "deposit"
+          | "lang"
         >
       >;
     }) => {

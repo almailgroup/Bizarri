@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { PartyPopper, Plus, Trash2 } from "lucide-react";
+import { PartyPopper, Pencil, Plus, Trash2 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { useAllOccasions, useDeleteOccasion, useSaveOccasion } from "@/lib/api";
 import { formatMoney, formatSpan, parseDate } from "@/lib/booking";
@@ -11,8 +11,10 @@ import {
   Btn,
   Card,
   EmptyState,
+  ErrorNote,
   Field,
   IconBtn,
+  Modal,
   PanelHeader,
   SkeletonList,
   Tag,
@@ -30,6 +32,7 @@ export function OccasionsPanel() {
   const remove = useDeleteOccasion();
   const [form, setForm] = useState(BLANK);
   const [pendingDelete, setPendingDelete] = useState<SpecialOccasionRow | null>(null);
+  const [editing, setEditing] = useState<SpecialOccasionRow | null>(null);
 
   // The DB refuses overlapping active windows; say so in plain language
   // rather than surfacing the raw exclusion-constraint text.
@@ -187,6 +190,9 @@ export function OccasionsPanel() {
                   />
                   {tr("activeLabel")}
                 </label>
+                <IconBtn label={`${t("edit")} ${o.name_en}`} onClick={() => setEditing(o)}>
+                  <Pencil className="h-4 w-4" />
+                </IconBtn>
                 <IconBtn
                   tone="danger"
                   label={`${t("delete")} ${o.name_en}`}
@@ -198,6 +204,10 @@ export function OccasionsPanel() {
             </Card>
           ))}
         </ul>
+      )}
+
+      {editing && (
+        <EditOccasionModal occasion={editing} onClose={() => setEditing(null)} explain={explain} />
       )}
 
       {pendingDelete && (
@@ -213,5 +223,170 @@ export function OccasionsPanel() {
         />
       )}
     </section>
+  );
+}
+
+/**
+ * Every field of an occasion already set: its names, its dates, its price and
+ * whether it is on. The overlap rule is the database's, and a refusal comes
+ * back in words (see explain) rather than as constraint text.
+ */
+function EditOccasionModal({
+  occasion,
+  onClose,
+  explain,
+}: {
+  occasion: SpecialOccasionRow;
+  onClose: () => void;
+  explain: (err: unknown) => string;
+}) {
+  const { tr } = useI18n();
+  const t = useAdminT();
+  const toast = useToast();
+  const save = useSaveOccasion();
+  const [form, setForm] = useState({
+    name_en: occasion.name_en,
+    name_ar: occasion.name_ar ?? "",
+    start_date: occasion.start_date,
+    end_date: occasion.end_date,
+    price: String(occasion.price),
+    active: occasion.active,
+  });
+  const valid =
+    form.name_en.trim().length > 0 &&
+    form.start_date !== "" &&
+    form.end_date !== "" &&
+    form.end_date >= form.start_date &&
+    form.price.trim() !== "" &&
+    Number(form.price) >= 0;
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!valid) return;
+    save.mutate(
+      { id: occasion.id, ...form, price: Number(form.price) },
+      {
+        onSuccess: () => {
+          toast.success(t("saved"));
+          onClose();
+        },
+      },
+    );
+  };
+
+  return (
+    <Modal
+      title={t("editOccasion")}
+      description={occasion.name_en}
+      onClose={onClose}
+      busy={save.isPending}
+      footer={
+        <>
+          <Btn onClick={onClose} disabled={save.isPending}>
+            {tr("cancel")}
+          </Btn>
+          <Btn
+            type="submit"
+            form="edit-occasion-form"
+            variant="primary"
+            busy={save.isPending}
+            disabled={!valid}
+          >
+            {save.isPending ? t("saving") : tr("saveChanges")}
+          </Btn>
+        </>
+      }
+    >
+      <form id="edit-occasion-form" onSubmit={submit} className="space-y-4">
+        {save.error && <ErrorNote>{explain(save.error)}</ErrorNote>}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field
+            label={tr("occasionName")}
+            error={form.name_en.trim() ? undefined : t("errOccasionName")}
+          >
+            {(a) => (
+              <input
+                {...a}
+                value={form.name_en}
+                onChange={(e) => setForm({ ...form, name_en: e.target.value })}
+                className={inputClass}
+              />
+            )}
+          </Field>
+          <Field label={tr("occasionNameAr")}>
+            {(a) => (
+              <input
+                {...a}
+                dir="rtl"
+                value={form.name_ar}
+                onChange={(e) => setForm({ ...form, name_ar: e.target.value })}
+                className={inputClass}
+              />
+            )}
+          </Field>
+          <Field label={tr("startDate")}>
+            {(a) => (
+              <input
+                {...a}
+                type="date"
+                value={form.start_date}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setForm((f) => ({
+                    ...f,
+                    start_date: v,
+                    end_date: f.end_date && f.end_date < v ? v : f.end_date,
+                  }));
+                }}
+                className={inputClass}
+              />
+            )}
+          </Field>
+          <Field
+            label={tr("endDate")}
+            error={form.end_date && form.end_date < form.start_date ? t("errOrder") : undefined}
+          >
+            {(a) => (
+              <input
+                {...a}
+                type="date"
+                min={form.start_date || undefined}
+                value={form.end_date}
+                onChange={(e) => setForm({ ...form, end_date: e.target.value })}
+                className={inputClass}
+              />
+            )}
+          </Field>
+          <Field
+            label={tr("priceLabel")}
+            error={
+              form.price.trim() !== "" && Number(form.price) >= 0 ? undefined : t("invalidPrice")
+            }
+          >
+            {(a) => (
+              <input
+                {...a}
+                type="number"
+                min={0}
+                step="0.001"
+                value={form.price}
+                onChange={(e) => setForm({ ...form, price: e.target.value })}
+                className={inputClass}
+              />
+            )}
+          </Field>
+          <label className="flex min-h-11 cursor-pointer items-center gap-3 self-end text-sm">
+            <input
+              type="checkbox"
+              role="switch"
+              checked={form.active}
+              onChange={(e) => setForm({ ...form, active: e.target.checked })}
+              className="admin-switch"
+            />
+            {tr("activeLabel")}
+          </label>
+        </div>
+      </form>
+    </Modal>
   );
 }

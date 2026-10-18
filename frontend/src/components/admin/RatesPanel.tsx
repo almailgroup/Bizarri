@@ -2,7 +2,13 @@ import { useEffect, useState } from "react";
 import { RotateCcw, Save } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { DEFAULT_RATES, type Rates } from "@/lib/booking";
-import { useInsuranceDeposit, useRates, useSaveRates, useSaveSetting } from "@/lib/api";
+import {
+  useInsuranceDeposit,
+  useRates,
+  useSaveMinStay,
+  useSaveRates,
+  useSaveSetting,
+} from "@/lib/api";
 import { useAdminT } from "./strings";
 import { errorText, useToast } from "./toast";
 import { Btn, Card, PanelHeader, cx, inputClass } from "./ui";
@@ -33,12 +39,9 @@ export function RatesPanel() {
     {
       key: "fullWeek",
       label: tr("fullWeekPkg"),
-      // Unreachable since the booking page stopped offering a free-form
-      // range: every stay it can produce is one day, Sun-Wed or Thu-Sat, and
-      // none of those is a week. quote_stay() still prices an exact Sun-Sat
-      // at this rate, so an admin entering a stay by hand gets it.
-      hint: lang === "en" ? "Not offered on the site" : "غير معروضة على الموقع",
-      muted: true,
+      // The booking page's Full week option: an exact Sun-Sat, which
+      // quote_stay() prices at this rate instead of the two packages added.
+      hint: lang === "en" ? "Sun – Sat · 7 days" : "الأحد – السبت · 7 أيام",
     },
     {
       key: "weekday",
@@ -143,7 +146,10 @@ export function RatesPanel() {
         </Btn>
       </div>
 
-      <DepositSetting />
+      <div className="mt-8 grid gap-6 lg:grid-cols-2">
+        <DepositSetting />
+        <MinStaySetting />
+      </div>
     </section>
   );
 }
@@ -166,7 +172,7 @@ function DepositSetting() {
   const valid = value.trim() !== "" && Number.isFinite(n) && n >= 0;
 
   return (
-    <Card className="mt-8 p-5 sm:p-6">
+    <Card className="p-5 sm:p-6">
       <h3 className="text-lg font-semibold">{t("depositSetting")}</h3>
       <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{t("depositSettingHint")}</p>
       <div className="mt-4 flex flex-wrap items-end gap-3">
@@ -207,6 +213,64 @@ function DepositSetting() {
           {tr("save")}
         </Btn>
       </div>
+    </Card>
+  );
+}
+
+/** The shortest stay the site takes. The booking page offers no shape shorter. */
+function MinStaySetting() {
+  const { tr } = useI18n();
+  const t = useAdminT();
+  const toast = useToast();
+  const { data: rates } = useRates();
+  const save = useSaveMinStay();
+  const current = rates?.minStayDays ?? 1;
+  const [draft, setDraft] = useState<string | null>(null);
+  const value = draft ?? String(current);
+  const n = Number(value);
+  const valid = Number.isInteger(n) && n >= 1 && n <= 7;
+
+  return (
+    <Card className="p-5 sm:p-6">
+      <h3 className="text-lg font-semibold">{t("minStayTitle")}</h3>
+      <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{t("minStayHint")}</p>
+      <div className="mt-4 flex flex-wrap items-end gap-3">
+        <label className="block w-40">
+          <span className="sr-only">{t("minStayTitle")}</span>
+          <div className="relative">
+            <input
+              type="number"
+              min={1}
+              max={7}
+              value={value}
+              aria-invalid={!valid}
+              onChange={(e) => setDraft(e.target.value)}
+              className={cx(inputClass, "pe-14 text-lg font-semibold tabular-nums")}
+            />
+            <span className="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+              {t("minStayDays")}
+            </span>
+          </div>
+        </label>
+        <Btn
+          variant="primary"
+          disabled={!valid || n === current}
+          busy={save.isPending}
+          icon={<Save className="h-4 w-4" aria-hidden="true" />}
+          onClick={() =>
+            save.mutate(n, {
+              onSuccess: () => {
+                setDraft(null);
+                toast.success(t("saved"));
+              },
+              onError: (err) => toast.error(errorText(err)),
+            })
+          }
+        >
+          {tr("save")}
+        </Btn>
+      </div>
+      {!valid && <p className="mt-2 text-xs text-destructive">{t("errMinStay")}</p>}
     </Card>
   );
 }

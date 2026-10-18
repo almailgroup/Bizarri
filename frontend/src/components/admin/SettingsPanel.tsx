@@ -121,6 +121,23 @@ export function SettingsPanel() {
       />
 
       <div className="space-y-6">
+        {/* The switch request_booking() reads: missing means on. */}
+        <Card className="p-5 sm:p-6">
+          <h3 className="text-lg font-semibold">{t("emailGateTitle")}</h3>
+          <p className="mb-4 mt-1 max-w-2xl text-sm text-muted-foreground">{t("emailGateHint")}</p>
+          <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm">
+            <input
+              type="checkbox"
+              role="switch"
+              checked={settings?.require_email_verification !== false}
+              disabled={save.isPending}
+              onChange={(e) => persist("require_email_verification", e.target.checked)}
+              className="admin-switch"
+            />
+            {t("emailGateOn")}
+          </label>
+        </Card>
+
         <Card className="p-5 sm:p-6">
           <h3 className="mb-4 text-lg font-semibold">{tr("contact")}</h3>
           <div className="grid gap-4 sm:grid-cols-2">

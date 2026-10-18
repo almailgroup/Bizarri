@@ -327,8 +327,8 @@ for (const [name, re, source] of [
   const { ctx, p } = await page();
   await fromOffers(p, () => p.getByRole("button", { name: /National Day/i }).click());
   ck(
-    "An occasion opens on the Occasions shape",
-    (await shapeOn(p)) === "OCCASIONS",
+    "An occasion opens on the Special Occasions shape",
+    (await shapeOn(p)) === "SPECIAL OCCASIONS",
     await shapeOn(p),
   );
   ck(

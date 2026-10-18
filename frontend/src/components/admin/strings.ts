@@ -80,6 +80,34 @@ const s = {
   changeStatus: { en: "Status", ar: "الحالة" },
   delete: { en: "Delete", ar: "حذف" },
 
+  // editing what is already there
+  edit: { en: "Edit", ar: "تعديل" },
+  editOccasion: { en: "Edit special occasion", ar: "تعديل المناسبة الخاصة" },
+  editNews: { en: "Edit news post", ar: "تعديل الخبر" },
+  errOccasionName: { en: "Give it an English name", ar: "أدخل الاسم بالإنجليزية" },
+  bookingMoved: { en: "Booking {ref} updated", ar: "تم تحديث الحجز {ref}" },
+  priceAndNotes: { en: "Price and notes", ar: "السعر والملاحظات" },
+  repriceNew: { en: "Price the new dates from the rates", ar: "تسعير التواريخ الجديدة من الأسعار" },
+  repriceTo: { en: "The total becomes {amount}.", ar: "يصبح الإجمالي {amount}." },
+  repriceKeep: { en: "Off: the total stays {amount}.", ar: "عند الإيقاف: يبقى الإجمالي {amount}." },
+  repriceSetsTotal: {
+    en: "Set from the rates when you save.",
+    ar: "يُحدَّد من الأسعار عند الحفظ.",
+  },
+  minStayTitle: { en: "Minimum stay", ar: "الحد الأدنى للإقامة" },
+  minStayHint: {
+    en: "The shortest booking a guest can make, in days. Shapes shorter than this are not offered on the booking page.",
+    ar: "أقصر حجز يمكن للضيف إجراؤه، بالأيام. لا تُعرض في صفحة الحجز الخيارات الأقصر من ذلك.",
+  },
+  minStayDays: { en: "days", ar: "أيام" },
+  errMinStay: { en: "Between 1 and 7 days", ar: "بين 1 و7 أيام" },
+  emailGateTitle: { en: "Email confirmation code", ar: "رمز تأكيد البريد الإلكتروني" },
+  emailGateHint: {
+    en: "Guests confirm their email with a 6-digit code before a request is sent. Turn this off only if emails are not arriving, so the site keeps taking requests.",
+    ar: "يؤكد الضيوف بريدهم برمز من 6 أرقام قبل إرسال الطلب. أوقفه فقط إذا لم تكن الرسائل تصل، حتى يستمر الموقع في استقبال الطلبات.",
+  },
+  emailGateOn: { en: "Required", ar: "مطلوب" },
+
   // deposit
   deposit: { en: "Refundable deposit", ar: "التأمين المسترد" },
   plusDeposit: { en: "+ {amount} refundable deposit", ar: "+ تأمين مسترد {amount}" },

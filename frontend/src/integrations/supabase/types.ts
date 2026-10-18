@@ -308,6 +308,16 @@ export type Database = {
         Args: { p_id: string; p_status: BookingStatus; p_note?: string | null };
         Returns: BookingRow;
       };
+      admin_update_booking: {
+        Args: {
+          p_id: string;
+          p_chalet_id: number;
+          p_start: string;
+          p_end: string;
+          p_reprice?: boolean;
+        };
+        Returns: BookingRow;
+      };
       admin_create_booking: {
         Args: {
           p_chalet_id: number;

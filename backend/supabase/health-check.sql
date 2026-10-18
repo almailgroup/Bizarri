@@ -37,7 +37,8 @@ select 'migrations' as area, * from (values
   ('15 admin bookings',   (to_regprocedure('public.admin_create_booking(smallint,date,date,text,text,text,smallint,public.booking_status,numeric,text,text,text,boolean)') is not null)),
   ('16 insurance deposit', (to_regprocedure('public.insurance_deposit()')              is not null)),
   ('17 pending holds dates', (exists (select 1 from pg_trigger where tgname = 'guard_guest_overlap'
-                                     and tgrelid = 'public.bookings'::regclass)))
+                                     and tgrelid = 'public.bookings'::regclass))),
+  ('18 admin edits stays', (to_regprocedure('public.admin_update_booking(uuid,smallint,date,date,boolean)') is not null))
 ) t(item, ok)
 union all
 -- Expected from the rates as they stand, not from the defaults: the owner

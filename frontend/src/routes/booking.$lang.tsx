@@ -128,8 +128,10 @@ const FILTER_SHAPE: Record<
   fullWeek: { startDow: 0, length: 7 }, // Sun–Sat, the two packages together
 };
 
-// Holiday beside Weekend; Full week last, being the two before it combined.
-const FILTERS: DateFilter[] = ["day", "weekday", "weekend", "holiday", "fullWeek"];
+// The owner's order: the four that are rules about the week, shortest first,
+// then Special Occasions -- the "holiday" shape, whose stays are whatever the
+// admin has entered rather than a rule.
+const FILTERS: DateFilter[] = ["day", "weekday", "weekend", "fullWeek", "holiday"];
 
 const FILTER_LABEL = {
   day: "filterByDay",

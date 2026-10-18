@@ -159,6 +159,34 @@ function makeState() {
         created_at: new Date().toISOString(),
       },
     ],
+    occasions: [
+      {
+        id: "occ-1",
+        name_en: "Eid Al-Fitr",
+        name_ar: "عيد الفطر",
+        start_date: ymd(at(40)),
+        end_date: ymd(at(42)),
+        price: 900,
+        active: true,
+        created_at: "",
+        updated_at: "",
+        updated_by: null,
+      },
+    ],
+    news: [
+      {
+        id: "news-1",
+        title_en: "Pool reopened",
+        title_ar: "إعادة افتتاح المسبح",
+        body_en: "The pool is open again.",
+        body_ar: "المسبح مفتوح مجددًا.",
+        published: true,
+        published_at: "2026-09-01T09:00:00.000Z",
+        created_at: "2026-09-01T09:00:00.000Z",
+        updated_at: "",
+      },
+    ],
+    minStay: 3,
     blocked: [],
     dayPrices: {},
     calls: [],
@@ -303,6 +331,35 @@ function mock(ctx, state) {
       state.bookings = [row, ...state.bookings];
       return send(row);
     }
+    // A PATCH answers with the row, the way PostgREST does when asked for it.
+    const byId = (rows) => {
+      const id = decodeURIComponent(url.searchParams.get("id") ?? "").replace("eq.", "");
+      const i = rows.findIndex((x) => String(x.id) === id);
+      if (i >= 0) rows[i] = { ...rows[i], ...body };
+      return send([rows[i] ?? {}]);
+    };
+    if (path === "special_occasions")
+      return req.method() === "PATCH" ? byId(state.occasions) : send(state.occasions);
+    if (path === "news") return req.method() === "PATCH" ? byId(state.news) : send(state.news);
+    if (path === "rpc/admin_update_booking") {
+      const bk = state.bookings.find((x) => x.id === body.p_id);
+      const n =
+        Math.round(
+          (new Date(body.p_end + "T00:00:00") - new Date(body.p_start + "T00:00:00")) / 86400000,
+        ) + 1;
+      Object.assign(bk, {
+        chalet_id: body.p_chalet_id,
+        start_date: body.p_start,
+        end_date: body.p_end,
+        days: n,
+        ...(body.p_reprice ? { total: n * 75, package_key: null } : {}),
+      });
+      return send(bk);
+    }
+    if (path === "rates" && req.method() === "PATCH") {
+      if (body?.min_stay_days) state.minStay = body.min_stay_days;
+      return send([]);
+    }
     if (path === "rates")
       return send({
         id: true,
@@ -312,7 +369,7 @@ function mock(ctx, state) {
         daily_weekday: 75,
         daily_weekend: 120,
         currency: "KWD",
-        min_stay_days: 3,
+        min_stay_days: state.minStay,
         updated_at: "",
         updated_by: null,
       });
@@ -1048,6 +1105,204 @@ async function adminPage(state, { phone = false } = {}) {
     await p
       .locator('[data-toast="success"]', { hasText: "BZR-BBB222 marked Accepted" })
       .isVisible(),
+  );
+  await ctx.close();
+}
+
+// ================================ everything set can be changed afterwards
+// An occasion, once added, could only be switched off or deleted; a news post
+// the same. Both now open in a form with every field.
+{
+  const state = makeState();
+  const { p, ctx } = await adminPage(state);
+  await p.getByRole("button", { name: /^Special Occasions$/i }).click();
+  await p.waitForTimeout(500);
+  await p.getByRole("button", { name: "Edit Eid Al-Fitr" }).click();
+  const dialog = p.getByRole("dialog");
+  ck("An occasion opens for editing", await dialog.getByText("Edit special occasion").isVisible());
+  ck(
+    "…with what was set",
+    (await dialog.getByLabel("Occasion", { exact: true }).inputValue()) === "Eid Al-Fitr" &&
+      (await dialog.getByLabel("Price").inputValue()) === "900",
+  );
+  await dialog.getByLabel("Occasion", { exact: true }).fill("Eid Al-Adha");
+  await dialog.getByLabel("End").fill(ymd(at(43)));
+  await dialog.getByLabel("Price").fill("1200");
+  await dialog.getByRole("switch").click();
+  await dialog.getByRole("button", { name: /save changes/i }).click();
+  await p.waitForTimeout(600);
+  const patch = state.calls.find((c) => c.path === "special_occasions" && c.method === "PATCH");
+  ck(
+    "Saving sends every field to that occasion",
+    patch?.search.includes("id=eq.occ-1") &&
+      patch?.body?.name_en === "Eid Al-Adha" &&
+      patch?.body?.name_ar === "عيد الفطر" &&
+      patch?.body?.end_date === ymd(at(43)) &&
+      patch?.body?.price === 1200 &&
+      patch?.body?.active === false,
+    JSON.stringify(patch?.body),
+  );
+  ck(
+    "…closes, and the list shows the change",
+    !(await dialog.isVisible().catch(() => false)) &&
+      (await p.locator("li", { hasText: "Eid Al-Adha" }).first().isVisible()),
+  );
+
+  // A name is needed; the form says so rather than saving a blank.
+  await p.getByRole("button", { name: "Edit Eid Al-Adha" }).click();
+  await dialog.getByLabel("Occasion", { exact: true }).fill(" ");
+  ck(
+    "An occasion cannot be saved without a name",
+    await dialog.getByRole("button", { name: /save changes/i }).isDisabled(),
+  );
+  await dialog.getByRole("button", { name: /cancel/i }).click();
+
+  await p.getByRole("button", { name: /^News$/ }).click();
+  await p.waitForTimeout(500);
+  await p.getByRole("button", { name: "Edit news item" }).click();
+  ck("A news post opens for editing", await dialog.getByText("Edit news post").isVisible());
+  await dialog.getByLabel("Title (English)").fill("Pool and gym reopened");
+  await dialog.getByLabel("Body (English)").fill("Both are open again.");
+  await dialog.getByRole("button", { name: /save changes/i }).click();
+  await p.waitForTimeout(600);
+  const newsPatch = state.calls.find((c) => c.path === "news" && c.method === "PATCH");
+  ck(
+    "Saving a post keeps it published, under its first date",
+    newsPatch?.body?.title_en === "Pool and gym reopened" &&
+      newsPatch?.body?.body_en === "Both are open again." &&
+      newsPatch?.body?.title_ar === "إعادة افتتاح المسبح" &&
+      newsPatch?.body?.published === true &&
+      newsPatch?.body?.published_at === "2026-09-01T09:00:00.000Z",
+    JSON.stringify(newsPatch?.body),
+  );
+  await ctx.close();
+}
+
+// ==================================== a booking's dates and chalet can move
+{
+  const state = makeState();
+  const { p, ctx } = await adminPage(state);
+  await p.getByRole("button", { name: "Booking Requests" }).click();
+  await p.waitForTimeout(400);
+  await p.locator("li", { hasText: "Aisha Al-Sabah" }).getByLabel("Edit details").click();
+  const dialog = p.getByRole("dialog");
+  ck(
+    "The edit form shows the stay as check-in and check-out",
+    (await dialog.getByLabel("Check-in date").inputValue()) === A_START &&
+      (await dialog.getByLabel("Check-out date").inputValue()) === ymd(at(4)),
+  );
+  ck(
+    "…and offers no repricing while the stay is unchanged",
+    !(await dialog
+      .getByTestId("reprice-hint")
+      .isVisible()
+      .catch(() => false)),
+  );
+  // Two nights later, on the other chalet, at the old price.
+  await dialog.getByLabel("Check-in date").fill(ymd(at(2)));
+  await dialog.getByLabel("Check-out date").fill(ymd(at(6)));
+  await dialog.getByRole("button", { name: "Bizarri Chalet 2" }).click();
+  ck(
+    "Moving says the price stays unless asked",
+    (await dialog.getByTestId("reprice-hint").innerText()).includes("stays"),
+    await dialog.getByTestId("reprice-hint").innerText(),
+  );
+  await dialog.getByRole("button", { name: /save changes/i }).click();
+  await p.waitForTimeout(700);
+  const move = state.calls.find((c) => c.path === "rpc/admin_update_booking");
+  ck(
+    "Saving moves the booking: chalet, check-in, last night",
+    move?.body?.p_id === "b-1" &&
+      move?.body?.p_chalet_id === 2 &&
+      move?.body?.p_start === ymd(at(2)) &&
+      move?.body?.p_end === ymd(at(5)) &&
+      move?.body?.p_reprice === false,
+    JSON.stringify(move?.body),
+  );
+  const patch = state.calls.find((c) => c.path === "bookings" && c.method === "PATCH");
+  ck(
+    "…then saves the rest, total included",
+    patch?.body?.total === 300,
+    JSON.stringify(patch?.body),
+  );
+  ck(
+    "…and says so",
+    await p
+      .locator('[data-toast="success"]', { hasText: "Booking BZR-AAA111 updated" })
+      .isVisible(),
+  );
+
+  // Again, priced from the rates this time.
+  state.calls.length = 0;
+  await p.locator("li", { hasText: "Aisha Al-Sabah" }).getByLabel("Edit details").click();
+  await dialog.getByLabel("Check-out date").fill(ymd(at(5)));
+  await dialog.getByRole("switch").click();
+  await p.waitForTimeout(500);
+  ck(
+    "Repricing shows the new total before saving",
+    (await dialog.getByTestId("reprice-hint").innerText()).includes("225"),
+    await dialog.getByTestId("reprice-hint").innerText(),
+  );
+  ck("…and the total box gives way to it", await dialog.getByLabel(/^Total/).isDisabled());
+  await dialog.getByRole("button", { name: /save changes/i }).click();
+  await p.waitForTimeout(700);
+  const reprice = state.calls.find((c) => c.path === "rpc/admin_update_booking");
+  const after = state.calls.find((c) => c.path === "bookings" && c.method === "PATCH");
+  ck("A repriced move asks for the new price", reprice?.body?.p_reprice === true);
+  ck(
+    "…and the edit after it leaves that price alone",
+    after && !("total" in after.body),
+    JSON.stringify(after?.body),
+  );
+  ck("The booking now costs the new price", state.bookings[0].total === 225);
+
+  // A check-out before the check-in is caught in the form.
+  await p.locator("li", { hasText: "Aisha Al-Sabah" }).getByLabel("Edit details").click();
+  await dialog.getByLabel("Check-out date").fill(ymd(at(1)));
+  ck(
+    "A check-out before the check-in cannot be saved",
+    await dialog.getByRole("button", { name: /save changes/i }).isDisabled(),
+  );
+  await ctx.close();
+}
+
+// ========================== the minimum stay and the email code are settings
+{
+  const state = makeState();
+  const { p, ctx } = await adminPage(state);
+  await p.getByRole("button", { name: "Package Rates" }).click();
+  await p.waitForTimeout(500);
+  const minStay = p.getByLabel("Minimum stay");
+  ck("The minimum stay shows what is set", (await minStay.inputValue()) === "3");
+  await minStay.fill("9");
+  ck("…refuses more than a week", await p.getByText("Between 1 and 7 days").isVisible());
+  await minStay.fill("2");
+  await minStay
+    .locator("xpath=ancestor::div[contains(@class,'flex-wrap')]")
+    .getByRole("button", { name: /^Save$/ })
+    .click();
+  await p.waitForTimeout(600);
+  const rates = state.calls.find((c) => c.path === "rates" && c.method === "PATCH");
+  ck(
+    "…and saves only the minimum stay",
+    JSON.stringify(rates?.body) === JSON.stringify({ min_stay_days: 2 }),
+    JSON.stringify(rates?.body),
+  );
+  ck("…which the form then shows", (await minStay.inputValue()) === "2");
+
+  await p.getByRole("button", { name: "Site Settings" }).click();
+  await p.waitForTimeout(500);
+  const gate = p.getByRole("switch", { name: "Required" });
+  ck("The email code is on until it is turned off", await gate.isChecked());
+  await gate.click();
+  await p.waitForTimeout(600);
+  const call = state.calls.find(
+    (c) => c.path === "settings" && c.body?.key === "require_email_verification",
+  );
+  ck(
+    "Turning it off saves require_email_verification = false",
+    call?.body?.value === false,
+    JSON.stringify(call?.body),
   );
   await ctx.close();
 }

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Eye, EyeOff, Newspaper, Plus, Trash2 } from "lucide-react";
+import { Eye, EyeOff, Newspaper, Pencil, Plus, Trash2 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { dateLocale } from "@/lib/locale";
 import { useAllNews, useDeleteNews, useSaveNews } from "@/lib/api";
@@ -7,7 +7,19 @@ import type { NewsRow } from "@/integrations/supabase/types";
 import { DeleteConfirm } from "./DeleteConfirm";
 import { useAdminT } from "./strings";
 import { errorText, useToast } from "./toast";
-import { Btn, Card, EmptyState, IconBtn, PanelHeader, SkeletonList, Tag, inputClass } from "./ui";
+import {
+  Btn,
+  Card,
+  EmptyState,
+  ErrorNote,
+  Field,
+  IconBtn,
+  Modal,
+  PanelHeader,
+  SkeletonList,
+  Tag,
+  inputClass,
+} from "./ui";
 
 const BLANK = { title_en: "", title_ar: "", body_en: "", body_ar: "" };
 
@@ -20,6 +32,7 @@ export function NewsPanel() {
   const remove = useDeleteNews();
   const [form, setForm] = useState(BLANK);
   const [pendingDelete, setPendingDelete] = useState<NewsRow | null>(null);
+  const [editing, setEditing] = useState<NewsRow | null>(null);
   const en = lang === "en";
 
   const publish = (e: React.FormEvent) => {
@@ -140,6 +153,12 @@ export function NewsPanel() {
                   {n.published ? (en ? "Unpublish" : "إلغاء النشر") : en ? "Publish" : "نشر"}
                 </Btn>
                 <IconBtn
+                  label={en ? "Edit news item" : "تعديل الخبر"}
+                  onClick={() => setEditing(n)}
+                >
+                  <Pencil className="h-4 w-4" />
+                </IconBtn>
+                <IconBtn
                   tone="danger"
                   label={en ? "Delete news item" : "حذف الخبر"}
                   onClick={() => setPendingDelete(n)}
@@ -151,6 +170,8 @@ export function NewsPanel() {
           ))}
         </ul>
       )}
+
+      {editing && <EditNewsModal item={editing} onClose={() => setEditing(null)} />}
 
       {pendingDelete && (
         <DeleteConfirm
@@ -165,5 +186,123 @@ export function NewsPanel() {
         />
       )}
     </section>
+  );
+}
+
+/** A post already published or drafted: both titles, both bodies, and whether it shows. */
+function EditNewsModal({ item, onClose }: { item: NewsRow; onClose: () => void }) {
+  const { tr, lang } = useI18n();
+  const t = useAdminT();
+  const toast = useToast();
+  const save = useSaveNews();
+  const en = lang === "en";
+  const [form, setForm] = useState({
+    title_en: item.title_en,
+    title_ar: item.title_ar,
+    body_en: item.body_en,
+    body_ar: item.body_ar,
+    published: item.published,
+  });
+  const valid = form.title_en.trim() !== "" || form.title_ar.trim() !== "";
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!valid) return;
+    save.mutate(
+      // published_at kept: editing a post does not move it up the list.
+      { ...item, ...form },
+      {
+        onSuccess: () => {
+          toast.success(t("saved"));
+          onClose();
+        },
+      },
+    );
+  };
+
+  return (
+    <Modal
+      title={t("editNews")}
+      description={item.title_en || item.title_ar}
+      onClose={onClose}
+      busy={save.isPending}
+      size="lg"
+      footer={
+        <>
+          <Btn onClick={onClose} disabled={save.isPending}>
+            {tr("cancel")}
+          </Btn>
+          <Btn
+            type="submit"
+            form="edit-news-form"
+            variant="primary"
+            busy={save.isPending}
+            disabled={!valid}
+          >
+            {save.isPending ? t("saving") : tr("saveChanges")}
+          </Btn>
+        </>
+      }
+    >
+      <form id="edit-news-form" onSubmit={submit} className="space-y-4">
+        {save.error && <ErrorNote>{errorText(save.error)}</ErrorNote>}
+        <div className="grid gap-4 md:grid-cols-2">
+          <Field label="Title (English)">
+            {(a) => (
+              <input
+                {...a}
+                value={form.title_en}
+                onChange={(e) => setForm({ ...form, title_en: e.target.value })}
+                className={inputClass}
+              />
+            )}
+          </Field>
+          <Field label="العنوان (عربي)">
+            {(a) => (
+              <input
+                {...a}
+                dir="rtl"
+                value={form.title_ar}
+                onChange={(e) => setForm({ ...form, title_ar: e.target.value })}
+                className={inputClass}
+              />
+            )}
+          </Field>
+          <Field label="Body (English)">
+            {(a) => (
+              <textarea
+                {...a}
+                rows={6}
+                value={form.body_en}
+                onChange={(e) => setForm({ ...form, body_en: e.target.value })}
+                className={inputClass}
+              />
+            )}
+          </Field>
+          <Field label="المحتوى (عربي)">
+            {(a) => (
+              <textarea
+                {...a}
+                dir="rtl"
+                rows={6}
+                value={form.body_ar}
+                onChange={(e) => setForm({ ...form, body_ar: e.target.value })}
+                className={inputClass}
+              />
+            )}
+          </Field>
+        </div>
+        <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm">
+          <input
+            type="checkbox"
+            role="switch"
+            checked={form.published}
+            onChange={(e) => setForm({ ...form, published: e.target.checked })}
+            className="admin-switch"
+          />
+          {en ? "Published on the News page" : "منشور في صفحة الأخبار"}
+        </label>
+      </form>
+    </Modal>
   );
 }

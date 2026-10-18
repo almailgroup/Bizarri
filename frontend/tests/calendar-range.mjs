@@ -218,15 +218,15 @@ const clickDay = (p, dow, nth = 0) =>
   ck("Every way to book is offered at once", cards.length === 5, cards.join(" / "));
   // The rule-based shapes name their days; Holiday names its occasions,
   // since its dates are whatever the admin has entered.
-  const ruled = cards.filter((t) => !/^OCCASIONS/.test(t));
+  const ruled = cards.filter((t) => !/^SPECIAL OCCASIONS/.test(t));
   ck(
     "Each says which days it means",
     ruled.length === 4 && ruled.every((t) => /Sun|Thu/.test(t)),
     ruled.find((t) => !/Sun|Thu/.test(t)) ?? "all do",
   );
   ck(
-    "…and Occasions says which occasions",
-    cards.some((t) => /^OCCASIONS \| Eid & national days/.test(t)),
+    "…and Special Occasions says which occasions",
+    cards.some((t) => /^SPECIAL OCCASIONS \| Eid & national days/.test(t)),
     cards[3],
   );
   // The cards carry no price: the rates strip above them does, and repeating
@@ -608,8 +608,8 @@ for (const [name, days] of [
 // ============================== the holiday shape
 //
 // Unlike the other three, a holiday is not a rule about weekdays and a
-// length: it is whatever the admin entered under Occasions, with its
-// own dates and its own flat price. The card is always there, beside Weekend;
+// length: it is whatever the admin entered under Special Occasions, with its
+// own dates and its own flat price. The card is always there, after Full week;
 // with nothing open it says so rather than showing a year of grey days.
 {
   const { p, ctx } = await calendar(1, "en", []);
@@ -619,8 +619,8 @@ for (const [name, days] of [
     ),
   );
   ck(
-    "The Occasions card is always offered, right after Weekend",
-    names.join(",") === "BY DAY,WEEKDAY,WEEKEND,OCCASIONS,FULL WEEK",
+    "Special Occasions is always offered, last, after Full week",
+    names.join(",") === "BY DAY,WEEKDAY,WEEKEND,FULL WEEK,SPECIAL OCCASIONS",
     names.join(", "),
   );
   const tops = await p.evaluate(() =>
@@ -630,11 +630,11 @@ for (const [name, days] of [
   );
   ck("…all five in one row", new Set(tops).size === 1, tops.join(","));
 
-  await p.getByRole("button", { name: /^Occasions/i }).click();
+  await p.getByRole("button", { name: /^Special Occasions/i }).click();
   await p.waitForTimeout(500);
   ck(
     "With none open, choosing it says so",
-    await p.getByText("No occasion dates are open yet").isVisible(),
+    await p.getByText("No special occasion dates are open yet").isVisible(),
   );
   ck(
     "…instead of a calendar of days that cannot be had",
@@ -644,7 +644,7 @@ for (const [name, days] of [
     "…and not as if the months were simply full",
     (await p.getByText(/Nothing free this month/i).count()) === 0,
   );
-  const wa = p.getByRole("link", { name: /Ask about occasions/i });
+  const wa = p.getByRole("link", { name: /Ask about special occasions/i });
   ck(
     "…offering WhatsApp to ask about the next one",
     (await wa.isVisible()) && /^https:\/\/wa\.me\//.test((await wa.getAttribute("href")) ?? ""),
@@ -679,7 +679,11 @@ for (const [name, days] of [
       boxes[4].w > boxes[0].w * 1.8,
     boxes.map((x) => `${x.label}@${x.top}`).join(", "),
   );
-  ck("…and Occasions is named in Arabic", boxes[3]?.label.includes("المناسبات"), boxes[3]?.label);
+  ck(
+    "…and Special Occasions, last, is named in Arabic",
+    boxes[4]?.label.includes("المناسبات الخاصة"),
+    boxes[4]?.label,
+  );
   ck(
     "…without the page scrolling sideways",
     (await p.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 1,
@@ -701,8 +705,8 @@ for (const [name, days] of [
   ];
   const { p, ctx } = await calendar(1, "en", occ);
 
-  const card = p.getByRole("button", { name: /^Occasions/i }).first();
-  ck("An occasion ahead puts an Occasions card on the page", await card.isVisible());
+  const card = p.getByRole("button", { name: /^Special Occasions/i }).first();
+  ck("An occasion ahead puts a Special Occasions card on the page", await card.isVisible());
   const text = (await card.innerText()).replace(/\n+/g, " | ");
   // "Holiday" alone says nothing about which one or when.
   ck("…which names the occasion", /Eid Al-Fitr/.test(text), text);
