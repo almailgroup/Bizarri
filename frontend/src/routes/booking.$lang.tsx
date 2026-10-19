@@ -1300,11 +1300,11 @@ function Calendar({
                     month: "long",
                   });
 
-                  // Grey means one thing only -- awaiting approval -- and black
-                  // means reserved, so the guest's own stay is white: a black
-                  // ring round its two ends, the days between plain white with
-                  // no grey ring either. Hovering a free day draws a ring
-                  // rather than a grey fill.
+                  // Grey means one thing only -- awaiting approval -- and a
+                  // solid black means reserved, so the guest's own stay is
+                  // white with a black ring round every day of it, the days
+                  // between as well as the two ends. Hovering a free day draws
+                  // a ring rather than a grey fill.
                   const tone = reserved
                     ? "bg-black text-white cursor-not-allowed"
                     : pending
@@ -1317,7 +1317,7 @@ function Calendar({
                             // ring-inset keeps it inside the cell so nothing shifts.
                             "bg-background font-semibold text-foreground ring-2 ring-inset ring-foreground"
                           : within
-                            ? "bg-background font-medium text-foreground"
+                            ? "bg-background font-medium text-foreground ring-2 ring-inset ring-foreground"
                             : offPackage
                               ? "cursor-not-allowed text-muted-foreground/30"
                               : occ
@@ -1356,9 +1356,8 @@ function Calendar({
                       // The cell is square, so a full radius is a circle -- every
                       // cell, so all the states are the same shape and differ
                       // only in fill: black for reserved, grey for awaiting
-                      // approval, white for the guest's own stay (with a black
-                      // ring at its two ends). The focus outline follows the
-                      // radius.
+                      // approval, white with a black ring for every day of the
+                      // guest's own stay. The focus outline follows the radius.
                       className={`relative flex aspect-square flex-col items-center justify-center rounded-full text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-current ${tone}`}
                     >
                       {d.getDate()}

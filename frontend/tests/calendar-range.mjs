@@ -423,7 +423,12 @@ for (const [name, days] of [
 
   // Every cell is a circle now, the days between included: the owner asked
   // for one shape across the grid, with fill alone telling them apart --
-  // a black ring for the two ends, plain white for the days between.
+  // a black ring round every day of the stay, the days between included.
+  ck(
+    "The days between are ringed like the ends",
+    !!shapes.between && shapes.between.ring === shapes.chosen[0]?.ring,
+    `${shapes.between?.ring} vs ${shapes.chosen[0]?.ring}`,
+  );
   ck(
     "The days between are round too",
     !!shapes.between && shapes.between.radius >= shapes.between.w / 2 - 0.5,

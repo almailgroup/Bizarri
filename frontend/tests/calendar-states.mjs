@@ -1,7 +1,7 @@
 /**
  * The guest calendar's three ways a day can be spoken for.
  *
- *   selected  the guest's own choice      white; a black ring at its two ends
+ *   selected  the guest's own choice      white, a black ring round every day
  *   pending   another guest's request     grey, cannot be chosen
  *   reserved  confirmed by the admin      black, cannot be chosen
  *
@@ -130,6 +130,7 @@ const look = (p, d) =>
       lum: Math.round(((0.2126 * r + 0.7152 * g + 0.0722 * bl) / 255) * 1000) / 1000,
       bg: s.backgroundColor,
       ring: s.boxShadow !== "none",
+      shadow: s.boxShadow,
       disabled: el.disabled,
       label: el.getAttribute("aria-label"),
       state: el.dataset.state,
@@ -214,11 +215,11 @@ const shape = async (p, name) => {
     ends.every((s) => s.ring),
     JSON.stringify(ends),
   );
-  // The owner's call: grey is for awaiting approval only, not even as a ring.
+  // The owner's call: every day of the stay gets the same black circle.
   ck(
-    "…and the days between plain white, with no grey ring",
-    between.every((s) => !s.ring),
-    JSON.stringify(between),
+    "…and the same black ring round every day between",
+    between.every((s) => s.ring && s.shadow === ends[0].shadow),
+    JSON.stringify(between.map((s) => s.shadow)),
   );
   ck(
     "…with its two ends marked more strongly than the days between",
