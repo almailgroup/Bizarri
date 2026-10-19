@@ -409,21 +409,21 @@ for (const [name, days] of [
       .map((c) => `${c.w}px wide, corners ${c.corners.map((x) => x.toFixed(0)).join("/")}`)
       .join(" | "),
   );
-  // Filled, as the owner asked: solid black at the two ends, mid grey between.
+  // An outline, not a fill: the number has to stay readable inside the mark.
   ck(
-    "…filled in black",
-    shapes.chosen.every((c) => c.bg === "rgb(0, 0, 0)"),
-    shapes.chosen.map((c) => c.bg).join(" | "),
+    "…drawn as an outline rather than filled in",
+    shapes.chosen.every((c) => c.ring && c.ring !== "none"),
+    shapes.chosen[0]?.ring?.slice(0, 40),
   );
   ck(
-    "…and the days between filled grey, not left as the page colour",
-    !!shapes.between && shapes.between.bg !== shapes.page && shapes.between.bg !== "rgb(0, 0, 0)",
-    `between ${shapes.between?.bg} vs page ${shapes.page}`,
+    "…over the page colour, not a solid block",
+    !!shapes.page && shapes.chosen.every((c) => c.bg === shapes.page),
+    `cell ${shapes.chosen[0]?.bg} vs page ${shapes.page}`,
   );
 
   // Every cell is a circle now, the days between included: the owner asked
   // for one shape across the grid, with fill alone telling them apart --
-  // black for the two ends, grey for the days between.
+  // a black ring for the two ends, plain white for the days between.
   ck(
     "The days between are round too",
     !!shapes.between && shapes.between.radius >= shapes.between.w / 2 - 0.5,

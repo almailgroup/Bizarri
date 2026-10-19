@@ -1300,10 +1300,11 @@ function Calendar({
                     month: "long",
                   });
 
-                  // The guest's own stay is filled: black at its two ends,
-                  // a mid grey between. That grey is a good deal darker than
-                  // the pale grey of awaiting approval, so the two never read
-                  // alike, and hovering a free day draws a ring, not a fill.
+                  // Grey means one thing only -- awaiting approval -- and black
+                  // means reserved, so the guest's own stay is white: a black
+                  // ring round its two ends, the days between plain white with
+                  // no grey ring either. Hovering a free day draws a ring
+                  // rather than a grey fill.
                   const tone = reserved
                     ? "bg-black text-white cursor-not-allowed"
                     : pending
@@ -1311,9 +1312,12 @@ function Calendar({
                       : past
                         ? "cursor-not-allowed text-muted-foreground/30"
                         : selected
-                          ? "bg-black font-semibold text-white"
+                          ? // An outlined circle, not a filled one: the ring marks the
+                            // day without hiding its number under a solid block, and
+                            // ring-inset keeps it inside the cell so nothing shifts.
+                            "bg-background font-semibold text-foreground ring-2 ring-inset ring-foreground"
                           : within
-                            ? "bg-neutral-400 font-medium text-foreground"
+                            ? "bg-background font-medium text-foreground"
                             : offPackage
                               ? "cursor-not-allowed text-muted-foreground/30"
                               : occ
@@ -1351,18 +1355,16 @@ function Calendar({
                       }}
                       // The cell is square, so a full radius is a circle -- every
                       // cell, so all the states are the same shape and differ
-                      // only in fill: black for reserved, pale grey for awaiting
-                      // approval, and for the guest's own stay black at the two
-                      // ends with mid grey between. The focus outline follows
-                      // the radius.
+                      // only in fill: black for reserved, grey for awaiting
+                      // approval, white for the guest's own stay (with a black
+                      // ring at its two ends). The focus outline follows the
+                      // radius.
                       className={`relative flex aspect-square flex-col items-center justify-center rounded-full text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-current ${tone}`}
                     >
                       {d.getDate()}
                       {priced && !reserved && !pending && !past && (
                         <span
-                          className={`absolute bottom-1 h-1 w-1 rounded-full ${
-                            selected ? "bg-white/70" : "bg-foreground/50"
-                          }`}
+                          className="absolute bottom-1 h-1 w-1 rounded-full bg-foreground/50"
                           aria-hidden="true"
                         />
                       )}
@@ -1408,13 +1410,8 @@ function Calendar({
                 <span className="flex items-center gap-2">
                   <span className="h-3 w-3 rounded-full bg-neutral-200" /> {tr("pendingLabel")}
                 </span>
-                {/* Black and grey together, as a stay draws them, so the key
-                does not show Selected and Reserved as the same black dot. */}
                 <span className="flex items-center gap-2">
-                  <span className="flex" aria-hidden="true">
-                    <span className="h-3 w-3 rounded-full bg-black" />
-                    <span className="-ms-0.5 h-3 w-3 rounded-full bg-neutral-400" />
-                  </span>
+                  <span className="h-3 w-3 rounded-full bg-background ring-2 ring-inset ring-foreground" />{" "}
                   {tr("selectedLabel")}
                 </span>
                 <span className="flex items-center gap-2">
