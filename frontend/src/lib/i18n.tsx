@@ -217,13 +217,15 @@ export const t: Dict = {
   filterFullWeekNote: { en: "Sun – Sat · 7 days", ar: "الأحد – السبت · 7 أيام" },
   filterWeekday: { en: "Weekday", ar: "أيام الأسبوع" },
   filterWeekdayNote: { en: "Sun – Wed · 4 days", ar: "الأحد – الأربعاء · 4 أيام" },
-  // The card only appears when an occasion is coming up, and names it; the
-  // note is the fallback for the moment before the occasions have loaded.
   // Shown as "Special Occasions": the windows the admin enters under Special
-  // Occasions. The keys keep their old names, as does the shape's value in
-  // the address, so links already shared still open on it.
+  // Occasions. The card is just its name; choosing it lists the occasions.
+  // The keys keep their old names, as does the shape's value in the address,
+  // so links already shared still open on it.
   filterHoliday: { en: "Special Occasions", ar: "المناسبات الخاصة" },
-  filterHolidayNote: { en: "Eid & national days", ar: "الأعياد والمناسبات الوطنية" },
+  chooseOccasion: { en: "Choose an occasion", ar: "اختر المناسبة" },
+  occasionTaken: { en: "Not available", ar: "غير متاح" },
+  oneDayShort: { en: "1 day", ar: "يوم واحد" },
+  nDaysShort: { en: "{n} days", ar: "{n} أيام" },
   noHolidaysTitle: {
     en: "No special occasion dates are open yet",
     ar: "لا توجد مناسبات خاصة متاحة للحجز حالياً",

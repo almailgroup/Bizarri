@@ -48,6 +48,7 @@ async function calendar(
   lang = LANG,
   occasions = [],
   viewport = { width: 1100, height: 1000 },
+  requested = [],
 ) {
   const ctx = await b.newContext({ viewport });
   await ctx.route(/^https?:\/\/(?!localhost)/, (r) => {
@@ -93,7 +94,14 @@ async function calendar(
       const e = new Date(body.p_to + "T00:00:00");
       for (; d <= e; d.setDate(d.getDate() + 1)) {
         const k = iso(d);
-        out.push({ day: k, blocked: k < iso(today), price: 75, custom: false });
+        const asked = requested.includes(k);
+        out.push({
+          day: k,
+          blocked: k < iso(today) || asked,
+          pending: asked,
+          price: 75,
+          custom: false,
+        });
       }
       return send(out);
     }
@@ -216,19 +224,15 @@ const clickDay = (p, dow, nth = 0) =>
     ),
   );
   ck("Every way to book is offered at once", cards.length === 5, cards.join(" / "));
-  // The rule-based shapes name their days; Holiday names its occasions,
-  // since its dates are whatever the admin has entered.
+  // The rule-based shapes name their days; Special Occasions is only its
+  // name, and lists the occasions the admin has entered once it is chosen.
   const ruled = cards.filter((t) => !/^SPECIAL OCCASIONS/.test(t));
   ck(
     "Each says which days it means",
     ruled.length === 4 && ruled.every((t) => /Sun|Thu/.test(t)),
     ruled.find((t) => !/Sun|Thu/.test(t)) ?? "all do",
   );
-  ck(
-    "…and Special Occasions says which occasions",
-    cards.some((t) => /^SPECIAL OCCASIONS \| Eid & national days/.test(t)),
-    cards[3],
-  );
+  ck("…and Special Occasions is just its name", cards.includes("SPECIAL OCCASIONS"), cards[4]);
   // The cards carry no price: the rates strip above them does, and repeating
   // it three times made the row of choices read as a price list.
   ck(
@@ -697,6 +701,11 @@ for (const [name, days] of [
 }
 
 {
+  // Two occasions: one free, and one a few weeks later already requested by
+  // someone else.
+  const later = { from: new Date(eid.from), to: new Date(eid.to) };
+  later.from.setDate(later.from.getDate() + 21);
+  later.to.setDate(later.to.getDate() + 21);
   const occ = [
     {
       id: "o1",
@@ -707,28 +716,63 @@ for (const [name, days] of [
       price: 900,
       active: true,
     },
+    {
+      id: "o2",
+      name_en: "National Day",
+      name_ar: "العيد الوطني",
+      start_date: iso(later.from),
+      end_date: iso(later.to),
+      price: 1100,
+      active: true,
+    },
   ];
-  const { p, ctx } = await calendar(1, "en", occ);
+  const { p, ctx } = await calendar(1, "en", occ, undefined, [iso(later.from)]);
 
   const card = p.getByRole("button", { name: /^Special Occasions/i }).first();
-  ck("An occasion ahead puts a Special Occasions card on the page", await card.isVisible());
+  ck("Occasions ahead put a Special Occasions card on the page", await card.isVisible());
   const text = (await card.innerText()).replace(/\n+/g, " | ");
-  // "Holiday" alone says nothing about which one or when.
-  ck("…which names the occasion", /Eid Al-Fitr/.test(text), text);
-  ck("…and when it is", /\d{1,2}\s+\w{3}/.test(text), text);
+  ck("…which says just that, naming no occasion and no dates", text === "SPECIAL OCCASIONS", text);
+  ck(
+    "No list of occasions before it is chosen",
+    (await p.getByRole("list", { name: "Choose an occasion" }).count()) === 0,
+  );
 
   await card.click();
   await p.waitForTimeout(500);
-  // The helper opens on next month; the occasion may be in another one.
+  const list = p.getByRole("list", { name: "Choose an occasion" });
+  const items = list.getByRole("button");
+  ck("Choosing it lists the occasions the admin has set", (await items.count()) === 2);
+  const first = (await items.nth(0).innerText()).replace(/\n+/g, " | ");
+  ck(
+    "…each with its name, its dates, its length and its price",
+    /Eid Al-Fitr/.test(first) &&
+      /\d{1,2}\s+\w{3}/.test(first) &&
+      /3 days/.test(first) &&
+      /900/.test(first),
+    first,
+  );
+  const second = (await items.nth(1).innerText()).replace(/\n+/g, " | ");
+  ck("…nearest first", /National Day/.test(second), second);
+  ck(
+    "One already requested says so and cannot be chosen",
+    /Not available/i.test(second) && (await items.nth(1).isDisabled()),
+    second,
+  );
+
+  await items.nth(0).click();
+  await p.waitForTimeout(600);
+  ck("Tapping an occasion takes its whole stay", await p.getByText("3 days selected").isVisible());
+  ck(
+    "…marks it as chosen",
+    (await items.nth(0).getAttribute("aria-pressed")) === "true" &&
+      /Selected/i.test(await items.nth(0).innerText()),
+  );
   const want = eid.from.toLocaleDateString("en-US", { month: "long", year: "numeric" });
-  for (let i = 0; i < 8; i++) {
-    const heading = (await p.locator('[role="grid"]').getAttribute("aria-label")) ?? "";
-    if (heading.includes(want)) break;
-    const shown = new Date(`${heading} 1`).getTime();
-    const dir = shown > eid.from.getTime() ? /Previous month/i : /Next month/i;
-    await p.getByRole("button", { name: dir }).click();
-    await p.waitForTimeout(300);
-  }
+  ck(
+    "…and shows its month on the calendar",
+    ((await p.locator('[role="grid"]').getAttribute("aria-label")) ?? "").includes(want),
+    await p.locator('[role="grid"]').getAttribute("aria-label"),
+  );
   const offered = await p.evaluate(
     () =>
       [
@@ -737,14 +781,7 @@ for (const [name, days] of [
         ),
       ].length,
   );
-  ck("Choosing it leaves only the occasion selectable", offered === 3, `${offered} days`);
-
-  await p
-    .locator('[role="grid"] button:not([disabled]):not([aria-disabled="true"])')
-    .first()
-    .click();
-  await p.waitForTimeout(600);
-  ck("One tap takes the whole occasion", await p.getByText("3 days selected").isVisible());
+  ck("On the calendar only the occasion is selectable", offered === 3, `${offered} days`);
   // The occasion's own price, not the weekend rate those three days would
   // otherwise carry -- the same precedence the server applies.
   const total = await p.evaluate(() => {

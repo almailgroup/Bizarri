@@ -145,7 +145,6 @@ const FILTER_NOTE = {
   day: "filterByDayNote",
   weekday: "filterWeekdayNote",
   weekend: "filterWeekendNote",
-  holiday: "filterHolidayNote",
   fullWeek: "filterFullWeekNote",
 } as const;
 
@@ -762,6 +761,24 @@ function Calendar({
   const holidaysAhead = holidays.length > 0;
 
   /**
+   * Whether an occasion can be booked on this chalet: the same tests
+   * windowsIn() applies -- ahead, inside the horizon, every day free, and no
+   * half a weekend. Not before availability is in, when every day reads as
+   * taken.
+   */
+  const occasionOpen = (o: { start: string; end: string }) => {
+    if (!calendar) return false;
+    const from = parseDate(o.start);
+    const to = parseDate(o.end);
+    return (
+      from >= today &&
+      to <= windowEnd &&
+      eachDay(from, to).every((d) => !dayBlocked(d)) &&
+      weekendIsWhole(from, to)
+    );
+  };
+
+  /**
    * Whether this month has a day you can actually tap.
    *
    * Not "is the window map non-empty": that map is padded a week either side
@@ -1028,6 +1045,18 @@ function Calendar({
     setEnd(w.end);
   };
 
+  // An occasion from the list: its whole stay, shown on its month.
+  const pickOccasion = (o: { start: string; end: string }) => {
+    if (!occasionOpen(o)) return;
+    const from = parseDate(o.start);
+    setError("");
+    userPaged.current = true;
+    setJumped(false);
+    setMonth(startOfMonth(from));
+    setStart(from);
+    setEnd(parseDate(o.end));
+  };
+
   const inRange = (d: Date) => start && previewEnd && d >= start && d <= previewEnd;
   const isEdge = (d: Date) =>
     (start && fmtDate(d) === fmtDate(start)) || (previewEnd && fmtDate(d) === fmtDate(previewEnd));
@@ -1178,26 +1207,83 @@ function Calendar({
                 }`}
               >
                 <span className="text-xs uppercase tracking-widest">{tr(FILTER_LABEL[f])}</span>
-                {/* Every other shape is a rule and says so. A holiday is a
-                    date, so it names the next one instead: "Holiday / Sun -
-                    Wed" would be true of a weekday break too, and tells a
-                    guest nothing about which holiday or when. */}
-                <span className={`text-xs ${on ? "opacity-70" : "text-muted-foreground"}`}>
-                  {f === "holiday" && holidays[0]
-                    ? lang === "en"
-                      ? holidays[0].nameEn
-                      : holidays[0].nameAr || holidays[0].nameEn
-                    : tr(FILTER_NOTE[f])}
-                </span>
-                {f === "holiday" && holidays[0] && (
+                {/* Every other shape is a rule and says so. Special
+                    Occasions is just its name: which occasions, and when,
+                    is the list that opens below it once it is chosen. */}
+                {f !== "holiday" && (
                   <span className={`text-xs ${on ? "opacity-70" : "text-muted-foreground"}`}>
-                    {formatSpan(parseDate(holidays[0].start), parseDate(holidays[0].end), lang)}
+                    {tr(FILTER_NOTE[f])}
                   </span>
                 )}
               </button>
             );
           })}
         </div>
+
+        {/* Special Occasions chosen: every occasion the admin has set that is
+            still ahead, each with its dates and its price. Tapping one takes
+            its whole stay and shows it on the calendar below; one already
+            requested or reserved on this chalet says so and cannot be had. */}
+        {filter === "holiday" && holidaysAhead && (
+          <div className="mb-4">
+            <p className="mb-2 text-xs uppercase tracking-widest text-muted-foreground">
+              {tr("chooseOccasion")}
+            </p>
+            <ul className="grid gap-2 sm:grid-cols-2" aria-label={tr("chooseOccasion")}>
+              {holidays.map((o) => {
+                const from = parseDate(o.start);
+                const to = parseDate(o.end);
+                const n = daysBetween(from, to);
+                const open = occasionOpen(o);
+                const on = !!start && !!end && fmtDate(start) === o.start && fmtDate(end) === o.end;
+                return (
+                  <li key={o.id}>
+                    <button
+                      type="button"
+                      disabled={!open}
+                      aria-pressed={on}
+                      onClick={() => pickOccasion(o)}
+                      className={`flex h-full w-full items-start justify-between gap-4 border p-4 text-start transition-colors ${
+                        on
+                          ? "border-foreground ring-1 ring-inset ring-foreground"
+                          : open
+                            ? "border-border hover:border-foreground/50"
+                            : "cursor-not-allowed border-border text-muted-foreground"
+                      }`}
+                    >
+                      <span className="min-w-0">
+                        <span className="block font-display text-lg">
+                          {lang === "en" ? o.nameEn : o.nameAr || o.nameEn}
+                        </span>
+                        <span className="mt-1 block text-xs text-muted-foreground">
+                          {formatSpan(from, to, lang)} ·{" "}
+                          {n === 1 ? tr("oneDayShort") : tr("nDaysShort").replace("{n}", String(n))}
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-end">
+                        <span className="block font-display text-lg">
+                          {formatMoney(o.price, lang)}
+                        </span>
+                        {(on || (calendar && !open)) && (
+                          <span className="mt-1 flex items-center justify-end gap-1 text-xs uppercase tracking-widest">
+                            {on ? (
+                              <>
+                                <Check className="h-3.5 w-3.5" aria-hidden="true" />
+                                {tr("selectedLabel")}
+                              </>
+                            ) : (
+                              tr("occasionTaken")
+                            )}
+                          </span>
+                        )}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
 
         {jumped && !noHolidays && (
           <p className="mb-4 border border-border bg-secondary p-4 text-sm">
