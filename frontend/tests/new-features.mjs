@@ -416,7 +416,9 @@ const bg = (loc) => loc.evaluate((el) => getComputedStyle(el).backgroundColor);
     await p.getByText("Reserved", { exact: true }).first().isVisible(),
   );
 
-  // Selection must no longer use black, or it would read as reserved.
+  // The owner asked for the selection filled black at its ends, the same
+  // black as reserved; what tells them apart is that the guest's own day
+  // stays theirs to change, and is never announced as reserved.
   // A Thursday belongs to the weekend shape, so choose that first: under the
   // default one-day shape it is not selectable at all.
   await p
@@ -426,10 +428,12 @@ const bg = (loc) => loc.evaluate((el) => getComputedStyle(el).backgroundColor);
   await p.waitForTimeout(400);
   await freeCell.click();
   await p.waitForTimeout(300);
+  ck("Selected day is filled black", (await bg(freeCell)) === "rgb(0, 0, 0)", await bg(freeCell));
   ck(
-    "Selected day is distinct from reserved (not black)",
-    (await bg(freeCell)) !== "rgb(0, 0, 0)",
-    await bg(freeCell),
+    "…but is still the guest's: pressed, not disabled, not called reserved",
+    (await freeCell.getAttribute("aria-pressed")) === "true" &&
+      !(await freeCell.isDisabled()) &&
+      !/Reserved/.test((await freeCell.getAttribute("aria-label")) ?? ""),
   );
   await ctx.close();
 }

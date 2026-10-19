@@ -1,7 +1,7 @@
 /**
  * The guest calendar's three ways a day can be spoken for.
  *
- *   selected  the guest's own choice      white, with a ring
+ *   selected  the guest's own choice      filled: black ends, mid grey between
  *   pending   another guest's request     grey, cannot be chosen
  *   reserved  confirmed by the admin      black, cannot be chosen
  *
@@ -174,9 +174,15 @@ const shape = async (p, name) => {
   await p.waitForTimeout(300);
   const sel = await look(p, mon2);
   ck(
-    "The guest's own selection is white, not grey",
-    sel.lum > 0.99 && sel.state === "selected" && sel.ring,
+    "The guest's own day is filled black",
+    sel.lum < 0.1 && sel.state === "selected" && !sel.disabled,
     JSON.stringify(sel),
+  );
+  ck(
+    "…and is still the guest's, not called reserved",
+    (await cell(p, mon2).getAttribute("aria-pressed")) === "true" &&
+      !/Reserved/.test(sel.label ?? ""),
+    sel.label,
   );
 
   // Sun-Wed: the week with the pending days has no stay on offer; the next does.
@@ -205,9 +211,17 @@ const shape = async (p, name) => {
   const ends = [await look(p, sun2), await look(p, add(sun2, 3))];
   const between = [await look(p, mon2), await look(p, tue2)];
   ck(
-    "A whole stay is white from end to end",
-    [...ends, ...between].every((s) => s.lum > 0.99 && s.state === "selected" && s.ring),
-    JSON.stringify([...ends, ...between].map((s) => s.lum)),
+    "A whole stay is filled: black at its two ends",
+    ends.every((s) => s.lum < 0.1 && s.state === "selected"),
+    JSON.stringify(ends.map((s) => s.lum)),
+  );
+  // Grey, but nowhere near the pale grey of a day awaiting approval.
+  ck(
+    "…and a mid grey between, clearly darker than awaiting approval",
+    between.every(
+      (s) => s.state === "selected" && s.lum > 0.4 && s.lum < 0.75 && s.lum < pend.lum - 0.2,
+    ),
+    JSON.stringify({ between: between.map((s) => s.lum), pending: pend.lum }),
   );
   ck(
     "…with its two ends marked more strongly than the days between",
