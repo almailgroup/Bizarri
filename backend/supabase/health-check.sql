@@ -38,7 +38,9 @@ select 'migrations' as area, * from (values
   ('16 insurance deposit', (to_regprocedure('public.insurance_deposit()')              is not null)),
   ('17 pending holds dates', (exists (select 1 from pg_trigger where tgname = 'guard_guest_overlap'
                                      and tgrelid = 'public.bookings'::regclass))),
-  ('18 admin edits stays', (to_regprocedure('public.admin_update_booking(uuid,smallint,date,date,boolean)') is not null))
+  ('18 admin edits stays', (to_regprocedure('public.admin_update_booking(uuid,smallint,date,date,boolean)') is not null)),
+  ('19 offers', (to_regclass('public.offers') is not null
+                 and pg_get_functiondef('public.quote_stay(smallint,date,date)'::regprocedure) like '%public.offers%'))
 ) t(item, ok)
 union all
 -- Expected from the rates as they stand, not from the defaults: the owner
@@ -46,7 +48,8 @@ union all
 -- read false the moment the weekend rate changed. The dates are the first
 -- Sun-Sat fortnight with no custom day price and no special occasion on
 -- chalet 1, so what is measured is the rates alone. A false row says what
--- it got.
+-- it got. Offers are not looked for: an offer prices only its own exact
+-- dates, and these weeks start in October 2026, which no offer will cover.
 select 'pricing', t.item, t.ok
 from (select * from public.rates where id) r
 cross join lateral (
