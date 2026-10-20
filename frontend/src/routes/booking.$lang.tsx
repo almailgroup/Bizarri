@@ -43,6 +43,7 @@ import {
   useInsuranceDeposit,
   useRates,
   useRequestBooking,
+  useOffers,
   useSpecialOccasions,
 } from "@/lib/api";
 import type { BookingRow } from "@/integrations/supabase/types";
@@ -73,6 +74,8 @@ interface BookingSearch {
    */
   shape?: DateFilter;
   occasion?: string;
+  /** …or an offer: its own dates, selected outright on its chalet. */
+  offer?: string;
   /**
    * The code dialog is open. An entry of its own for the same reason the
    * steps are: on a phone, Back is how a popup is dismissed, and it used to
@@ -85,20 +88,22 @@ export const Route = createFileRoute("/booking/$lang")({
   component: Booking,
   beforeLoad: requireLang,
   validateSearch: (s: Record<string, unknown>): BookingSearch =>
-    !s.step && FILTERS.includes(s.shape as DateFilter)
-      ? {
-          shape: s.shape as DateFilter,
-          ...(s.shape === "holiday" && typeof s.occasion === "string" && s.occasion
-            ? { occasion: s.occasion }
-            : {}),
-        }
-      : s.step === "details"
-        ? s.verify === true || s.verify === "true"
-          ? { step: "details", verify: true }
-          : { step: "details" }
-        : s.step === "done"
-          ? { step: "done" }
-          : {},
+    !s.step && typeof s.offer === "string" && s.offer
+      ? { offer: s.offer }
+      : !s.step && FILTERS.includes(s.shape as DateFilter)
+        ? {
+            shape: s.shape as DateFilter,
+            ...(s.shape === "holiday" && typeof s.occasion === "string" && s.occasion
+              ? { occasion: s.occasion }
+              : {}),
+          }
+        : s.step === "details"
+          ? s.verify === true || s.verify === "true"
+            ? { step: "details", verify: true }
+            : { step: "details" }
+          : s.step === "done"
+            ? { step: "done" }
+            : {},
 });
 
 /**
@@ -229,11 +234,11 @@ function Booking() {
       : "تحقق من التوفر واطلب إقامتك في شاليه بيزاري.",
   );
 
-  const { step, shape, occasion } = Route.useSearch();
+  const { step, shape, occasion, offer } = Route.useSearch();
   const navigate = Route.useNavigate();
   // A booking already under way in this tab, unless the guest has just
   // arrived with an offer chosen, which is a fresh start by definition.
-  const [draft] = useState(() => (shape || occasion ? null : readDraft()));
+  const [draft] = useState(() => (shape || occasion || offer ? null : readDraft()));
   const [chaletId, setChaletId] = useState(() => draft?.chaletId ?? 1);
 
   // Chalet 1 to start with, but only while it is on offer. Guests see active
@@ -255,10 +260,10 @@ function Booking() {
   // arrival's own reset: the guest pressed the button at the foot of the
   // offers and landed 1,200px down the booking page, past the heading and
   // the chalets. A fresh arrival starts at the top, so let it.
-  const [offer] = useState(() => ({ shape, occasion }));
+  const [arrival] = useState(() => ({ shape, occasion, offer }));
   useEffect(() => {
-    if (shape || occasion) clearDraft();
-    if (shape || occasion) navigate({ search: {}, replace: true });
+    if (shape || occasion || offer) clearDraft();
+    if (shape || occasion || offer) navigate({ search: {}, replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [confirmed, setConfirmed] = useState<BookingRow | null>(null);
@@ -302,8 +307,9 @@ function Booking() {
             chaletId={chaletId}
             setChaletId={setChaletId}
             showForm={step === "details"}
-            initialShape={offer.shape}
-            initialOccasion={offer.occasion}
+            initialShape={arrival.shape}
+            initialOccasion={arrival.occasion}
+            initialOffer={arrival.offer}
             restore={draft}
             onDone={(b) => {
               rememberBookingRef(b.ref);
@@ -571,6 +577,7 @@ function Calendar({
   showForm,
   initialShape,
   initialOccasion,
+  initialOffer,
   restore,
   onDone,
 }: {
@@ -582,6 +589,8 @@ function Calendar({
   initialShape?: DateFilter;
   /** …and, for a holiday, which occasion: its stay is chosen outright. */
   initialOccasion?: string;
+  /** An offer chosen on the Offers page: its dates, chosen outright. */
+  initialOffer?: string;
   /** The details step is in the address; see BookingSearch. */
   showForm: boolean;
   onDone: (b: BookingRow) => void;
@@ -647,6 +656,8 @@ function Calendar({
   } = useAvailability(chaletId, thisMonth, windowEnd);
   const { data: rates } = useRates();
   const { data: occasions } = useSpecialOccasions();
+  const { data: offers } = useOffers();
+  const { data: chalets } = useChalets();
 
   const byDay = useMemo(() => {
     const map = new Map<
@@ -904,7 +915,9 @@ function Calendar({
   // Shown live while choosing; request_booking() re-derives it server-side and
   // its answer is what is stored.
   const current =
-    start && end && rates ? quote(start, end, customPrices, rates, occasions ?? []) : null;
+    start && end && rates
+      ? quote(start, end, customPrices, rates, occasions ?? [], offers ?? [], chaletId)
+      : null;
   // rates is the source of truth; the constant only covers the moment before
   // it has loaded. request_booking() enforces the same number server-side.
   const minStay = rates?.minStayDays ?? MIN_STAY_DAYS;
@@ -970,6 +983,53 @@ function Calendar({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [calendar, occasions]);
+
+  // An offer chosen on the Offers page: its own dates, which need not be any
+  // of the shapes, selected outright and shown on their month. On its chalet;
+  // an offer for either chalet goes to the first one that has the dates free.
+  // If none has, the month is shown with the dates taken, and the guest is
+  // told rather than left to wonder why nothing is selected.
+  const pendingOffer = useRef(initialOffer);
+  const triedChalets = useRef(new Set<number>());
+  useEffect(() => {
+    const id = pendingOffer.current;
+    if (!id || !offers || !chalets) return;
+    const o = offers.find((x) => x.id === id);
+    if (!o || (o.chaletId !== null && !chalets.some((c) => c.id === o.chaletId))) {
+      pendingOffer.current = undefined;
+      setError(tr("offerGone"));
+      return;
+    }
+    if (o.chaletId !== null && o.chaletId !== chaletId) {
+      setChaletId(o.chaletId);
+      return;
+    }
+    if (!calendar) return;
+    const from = parseDate(o.start);
+    const to = parseDate(o.end);
+    const free = from >= today && eachDay(from, to).every((d) => !dayBlocked(d));
+    if (!free && o.chaletId === null) {
+      triedChalets.current.add(chaletId);
+      const next = chalets.find((c) => !triedChalets.current.has(c.id));
+      if (next) {
+        setChaletId(next.id);
+        return;
+      }
+    }
+    pendingOffer.current = undefined;
+    userPaged.current = true;
+    setJumped(false);
+    setMonth(startOfMonth(from));
+    if (free) {
+      setStart(from);
+      setEnd(to);
+      setError("");
+    } else {
+      setError(tr("offerTaken"));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calendar, offers, chalets, chaletId]);
+
   // Putting back a stay this tab had chosen before it was reloaded, once
   // availability is in -- and only if every day of it is still free and still
   // ahead, since somebody else may have booked it in the meantime. Until then
@@ -1011,12 +1071,17 @@ function Calendar({
   // someone else, or confirmed for them -- let go of it and say why, rather
   // than leave a selection the server will refuse at the very end. Only on the
   // dates: on the form, Submit's own refusal says the same thing in context.
+  // Set when a chalet switch kept an offer selected: the first check on the
+  // new chalet's calendar is about that chalet, not about someone else.
+  const switchedChalet = useRef(false);
   useEffect(() => {
     if (showForm || restoring || !start || !end || !calendar) return;
+    const switched = switchedChalet.current;
+    switchedChalet.current = false;
     if (eachDay(start, end).some((d) => dayBlocked(d))) {
       setStart(null);
       setEnd(null);
-      setError(tr("datesJustTaken"));
+      setError(tr(switched ? "offerNotOnChalet" : "datesJustTaken"));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [byDay]);
@@ -1158,9 +1223,25 @@ function Calendar({
         <ChaletPicker
           chaletId={chaletId}
           setChaletId={(id) => {
+            // An offer's dates match no shape, so once let go of they cannot
+            // be tapped back; one that covers the other chalet too stays
+            // selected, and is checked against that chalet's calendar.
+            const offerHere =
+              !!start &&
+              !!end &&
+              (offers ?? []).some(
+                (o) =>
+                  o.start === fmtDate(start) &&
+                  o.end === fmtDate(end) &&
+                  (o.chaletId === null || o.chaletId === id),
+              );
             setChaletId(id);
-            setStart(null);
-            setEnd(null);
+            if (offerHere) {
+              switchedChalet.current = true;
+            } else {
+              setStart(null);
+              setEnd(null);
+            }
             setError("");
           }}
         />
@@ -1577,15 +1658,31 @@ function Calendar({
                   : current.occasion.nameAr || current.occasion.nameEn}
               </p>
             )}
-            {current && !tooShort && current.packageKey && current.packageKey !== "special" && (
-              <p className="mt-3 text-sm text-muted-foreground">
-                {current.packageKey === "fullWeek"
-                  ? tr("fullWeekPkg")
-                  : current.packageKey === "weekend"
-                    ? tr("weekendPkg")
-                    : tr("weekdayPkg")}
+            {current && !tooShort && current.offer && (
+              <p className="mt-3 text-sm text-muted-foreground" data-testid="offer-line">
+                {[
+                  tr("specialOffer"),
+                  lang === "en"
+                    ? current.offer.titleEn
+                    : current.offer.titleAr || current.offer.titleEn,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
               </p>
             )}
+            {current &&
+              !tooShort &&
+              current.packageKey &&
+              current.packageKey !== "special" &&
+              current.packageKey !== "offer" && (
+                <p className="mt-3 text-sm text-muted-foreground">
+                  {current.packageKey === "fullWeek"
+                    ? tr("fullWeekPkg")
+                    : current.packageKey === "weekend"
+                      ? tr("weekendPkg")
+                      : tr("weekdayPkg")}
+                </p>
+              )}
             {current && !tooShort && current.hasCustom && (
               <p className="mt-3 text-sm text-muted-foreground">{tr("customPricing")}</p>
             )}

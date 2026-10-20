@@ -154,15 +154,31 @@ export const t: Dict = {
   packages: { en: "Packages", ar: "الباقات" },
   specialOffers: { en: "Special offers", ar: "عروض خاصة" },
   offersPageIntro: {
-    en: "Special prices for Eid, national holidays and other occasions — one price for the whole stay.",
-    ar: "أسعار خاصة للأعياد والعطل الرسمية والمناسبات — بسعر واحد للإقامة كاملة.",
+    en: "Selected dates at a special price — one price for the whole stay.",
+    ar: "تواريخ مختارة بسعر خاص — بسعر واحد للإقامة كاملة.",
   },
   noOffersTitle: { en: "No offers running right now", ar: "لا توجد عروض حالياً" },
   noOffersBody: {
-    en: "Offers are announced for Eid, national holidays and other occasions. Message us on WhatsApp to hear about the next one, or see our packages, available all year.",
-    ar: "نعلن عن العروض في الأعياد والعطل الرسمية والمناسبات. راسلنا عبر واتساب لتعرف بالعرض القادم، أو اطّلع على باقاتنا المتاحة طوال العام.",
+    en: "New offers appear here as soon as they are set. Message us on WhatsApp to hear about the next one, or see our packages, available all year.",
+    ar: "تظهر العروض الجديدة هنا فور إعلانها. راسلنا عبر واتساب لتعرف بالعرض القادم، أو اطّلع على باقاتنا المتاحة طوال العام.",
   },
   askAboutOffers: { en: "Ask about offers", ar: "اسأل عن العروض" },
+  // An offer the admin left untitled, and the label for a stay one priced.
+  specialOffer: { en: "Special offer", ar: "عرض خاص" },
+  offerBooked: { en: "Fully booked", ar: "محجوز بالكامل" },
+  offerOnlyChalet: { en: "{chalet} only", ar: "{chalet} فقط" },
+  offerTaken: {
+    en: "That offer's dates are no longer free. Please choose other dates, or another offer.",
+    ar: "لم تعد تواريخ هذا العرض متاحة. يرجى اختيار تواريخ أخرى أو عرض آخر.",
+  },
+  offerGone: {
+    en: "That offer is no longer available. Please choose other dates.",
+    ar: "لم يعد هذا العرض متاحاً. يرجى اختيار تواريخ أخرى.",
+  },
+  offerNotOnChalet: {
+    en: "Those dates are not free on this chalet.",
+    ar: "هذه التواريخ غير متاحة في هذا الشاليه.",
+  },
   seePackages: { en: "See our packages", ar: "اطّلع على باقاتنا" },
   packagesPageIntro: {
     en: "Fixed-rate packages for the whole chalet, or a single weekday at the daily rate.",

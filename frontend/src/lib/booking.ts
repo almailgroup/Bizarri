@@ -106,6 +106,19 @@ export interface Occasion {
   price: number;
 }
 
+/** Dates the admin sells at one price for the whole stay. */
+export interface Offer {
+  id: string;
+  titleEn: string;
+  titleAr: string;
+  /** null: either chalet. */
+  chaletId: number | null;
+  /** Inclusive yyyy-mm-dd bounds. */
+  start: string;
+  end: string;
+  price: number;
+}
+
 export interface Quote {
   total: number;
   days: number;
@@ -115,6 +128,8 @@ export interface Quote {
   hasCustom: boolean;
   /** Set when a special occasion priced the stay. */
   occasion: Occasion | null;
+  /** Set when an offer for exactly these dates priced it. */
+  offer: Offer | null;
   breakdown: { date: string; price: number; custom: boolean }[];
 }
 
@@ -195,7 +210,10 @@ function sumStayDays(days: Date[], rates: Rates, prices: Record<string, number>)
 }
 
 /** The package a range matches exactly, by length and start/end weekday. */
-export function matchPackage(start: Date, end: Date): Exclude<PackageKey, "special"> | null {
+export function matchPackage(
+  start: Date,
+  end: Date,
+): Exclude<PackageKey, "special" | "offer"> | null {
   const len = daysBetween(start, end);
   const from = start.getDay();
   const to = end.getDay();
@@ -207,6 +225,8 @@ export function matchPackage(start: Date, end: Date): Exclude<PackageKey, "speci
 
 /**
  * Price a stay. Mirrors quote_stay() in SQL, same precedence:
+ *   0. an offer for exactly these dates, on this chalet or on either — its
+ *      price as it stands, the cheapest if two match.
  *   1. custom day prices — sum per day, so an override is never masked.
  *   2. special occasion  — its flat price, plus per-day defaults for any days
  *                          the stay extends beyond the window.
@@ -225,13 +245,37 @@ export function quote(
   prices: Record<string, number>,
   rates: Rates,
   occasions: Occasion[] = [],
+  offers: Offer[] = [],
+  chaletId: number | null = null,
 ): Quote {
   const days = eachDay(start, end);
+  const from = fmtDate(start);
+  const to = fmtDate(end);
   const breakdown = days.map((d) => {
     const iso = fmtDate(d);
     const custom = Object.prototype.hasOwnProperty.call(prices, iso);
     return { date: iso, price: custom ? prices[iso] : defaultDayRate(d, rates), custom };
   });
+
+  const offer = offers
+    .filter(
+      (o) => o.start === from && o.end === to && (o.chaletId === null || o.chaletId === chaletId),
+    )
+    .sort(
+      (a, b) => a.price - b.price || Number(a.chaletId === null) - Number(b.chaletId === null),
+    )[0];
+  if (offer) {
+    return {
+      total: offer.price,
+      days: days.length,
+      packageKey: "offer",
+      hasCustom: false,
+      occasion: null,
+      offer,
+      breakdown,
+    };
+  }
+
   const hasCustom = breakdown.some((b) => b.custom);
   const perDay = sumStayDays(days, rates, prices);
 
@@ -242,12 +286,11 @@ export function quote(
       packageKey: null,
       hasCustom,
       occasion: null,
+      offer: null,
       breakdown,
     };
   }
 
-  const from = fmtDate(start);
-  const to = fmtDate(end);
   // The server forbids overlapping active occasions, so at most one matches;
   // the sort only decides a winner if that ever changes.
   const occasion = occasions
@@ -269,6 +312,7 @@ export function quote(
       packageKey: "special",
       hasCustom: false,
       occasion,
+      offer: null,
       breakdown,
     };
   }
@@ -276,7 +320,15 @@ export function quote(
   const packageKey = matchPackage(start, end);
   const total = packageKey ? rates[packageKey] : perDay;
 
-  return { total, days: days.length, packageKey, hasCustom: false, occasion: null, breakdown };
+  return {
+    total,
+    days: days.length,
+    packageKey,
+    hasCustom: false,
+    occasion: null,
+    offer: null,
+    breakdown,
+  };
 }
 
 /* -------------------------------------------------------- availability */

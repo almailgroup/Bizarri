@@ -2,6 +2,7 @@ import { requireLang } from "@/lib/lang-route";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import {
+  BadgePercent,
   CalendarDays,
   ExternalLink,
   Globe,
@@ -33,6 +34,7 @@ import { ChaletsPanel } from "@/components/admin/ChaletsPanel";
 import { NewsPanel } from "@/components/admin/NewsPanel";
 import { SettingsPanel } from "@/components/admin/SettingsPanel";
 import { OccasionsPanel } from "@/components/admin/OccasionsPanel";
+import { OfferModal, OffersPanel, type OfferPrefill } from "@/components/admin/OffersPanel";
 import { ActivityPanel } from "@/components/admin/ActivityPanel";
 
 const TABS = [
@@ -40,6 +42,7 @@ const TABS = [
   "requests",
   "availability",
   "rates",
+  "offers",
   "occasions",
   "chalets",
   "news",
@@ -243,6 +246,7 @@ function Dashboard() {
   };
   const [chaletId, setChaletId] = useState(1);
   const [newBooking, setNewBooking] = useState<Partial<BookingPrefill> | null>(null);
+  const [newOffer, setNewOffer] = useState<OfferPrefill | null>(null);
   const pending = (bookings ?? []).filter((b) => b.status === "pending").length;
 
   // On a phone the tabs are a strip that scrolls sideways; keep the open one
@@ -259,6 +263,7 @@ function Dashboard() {
     { key: "requests", label: tr("requests"), icon: Inbox },
     { key: "availability", label: tr("availability"), icon: CalendarDays },
     { key: "rates", label: tr("packageRates"), icon: Tags },
+    { key: "offers", label: t("offers"), icon: BadgePercent },
     { key: "occasions", label: tr("specialOccasions"), icon: PartyPopper },
     { key: "chalets", label: tr("chaletsMgmt"), icon: Home },
     { key: "news", label: lang === "en" ? "News" : "الأخبار", icon: Newspaper },
@@ -378,10 +383,12 @@ function Dashboard() {
                   chaletId={chaletId}
                   onChaletChange={setChaletId}
                   onNewBooking={(prefill) => setNewBooking(prefill)}
+                  onNewOffer={(prefill) => setNewOffer(prefill)}
                   onOpenBooking={(ref) => setTab("requests", ref)}
                 />
               )}
               {tab === "rates" && <RatesPanel />}
+              {tab === "offers" && <OffersPanel />}
               {tab === "occasions" && <OccasionsPanel />}
               {tab === "chalets" && <ChaletsPanel />}
               {tab === "news" && <NewsPanel />}
@@ -397,6 +404,7 @@ function Dashboard() {
             onClose={() => setNewBooking(null)}
           />
         )}
+        {newOffer && <OfferModal prefill={newOffer} onClose={() => setNewOffer(null)} />}
       </div>
     </ToastProvider>
   );

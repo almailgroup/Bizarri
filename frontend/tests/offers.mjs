@@ -39,7 +39,67 @@ const OCCASION = {
   active: true,
 };
 
-async function page(viewport = { width: 1200, height: 1000 }, occasions = [OCCASION]) {
+// The offers the admin has set, two months out. A is Wed-Sun, which is none
+// of the booking page's shapes, on either chalet; B is chalet 2's alone and
+// has no title; C is taken on both chalets; the last has already begun.
+const offFrom = (() => {
+  const d = new Date(today.getFullYear(), today.getMonth() + 2, 1);
+  while (d.getDay() !== 3) d.setDate(d.getDate() + 1);
+  return d;
+})();
+const at = (n) => new Date(offFrom.getFullYear(), offFrom.getMonth(), offFrom.getDate() + n);
+const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
+const OFFERS = [
+  {
+    id: "0f0f0000-0000-4000-8000-00000000000a",
+    title_en: "Long weekend",
+    title_ar: "عطلة طويلة",
+    chalet_id: null,
+    start_date: iso(offFrom),
+    end_date: iso(at(4)),
+    price: 200,
+    active: true,
+  },
+  {
+    id: "0f0f0000-0000-4000-8000-00000000000b",
+    title_en: "",
+    title_ar: "",
+    chalet_id: 2,
+    start_date: iso(at(11)),
+    end_date: iso(at(14)),
+    price: 250,
+    active: true,
+  },
+  {
+    id: "0f0f0000-0000-4000-8000-00000000000c",
+    title_en: "Sold out deal",
+    title_ar: "",
+    chalet_id: null,
+    start_date: iso(at(18)),
+    end_date: iso(at(21)),
+    price: 150,
+    active: true,
+  },
+  {
+    id: "0f0f0000-0000-4000-8000-00000000000d",
+    title_en: "Old deal",
+    title_ar: "",
+    chalet_id: null,
+    start_date: iso(yesterday),
+    end_date: iso(new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1)),
+    price: 100,
+    active: true,
+  },
+];
+// Days already held, per chalet: offer C on both.
+const TAKEN = { 1: [iso(at(18))], 2: [iso(at(19))] };
+
+async function page(
+  viewport = { width: 1200, height: 1000 },
+  occasions = [OCCASION],
+  offers = OFFERS,
+  taken = TAKEN,
+) {
   const ctx = await b.newContext({ viewport });
   await ctx.route(/^https?:\/\/(?!localhost)/, (r) => {
     const u = r.request().url();
@@ -63,6 +123,14 @@ async function page(viewport = { width: 1200, height: 1000 }, occasions = [OCCAS
           active: true,
           sort_order: 1,
         },
+        {
+          id: 2,
+          slug: "b2",
+          name_en: "Bizarri Chalet 2",
+          name_ar: "ش٢",
+          active: true,
+          sort_order: 2,
+        },
       ]);
     if (path === "rates")
       return send({
@@ -78,13 +146,21 @@ async function page(viewport = { width: 1200, height: 1000 }, occasions = [OCCAS
         updated_by: null,
       });
     if (path === "special_occasions") return send(occasions);
+    if (path === "offers") return send(offers);
     if (path === "rpc/availability_calendar") {
+      const held = taken[body.p_chalet_id] ?? [];
       const out = [];
       const d = new Date(body.p_from + "T00:00:00");
       const e = new Date(body.p_to + "T00:00:00");
       for (; d <= e; d.setDate(d.getDate() + 1)) {
         const k = iso(d);
-        out.push({ day: k, blocked: k < iso(today), price: 75, custom: false });
+        out.push({
+          day: k,
+          blocked: k < iso(today) || held.includes(k),
+          pending: held.includes(k),
+          price: 75,
+          custom: false,
+        });
       }
       return send(out);
     }
@@ -99,6 +175,19 @@ const path = (p) => {
   return u.pathname + u.search;
 };
 const cta = (p) => p.getByRole("link", { name: /Start your booking request/i });
+const chaletOn = (p) =>
+  p.evaluate(() =>
+    [...document.querySelectorAll('[aria-labelledby="pick-chalet"] button[aria-pressed="true"]')]
+      .map((x) => x.innerText.trim())
+      .join(","),
+  );
+const subtotal = (p) =>
+  p.evaluate(() => {
+    const el = [...document.querySelectorAll("div,p")].find((d) =>
+      /^(BOOKING SUB)?TOTAL/i.test((d.innerText || "").trim()),
+    );
+    return el ? el.innerText.replace(/\n/g, " ") : "";
+  });
 const shapeOn = (p) =>
   p.evaluate(() =>
     [...document.querySelectorAll('[aria-label="Choose your stay"] button[aria-pressed="true"]')]
@@ -106,7 +195,7 @@ const shapeOn = (p) =>
       .join(","),
   );
 
-/** From the Offers page (holidays) or the Packages page, through to booking. */
+/** From the Offers page or the Packages page, through to booking. */
 async function fromOffers(p, pick, from = "offers") {
   await p.goto(`${B}en`, { waitUntil: "load" });
   await p.waitForTimeout(500);
@@ -120,24 +209,51 @@ async function fromOffers(p, pick, from = "offers") {
 
 // ============================================== packages and offers, apart
 // One page until the owner asked for them separately: the year-round stays
-// on Packages, the holiday prices on Offers.
+// on Packages, and on Offers the dates the admin has priced -- not the
+// special occasions, which are booked under their own option.
 {
   const { ctx, p } = await page();
   await p.goto(`${B}offers/en`, { waitUntil: "load" });
-  await p.waitForTimeout(900);
+  await p.waitForTimeout(1200);
+  const cards = p.locator("main button[aria-pressed]");
+  ck("The Offers page lists the offers the admin has set", (await cards.count()) === 3);
+  ck("…not the special occasions", (await p.getByText(/National Day/i).count()) === 0);
+  ck("…nor one that has already begun", (await p.getByText(/Old deal/i).count()) === 0);
   ck(
-    "The Offers page lists the holiday offers",
-    (await p.locator("main button[aria-pressed]").count()) === 1 &&
-      (await p.getByRole("button", { name: /National Day/i }).isVisible()),
-  );
-  ck(
-    "…and not the packages, which have their own page",
+    "…nor the packages, which have their own page",
     (await p.getByText(/Full Week Package|Thu – Sat Package|By the day/i).count()) === 0,
+  );
+  const a = (await cards.nth(0).innerText()).replace(/\n+/g, " | ");
+  ck(
+    "Each says its title, its dates, its length and its price",
+    /Long weekend/.test(a) &&
+      a.includes(`${iso(offFrom)} → ${iso(at(4))}`) &&
+      /5 days/.test(a) &&
+      /KD 200/.test(a),
+    a,
+  );
+  const bText = (await cards.nth(1).innerText()).replace(/\n+/g, " | ");
+  ck(
+    "One without a title is a special offer, and one for a chalet says which",
+    /Special offer/.test(bText) && /Bizarri Chalet 2 only/.test(bText) && /KD 250/.test(bText),
+    bText,
+  );
+  const c = (await cards.nth(2).innerText()).replace(/\n+/g, " | ");
+  ck(
+    "One already taken on every chalet says so and cannot be chosen",
+    /Fully booked/i.test(c) && (await cards.nth(2).isDisabled()),
+    c,
+  );
+  await cards.nth(0).click();
+  ck(
+    "Choosing one puts it on the button",
+    (await cta(p).getAttribute("href")) === `/booking/en?offer=${OFFERS[0].id}`,
+    await cta(p).getAttribute("href"),
   );
   await ctx.close();
 }
 {
-  const { ctx, p } = await page(undefined, []);
+  const { ctx, p } = await page(undefined, [], []);
   await p.goto(`${B}offers/en`, { waitUntil: "load" });
   await p.waitForTimeout(900);
   ck(
@@ -168,7 +284,7 @@ async function fromOffers(p, pick, from = "offers") {
     pressed === 4,
     String(pressed),
   );
-  ck("…and the holiday offers are not here", (await p.getByText(/National Day/i).count()) === 0);
+  ck("…and the offers are not here", (await p.getByText(/Long weekend/i).count()) === 0);
   // The by-the-day card matches the rule: weekdays a day at a time, the
   // weekend only whole. It used to say "3 days or more" and quote a Thu-Sat
   // daily rate that no booking could use.
@@ -301,7 +417,7 @@ for (const [name, re, want] of [
 // chalets, into the middle of the calendar.
 for (const [name, re, source] of [
   ["a package", /Full Week Package/i, "packages"],
-  ["a holiday", /National Day/i, "offers"],
+  ["an offer", /Long weekend/i, "offers"],
 ]) {
   const { ctx, p } = await page({ width: 390, height: 844 });
   await p.goto(`${B}${source}/en`, { waitUntil: "load" });
@@ -322,32 +438,135 @@ for (const [name, re, source] of [
   await ctx.close();
 }
 
-// ================================================ a holiday, dates and all
+// An offer for a chalet that has been switched off is for nothing bookable.
+{
+  const ghost = {
+    ...OFFERS[0],
+    id: "0f0f0000-0000-4000-8000-00000000000e",
+    title_en: "Closed chalet deal",
+    chalet_id: 3,
+  };
+  const { ctx, p } = await page(undefined, [OCCASION], [...OFFERS, ghost]);
+  await p.goto(`${B}offers/en`, { waitUntil: "load" });
+  await p.waitForTimeout(1200);
+  ck(
+    "An offer for a chalet that is switched off is not listed",
+    (await p.getByText(/Closed chalet deal/).count()) === 0 &&
+      (await p.locator("main button[aria-pressed]").count()) === 3,
+  );
+  await ctx.close();
+}
+
+// ================================================ an offer, dates and all
 {
   const { ctx, p } = await page();
-  await fromOffers(p, () => p.getByRole("button", { name: /National Day/i }).click());
+  await fromOffers(p, () => p.getByRole("button", { name: /Long weekend/i }).click());
+  ck("An offer opens the booking page with the address tidied", path(p) === "/booking/en", path(p));
   ck(
-    "An occasion opens on the Special Occasions shape",
+    "…on its month",
+    ((await p.locator('[role="grid"]').getAttribute("aria-label")) ?? "").includes(
+      offFrom.toLocaleDateString("en-US", { month: "long" }),
+    ),
+    await p.locator('[role="grid"]').getAttribute("aria-label"),
+  );
+  // Wed-Sun is none of the shapes; it is selected all the same.
+  ck("…with its dates already chosen", await p.getByText("5 days selected").isVisible());
+  ck(
+    "…from its first day to its last",
+    (await p.getByText(`${iso(offFrom)} → ${iso(at(4))}`).count()) > 0,
+  );
+  ck("…at the offer's price", /KD 200/.test(await subtotal(p)), await subtotal(p));
+  ck(
+    "…and says it is an offer",
+    (await p.getByTestId("offer-line").innerText()) === "Special offer · Long weekend",
+  );
+  ck("…ready to continue", await p.getByRole("button", { name: /^Next$/i }).isEnabled());
+
+  // It covers both chalets, so changing chalet keeps it.
+  await p.getByRole("button", { name: "Bizarri Chalet 2" }).click();
+  await p.waitForTimeout(800);
+  ck(
+    "Switching to the other chalet keeps an offer that covers both",
+    (await chaletOn(p)) === "Bizarri Chalet 2" &&
+      (await p.getByText("5 days selected").isVisible()),
+  );
+  await ctx.close();
+}
+
+// One chalet's offer opens on that chalet, and is let go on the other.
+{
+  const { ctx, p } = await page();
+  await fromOffers(p, () => p.getByRole("button", { name: /Special offer/i }).click());
+  ck(
+    "A chalet's own offer opens on that chalet",
+    (await chaletOn(p)) === "Bizarri Chalet 2",
+    await chaletOn(p),
+  );
+  ck(
+    "…with its dates and its price",
+    (await p.getByText("4 days selected").isVisible()) && /KD 250/.test(await subtotal(p)),
+    await subtotal(p),
+  );
+  await p.getByRole("button", { name: "Bizarri Chalet 1" }).click();
+  await p.waitForTimeout(800);
+  ck("…and switching away lets it go", (await p.getByText(/days selected/).count()) === 0);
+  await ctx.close();
+}
+
+// An offer for both, taken on the first chalet: the second is used.
+{
+  const { ctx, p } = await page(undefined, [OCCASION], OFFERS, { 1: [iso(at(1))] });
+  await fromOffers(p, () => p.getByRole("button", { name: /Long weekend/i }).click());
+  ck(
+    "An offer for both chalets opens on the one that has it free",
+    (await chaletOn(p)) === "Bizarri Chalet 2" &&
+      (await p.getByText("5 days selected").isVisible()),
+    await chaletOn(p),
+  );
+  await ctx.close();
+}
+
+// Taken between the two pages: the guest is told, not left with nothing.
+{
+  const { ctx, p } = await page();
+  await p.goto(`${B}booking/en?offer=${OFFERS[2].id}`, { waitUntil: "load" });
+  await p.waitForTimeout(1800);
+  ck(
+    "An offer whose dates were taken in the meantime says so",
+    await p
+      .getByText(/That offer.s dates are no longer free/)
+      .first()
+      .isVisible(),
+  );
+  ck("…and selects nothing", (await p.getByText(/days selected/).count()) === 0);
+  await p.goto(`${B}booking/en?offer=0f0f0000-0000-4000-8000-0000000000ff`, { waitUntil: "load" });
+  await p.waitForTimeout(1500);
+  ck(
+    "An offer that no longer exists says so too",
+    await p
+      .getByText(/That offer is no longer available/)
+      .first()
+      .isVisible(),
+  );
+  await ctx.close();
+}
+
+// A special occasion link shared before offers had their own page still
+// opens on the occasion.
+{
+  const { ctx, p } = await page();
+  await p.goto(`${B}booking/en?shape=holiday&occasion=${OCCASION.id}`, { waitUntil: "load" });
+  await p.waitForTimeout(1800);
+  ck(
+    "An occasion link still opens on Special Occasions",
     (await shapeOn(p)) === "SPECIAL OCCASIONS",
     await shapeOn(p),
   );
   ck(
-    "…on its month",
-    ((await p.locator('[role="grid"]').getAttribute("aria-label")) ?? "").includes(
-      occFrom.toLocaleDateString("en-US", { month: "long" }),
-    ),
-    await p.locator('[role="grid"]').getAttribute("aria-label"),
+    "…with its dates chosen, at its own price",
+    (await p.getByText("3 days selected").isVisible()) && /900/.test(await subtotal(p)),
+    await subtotal(p),
   );
-  ck("…with its dates already chosen", await p.getByText("3 days selected").isVisible());
-  ck("…from its first day", (await p.getByText(iso(occFrom)).count()) > 0);
-  const total = await p.evaluate(() => {
-    const el = [...document.querySelectorAll("div,p")].find((d) =>
-      /^(BOOKING SUB)?TOTAL/i.test((d.innerText || "").trim()),
-    );
-    return el ? el.innerText.replace(/\n/g, " ") : "";
-  });
-  ck("…at its own price", /900/.test(total), total);
-  ck("…ready to continue", await p.getByRole("button", { name: /^Next$/i }).isEnabled());
   await ctx.close();
 }
 

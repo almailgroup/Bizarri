@@ -77,5 +77,62 @@ for (const [from, to, want, why] of [
   );
 }
 
+// ---- offers (13_offers.sql, the same dates and the totals Postgres returned)
+{
+  const OFFERS = [
+    {
+      id: "a",
+      titleEn: "Midweek escape",
+      titleAr: "",
+      chaletId: null,
+      start: "2027-05-02",
+      end: "2027-05-05",
+      price: 200,
+    },
+    {
+      id: "b",
+      titleEn: "",
+      titleAr: "",
+      chaletId: 2,
+      start: "2027-05-06",
+      end: "2027-05-08",
+      price: 250,
+    },
+  ];
+  const o = (from, to, chalet, prices = {}) =>
+    quote(parseDate(from), parseDate(to), prices, RATES, [], OFFERS, chalet);
+  for (const [from, to, chalet, prices, want, key, why] of [
+    ["2027-05-02", "2027-05-05", 1, {}, 200, "offer", "an offer prices exactly its own dates"],
+    ["2027-05-02", "2027-05-05", 2, {}, 200, "offer", "an offer for both chalets prices both"],
+    [
+      "2027-05-02",
+      "2027-05-04",
+      1,
+      {},
+      225,
+      null,
+      "a stay that only overlaps it is priced as usual",
+    ],
+    ["2027-05-06", "2027-05-08", 2, {}, 250, "offer", "an offer for one chalet prices that chalet"],
+    ["2027-05-06", "2027-05-08", 1, {}, 350, "weekend", "…and not the other one"],
+    [
+      "2027-05-02",
+      "2027-05-05",
+      1,
+      { "2027-05-03": 500 },
+      200,
+      "offer",
+      "the offer stands over a custom day price",
+    ],
+  ]) {
+    const got = o(from, to, chalet, prices);
+    ck(
+      `Offer: ${why} — KD ${want}`,
+      got.total === want && got.packageKey === key,
+      `got ${got.total} ${got.packageKey}`,
+    );
+  }
+}
+
 console.log(`\n${fails} failing`);
 process.exit(fails ? 1 : 0);

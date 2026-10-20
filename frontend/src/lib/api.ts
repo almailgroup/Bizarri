@@ -5,7 +5,13 @@
  * the client directly. Reads use React Query; writes invalidate the keys they
  * affect, which is what keeps the admin panel and the guest calendar in step.
  */
-import { useMutation, useQuery, useQueryClient, type UseQueryOptions } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQueries,
+  useQuery,
+  useQueryClient,
+  type UseQueryOptions,
+} from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type {
   AuditRow,
@@ -17,6 +23,7 @@ import type {
   QuoteRow,
   RatesRow,
   SettingRow,
+  OfferRow,
   SpecialOccasionRow,
 } from "@/integrations/supabase/types";
 import {
@@ -24,6 +31,7 @@ import {
   INSURANCE_DEPOSIT,
   fmtDate,
   type Occasion,
+  type Offer,
   type Rates,
 } from "@/lib/booking";
 
@@ -41,6 +49,7 @@ export const qk = {
   settings: ["settings"] as const,
   auditLog: ["auditLog"] as const,
   occasions: ["occasions"] as const,
+  offers: ["offers"] as const,
 };
 
 /** Postgres errors arrive with a `message`; surface it rather than "[object Object]". */
@@ -115,6 +124,30 @@ export function useAvailability(chaletId: number, from: Date, to: Date, enabled 
 }
 
 /**
+ * The same calendar for several chalets at once, sharing useAvailability's
+ * cache: the Offers page asks it whether each offer's dates are still free on
+ * a chalet it applies to.
+ */
+export function useAvailabilityFor(chaletIds: number[], from: string, to: string) {
+  return useQueries({
+    queries: chaletIds.map((id) => ({
+      queryKey: qk.calendar(id, from, to),
+      enabled: !!from && !!to,
+      queryFn: async (): Promise<CalendarDay[]> => {
+        const { data, error } = await supabase.rpc("availability_calendar", {
+          p_chalet_id: id,
+          p_from: from,
+          p_to: to,
+        });
+        if (error) fail("Could not load availability", error);
+        return (data ?? []) as CalendarDay[];
+      },
+      staleTime: 30_000,
+    })),
+  });
+}
+
+/**
  * Special occasion windows (Eid etc). Public-readable so the guest calendar can
  * mirror the premium price; request_booking() still re-derives the real total.
  */
@@ -139,6 +172,35 @@ function toOccasion(o: SpecialOccasionRow): Occasion {
     id: o.id,
     nameEn: o.name_en,
     nameAr: o.name_ar,
+    start: o.start_date,
+    end: o.end_date,
+    price: Number(o.price),
+  };
+}
+
+/** The offers that are on, for the Offers page and for pricing. */
+export function useOffers() {
+  return useQuery({
+    queryKey: qk.offers,
+    queryFn: async (): Promise<Offer[]> => {
+      const { data, error } = await supabase
+        .from("offers")
+        .select("*")
+        .eq("active", true)
+        .order("start_date");
+      if (error) fail("Could not load offers", error);
+      return (data ?? []).map(toOffer);
+    },
+    staleTime: 5 * 60_000,
+  });
+}
+
+function toOffer(o: OfferRow): Offer {
+  return {
+    id: o.id,
+    titleEn: o.title_en,
+    titleAr: o.title_ar,
+    chaletId: o.chalet_id,
     start: o.start_date,
     end: o.end_date,
     price: Number(o.price),
@@ -720,6 +782,51 @@ export function useSaveOccasion() {
       qc.invalidateQueries({ queryKey: qk.occasions });
       qc.invalidateQueries({ queryKey: ["calendar"] });
     },
+  });
+}
+
+export function useAllOffers(enabled: boolean) {
+  return useQuery({
+    queryKey: [...qk.offers, "all"],
+    enabled,
+    queryFn: async (): Promise<OfferRow[]> => {
+      const { data, error } = await supabase.from("offers").select("*").order("start_date");
+      if (error) fail("Could not load offers", error);
+      return data ?? [];
+    },
+  });
+}
+
+export function useSaveOffer() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (item: Partial<OfferRow> & { id?: string }) => {
+      const payload = {
+        title_en: (item.title_en ?? "").trim(),
+        title_ar: (item.title_ar ?? "").trim(),
+        chalet_id: item.chalet_id ?? null,
+        start_date: item.start_date ?? "",
+        end_date: item.end_date ?? "",
+        price: Number(item.price ?? 0),
+        active: item.active ?? true,
+      };
+      const { error } = item.id
+        ? await supabase.from("offers").update(payload).eq("id", item.id)
+        : await supabase.from("offers").insert(payload);
+      if (error) fail("Could not save the offer", error);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.offers }),
+  });
+}
+
+export function useDeleteOffer() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("offers").delete().eq("id", id);
+      if (error) fail("Could not delete the offer", error);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.offers }),
   });
 }
 

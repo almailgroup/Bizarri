@@ -187,6 +187,7 @@ function makeState() {
       },
     ],
     minStay: 3,
+    offers: [],
     blocked: [],
     dayPrices: {},
     calls: [],
@@ -341,6 +342,20 @@ function mock(ctx, state) {
     if (path === "special_occasions")
       return req.method() === "PATCH" ? byId(state.occasions) : send(state.occasions);
     if (path === "news") return req.method() === "PATCH" ? byId(state.news) : send(state.news);
+    if (path === "offers") {
+      if (req.method() === "POST") {
+        const row = { id: `offer-${state.offers.length + 1}`, ...body };
+        state.offers.push(row);
+        return send([row]);
+      }
+      if (req.method() === "PATCH") return byId(state.offers);
+      if (req.method() === "DELETE") {
+        const id = decodeURIComponent(url.searchParams.get("id") ?? "").replace("eq.", "");
+        state.offers = state.offers.filter((o) => o.id !== id);
+        return send([]);
+      }
+      return send(state.offers);
+    }
     if (path === "rpc/admin_update_booking") {
       const bk = state.bookings.find((x) => x.id === body.p_id);
       const n =
@@ -1303,6 +1318,138 @@ async function adminPage(state, { phone = false } = {}) {
     "Turning it off saves require_email_verification = false",
     call?.body?.value === false,
     JSON.stringify(call?.body),
+  );
+  await ctx.close();
+}
+
+// =========================================== offers: dates at one price
+// What the Offers page lists: dates the admin picks and prices, apart from
+// the special occasions.
+{
+  const state = makeState();
+  const { p, ctx } = await adminPage(state);
+  await p.getByRole("button", { name: "Offers", exact: true }).click();
+  await p.waitForTimeout(500);
+  ck("There is an Offers tab, empty to start with", await p.getByText(/No offers yet/).isVisible());
+
+  await p.getByRole("button", { name: "New offer" }).click();
+  const dlg = p.getByRole("dialog");
+  ck("New offer opens a form", await dlg.getByRole("heading", { name: "New offer" }).isVisible());
+  ck(
+    "…for both chalets unless told otherwise",
+    (await dlg.getByRole("button", { name: "Both chalets" }).getAttribute("aria-pressed")) ===
+      "true",
+  );
+  // Wednesday to Thursday takes a slice of a weekend.
+  await dlg.getByLabel("First day").fill(ymd(at(3)));
+  await dlg.getByLabel("Last day").fill(ymd(at(4)));
+  await dlg.getByLabel(/Price for the whole stay/).fill("400");
+  ck(
+    "Dates that split a Thu – Sat are refused in the form",
+    (await dlg.getByText(/Thu – Sat is sold whole/).isVisible()) &&
+      (await dlg.getByRole("button", { name: "Create offer" }).isDisabled()),
+  );
+  await dlg.getByLabel("Last day").fill(ymd(at(6)));
+  await dlg.getByLabel("Title (English)").fill("Long weekend");
+  ck(
+    "Whole dates say how long the stay is",
+    /4 days/.test(await dlg.getByTestId("offer-span").innerText()),
+    await dlg.getByTestId("offer-span").innerText(),
+  );
+  await dlg.getByRole("button", { name: "Create offer" }).click();
+  await p.waitForTimeout(700);
+  const post = state.calls.find((c) => c.path === "offers" && c.method === "POST");
+  ck(
+    "Creating it saves the dates, the price and the title, on both chalets",
+    post?.body?.start_date === ymd(at(3)) &&
+      post?.body?.end_date === ymd(at(6)) &&
+      post?.body?.price === 400 &&
+      post?.body?.title_en === "Long weekend" &&
+      post?.body?.chalet_id === null &&
+      post?.body?.active === true,
+    JSON.stringify(post?.body),
+  );
+  const row = p.locator("li", { hasText: "Long weekend" });
+  ck(
+    "…and lists it",
+    (await row.isVisible()) &&
+      /Both chalets/.test(await row.innerText()) &&
+      /KD 400/.test(await row.innerText()),
+    await row.innerText().catch(() => ""),
+  );
+
+  // Everything about it can be changed.
+  await p.getByRole("button", { name: "Edit Long weekend" }).click();
+  await dlg.getByLabel(/Price for the whole stay/).fill("350");
+  await dlg.getByRole("button", { name: "Bizarri Chalet 2" }).click();
+  await dlg.getByRole("button", { name: /Save changes/i }).click();
+  await p.waitForTimeout(700);
+  const patch = state.calls.find((c) => c.path === "offers" && c.method === "PATCH");
+  ck(
+    "An offer can be edited: its price, its chalet",
+    patch?.search.includes("id=eq.offer-1") &&
+      patch?.body?.price === 350 &&
+      patch?.body?.chalet_id === 2,
+    JSON.stringify(patch?.body),
+  );
+  await row.getByRole("switch").click();
+  await p.waitForTimeout(600);
+  ck("…switched off", state.offers[0]?.active === false, JSON.stringify(state.offers[0]));
+  await p.getByRole("button", { name: "Delete Long weekend" }).click();
+  await p.getByRole("button", { name: "Yes, delete" }).click();
+  await p.waitForTimeout(700);
+  ck(
+    "…and deleted, after one confirmation",
+    state.calls.some((c) => c.path === "offers" && c.method === "DELETE") &&
+      state.offers.length === 0,
+  );
+
+  // From the calendar: the selection becomes an offer on that chalet.
+  await p.getByRole("button", { name: "Availability & Pricing", exact: true }).click();
+  await p.waitForTimeout(700);
+  const panel = p.locator("#selection-panel").locator("..");
+  await panel.getByLabel("From", { exact: true }).fill(ymd(at(7)));
+  await panel.getByLabel("To", { exact: true }).fill(ymd(at(10)));
+  await p.waitForTimeout(200);
+  await panel.getByRole("button", { name: "Make these dates an offer" }).click();
+  await p.waitForTimeout(300);
+  ck(
+    "Selected dates on the calendar open an offer with them filled in",
+    (await dlg.getByLabel("First day").inputValue()) === ymd(at(7)) &&
+      (await dlg.getByLabel("Last day").inputValue()) === ymd(at(10)) &&
+      (await dlg.getByRole("button", { name: "Bizarri Chalet 1" }).getAttribute("aria-pressed")) ===
+        "true",
+  );
+  await dlg.getByLabel(/Price for the whole stay/).fill("200");
+  await dlg.getByRole("button", { name: "Create offer" }).click();
+  await p.waitForTimeout(700);
+  const fromCal = state.calls.filter((c) => c.path === "offers" && c.method === "POST")[1];
+  ck(
+    "…and saves it for that chalet",
+    fromCal?.body?.chalet_id === 1 &&
+      fromCal?.body?.price === 200 &&
+      fromCal?.body?.start_date === ymd(at(7)),
+    JSON.stringify(fromCal?.body),
+  );
+
+  // The activity log says what happened, in words.
+  state.audit.unshift({
+    id: 99,
+    actor: "admin-1",
+    actor_email: "admin@example.com",
+    action: "offer.created",
+    entity: "offers",
+    entity_id: "offer-1",
+    detail: { title: "Long weekend", start: ymd(at(3)), end: ymd(at(6)), price: 400, chalet: null },
+    created_at: new Date().toISOString(),
+  });
+  await p.getByRole("button", { name: "Activity Log" }).click();
+  await p.waitForTimeout(600);
+  ck(
+    "The activity log names a new offer",
+    await p
+      .getByText(`Offer “Long weekend” made — ${ymd(at(3))} → ${ymd(at(6))}, KD 400`)
+      .isVisible(),
   );
   await ctx.close();
 }

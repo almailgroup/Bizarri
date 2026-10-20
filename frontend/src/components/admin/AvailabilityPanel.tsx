@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  BadgePercent,
   CalendarPlus,
   ChevronLeft,
   ChevronRight,
@@ -74,11 +75,14 @@ export function AvailabilityPanel({
   chaletId,
   onChaletChange,
   onNewBooking,
+  onNewOffer,
   onOpenBooking,
 }: {
   chaletId: number;
   onChaletChange: (id: number) => void;
   onNewBooking: (prefill: BookingPrefill) => void;
+  /** Opens the offer form with the selection's dates and this chalet. */
+  onNewOffer?: (prefill: { chaletId: number; start: string; end: string }) => void;
   onOpenBooking: (ref: string) => void;
 }) {
   const { lang, tr } = useI18n();
@@ -850,13 +854,24 @@ export function AvailabilityPanel({
                 )}
 
               {range.from >= todayIso && (
-                <Btn
-                  className="w-full"
-                  onClick={() => onNewBooking({ chaletId, start: range.from, end: range.to })}
-                  icon={<CalendarPlus className="h-4 w-4" aria-hidden="true" />}
-                >
-                  {t("bookTheseDates")}
-                </Btn>
+                <div className="grid gap-2">
+                  <Btn
+                    className="w-full"
+                    onClick={() => onNewBooking({ chaletId, start: range.from, end: range.to })}
+                    icon={<CalendarPlus className="h-4 w-4" aria-hidden="true" />}
+                  >
+                    {t("bookTheseDates")}
+                  </Btn>
+                  {onNewOffer && (
+                    <Btn
+                      className="w-full"
+                      onClick={() => onNewOffer({ chaletId, start: range.from, end: range.to })}
+                      icon={<BadgePercent className="h-4 w-4" aria-hidden="true" />}
+                    >
+                      {t("makeOffer")}
+                    </Btn>
+                  )}
+                </div>
               )}
 
               {inSelection.length > 0 && (

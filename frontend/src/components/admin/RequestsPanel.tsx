@@ -76,7 +76,9 @@ export function RequestsPanel({
           ? tr("weekdayPkg")
           : key === "special"
             ? tr("specialPkg")
-            : "";
+            : key === "offer"
+              ? tr("specialOffer")
+              : "";
 
   const chaletName = (id: number) => {
     const c = (chalets ?? []).find((x) => x.id === id);

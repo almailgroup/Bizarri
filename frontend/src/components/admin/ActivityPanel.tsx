@@ -1,4 +1,5 @@
 import {
+  BadgePercent,
   CalendarPlus,
   CheckCircle2,
   History,
@@ -61,6 +62,24 @@ function describe(entry: AuditRow, lang: "en" | "ar"): string {
         ? `Chalet ${entry.entity_id} updated`
         : `تحديث الشاليه ${entry.entity_id}`;
     }
+    case "offer.created":
+    case "offer.updated":
+    case "offer.deleted": {
+      // An offer's title is optional, so it is named only when it has one.
+      const name = typeof d.title === "string" && d.title ? ` “${d.title}”` : "";
+      if (entry.action === "offer.created")
+        return lang === "en"
+          ? `Offer${name} made — ${d.start} → ${d.end}, KD ${d.price}`
+          : `إنشاء عرض${name} — ${d.start} → ${d.end}، ${d.price} د.ك`;
+      if (entry.action === "offer.deleted")
+        return lang === "en"
+          ? `Offer${name} deleted — ${d.start} → ${d.end}`
+          : `حذف العرض${name} — ${d.start} → ${d.end}`;
+      const fields = Object.keys(d).filter((k) => k !== "title");
+      return lang === "en"
+        ? `Offer${name}: edited ${fields.join(", ")}`
+        : `العرض${name}: تعديل ${fields.join("، ")}`;
+    }
     default:
       return `${entry.action} — ${entry.entity_id ?? ""}`;
   }
@@ -73,6 +92,9 @@ const ICON: Record<string, LucideIcon> = {
   "booking.edited": Pencil,
   "settings.updated": SettingsIcon,
   "chalet.updated": Home,
+  "offer.created": BadgePercent,
+  "offer.updated": BadgePercent,
+  "offer.deleted": Trash2,
 };
 
 export function ActivityPanel() {

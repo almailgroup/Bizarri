@@ -12,7 +12,7 @@
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export type BookingStatus = "pending" | "accepted" | "rejected" | "cancelled";
-export type PackageKey = "fullWeek" | "weekend" | "weekday" | "special";
+export type PackageKey = "fullWeek" | "weekend" | "weekday" | "special" | "offer";
 
 export type ChaletRow = {
   id: number;
@@ -59,6 +59,21 @@ export type SpecialOccasionRow = {
   id: string;
   name_en: string;
   name_ar: string;
+  start_date: string;
+  end_date: string;
+  price: number;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+  updated_by: string | null;
+};
+
+/** Dates the admin sells at one price; chalet_id null means either chalet. */
+export type OfferRow = {
+  id: string;
+  title_en: string;
+  title_ar: string;
+  chalet_id: number | null;
   start_date: string;
   end_date: string;
   price: number;
@@ -179,6 +194,16 @@ export type Database = {
         Row: BlockedDateRow;
         Insert: { chalet_id: number; day: string; reason?: string | null };
         Update: Partial<BlockedDateRow>;
+        Relationships: [];
+      };
+      offers: {
+        Row: OfferRow;
+        Insert: Partial<OfferRow> & {
+          start_date: string;
+          end_date: string;
+          price: number;
+        };
+        Update: Partial<OfferRow>;
         Relationships: [];
       };
       special_occasions: {

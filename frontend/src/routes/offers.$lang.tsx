@@ -1,14 +1,14 @@
 import { requireLang } from "@/lib/lang-route";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ArrowRight, Check } from "lucide-react";
 import { PageShell } from "@/components/PageShell";
 import { Reveal } from "@/components/Reveal";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
 import { useI18n } from "@/lib/i18n";
 import { usePageMeta } from "@/hooks/use-page-meta";
-import { fmtDate, formatMoney, formatSpan, parseDate } from "@/lib/booking";
-import { useSpecialOccasions } from "@/lib/api";
+import { daysBetween, eachDay, fmtDate, formatMoney, formatSpan, parseDate } from "@/lib/booking";
+import { useAvailabilityFor, useChalets, useOffers } from "@/lib/api";
 
 export const Route = createFileRoute("/offers/$lang")({
   component: Offers,
@@ -16,29 +16,59 @@ export const Route = createFileRoute("/offers/$lang")({
 });
 
 /**
- * Holiday offers: Eid, national holidays and the like, each with its own
- * dates and one price for the whole stay, entered by the admin under Special
- * Occasions. The year-round stays are on the Packages page.
+ * Offers: dates the admin has picked and priced, one price for the whole
+ * stay, entered under Offers in the dashboard. Special occasions (Eid and the
+ * like) are not here; they are booked under Special Occasions on the booking
+ * page. The year-round stays are on the Packages page.
  *
- * Choosing one and pressing Start opens the booking page on the Holiday
- * shape with that stay already selected, so there is nothing left to pick.
+ * Choosing one and pressing Start opens the booking page with that stay
+ * already selected, on its chalet, so there is nothing left to pick. One
+ * whose dates are already taken on every chalet it covers says so and
+ * cannot be chosen.
  */
 function Offers() {
   const { tr, lang } = useI18n();
   usePageMeta(
     lang === "en" ? "Offers" : "العروض",
     lang === "en"
-      ? "Special prices at Bizarri Chalet for Eid, national holidays and other occasions."
-      : "أسعار خاصة في شاليه بيزاري للأعياد والعطل الرسمية والمناسبات.",
+      ? "Special offers at Bizarri Chalet: selected dates at one price for the whole stay."
+      : "عروض خاصة في شاليه بيزاري: تواريخ مختارة بسعر واحد للإقامة كاملة.",
   );
-  const { data: occasions, isLoading } = useSpecialOccasions();
-  // Only what can still be booked: a holiday is sold whole, so one that has
-  // already begun is gone, not "on" -- listing it led to a booking page with
-  // nothing in it to choose.
+  const { data: offers, isLoading } = useOffers();
+  const { data: chalets } = useChalets();
+  // Only what can still be booked: an offer is sold whole, so one that has
+  // already begun is gone, not "on"; and one for a chalet that has been
+  // switched off is for nothing a guest can book.
   const today = fmtDate(new Date());
-  const upcoming = (occasions ?? [])
-    .filter((o) => o.start >= today)
-    .sort((a, b) => a.start.localeCompare(b.start));
+  const upcoming = useMemo(
+    () =>
+      (offers ?? [])
+        .filter((o) => o.start >= today)
+        .filter((o) => !chalets || o.chaletId === null || chalets.some((c) => c.id === o.chaletId))
+        .sort((a, b) => a.start.localeCompare(b.start) || a.price - b.price),
+    [offers, chalets, today],
+  );
+
+  // Whether each offer's dates are still free on a chalet it covers, from the
+  // same calendar the booking page reads. Until that is known, it is offered.
+  const chaletIds = (chalets ?? []).map((c) => c.id);
+  const from = upcoming.reduce((m, o) => (!m || o.start < m ? o.start : m), "");
+  const to = upcoming.reduce((m, o) => (o.end > m ? o.end : m), "");
+  const calendars = useAvailabilityFor(chaletIds, from, to);
+  const taken = (o: (typeof upcoming)[number]) => {
+    const ids = o.chaletId === null ? chaletIds : [o.chaletId];
+    const days = eachDay(parseDate(o.start), parseDate(o.end)).map(fmtDate);
+    return ids.every((id) => {
+      const data = calendars[chaletIds.indexOf(id)]?.data;
+      if (!data) return false;
+      const blocked = new Map(data.map((d) => [d.day, d.blocked]));
+      return days.some((d) => blocked.get(d) !== false);
+    });
+  };
+  const chaletName = (id: number) => {
+    const c = (chalets ?? []).find((x) => x.id === id);
+    return c ? (lang === "en" ? c.name_en : c.name_ar) : "";
+  };
 
   const [chosen, setChosen] = useState<string | null>(null);
 
@@ -59,33 +89,50 @@ function Offers() {
             <div className="mt-6 grid gap-4 md:grid-cols-3">
               {upcoming.map((o, i) => {
                 const on = chosen === o.id;
+                const gone = taken(o);
+                const n = daysBetween(parseDate(o.start), parseDate(o.end));
+                const title =
+                  (lang === "en" ? o.titleEn : o.titleAr || o.titleEn) || tr("specialOffer");
                 return (
                   <Reveal key={o.id} delay={i * 80}>
                     <button
                       type="button"
                       // Tapping the chosen one again lets go of it.
                       onClick={() => setChosen(on ? null : o.id)}
+                      disabled={gone}
                       aria-pressed={on}
                       className={`relative flex h-full w-full flex-col justify-between border p-8 text-start transition-colors ${
                         on
                           ? "border-foreground bg-secondary"
-                          : "border-border hover:border-foreground/50"
+                          : gone
+                            ? "cursor-not-allowed border-border text-muted-foreground"
+                            : "border-border hover:border-foreground/50"
                       }`}
                     >
-                      {on && (
+                      {(on || gone) && (
                         <span className="absolute end-4 top-4 flex items-center gap-1 text-xs uppercase tracking-widest">
-                          <Check className="h-4 w-4" aria-hidden="true" /> {tr("offerChosen")}
+                          {on ? (
+                            <>
+                              <Check className="h-4 w-4" aria-hidden="true" /> {tr("offerChosen")}
+                            </>
+                          ) : (
+                            tr("offerBooked")
+                          )}
                         </span>
                       )}
                       <span>
                         <span className="block text-xs uppercase tracking-widest text-muted-foreground">
                           {formatSpan(parseDate(o.start), parseDate(o.end), lang)}
                         </span>
-                        <span className="mt-3 block font-display text-2xl">
-                          {lang === "en" ? o.nameEn : o.nameAr || o.nameEn}
-                        </span>
+                        <span className="mt-3 block font-display text-2xl">{title}</span>
                         <span className="mt-2 block text-sm text-muted-foreground" dir="ltr">
                           {o.start} → {o.end}
+                        </span>
+                        <span className="mt-1 block text-sm text-muted-foreground">
+                          {n === 1 ? tr("oneDayShort") : tr("nDaysShort").replace("{n}", String(n))}
+                          {o.chaletId !== null &&
+                            chaletName(o.chaletId) &&
+                            ` · ${tr("offerOnlyChalet").replace("{chalet}", chaletName(o.chaletId))}`}
                         </span>
                       </span>
                       <span className="mt-10 block font-display text-4xl">
@@ -101,7 +148,7 @@ function Offers() {
               <Link
                 to="/booking/$lang"
                 params={{ lang }}
-                search={chosen ? { shape: "holiday", occasion: chosen } : {}}
+                search={chosen ? { offer: chosen } : {}}
                 className="group mt-12 inline-flex items-center gap-2 bg-black px-10 py-4 text-sm uppercase tracking-widest text-white transition-opacity hover:opacity-90"
               >
                 {tr("startBooking")}
