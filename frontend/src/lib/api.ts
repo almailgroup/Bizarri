@@ -23,6 +23,7 @@ import type {
   QuoteRow,
   RatesRow,
   SettingRow,
+  DiscountCodeRow,
   OfferRow,
   SpecialOccasionRow,
 } from "@/integrations/supabase/types";
@@ -50,6 +51,7 @@ export const qk = {
   auditLog: ["auditLog"] as const,
   occasions: ["occasions"] as const,
   offers: ["offers"] as const,
+  discountCodes: ["discountCodes"] as const,
 };
 
 /** Postgres errors arrive with a `message`; surface it rather than "[object Object]". */
@@ -238,6 +240,8 @@ export interface BookingRequestInput {
   termsAccepted: boolean;
   /** Which language the form was filled in, so the guest's copy matches. */
   lang: "en" | "ar";
+  /** A discount code the guest applied; the server checks it again. */
+  discountCode?: string | null;
 }
 
 /**
@@ -284,6 +288,10 @@ export function useRequestBooking() {
         p_civil_id_path: input.civilIdPath,
         p_terms_accepted: input.termsAccepted,
         p_lang: input.lang,
+        // Only with a code: a database that has not had the discount-code
+        // migration yet does not know the parameter, and naming it at all
+        // would make every booking fail rather than only the coded ones.
+        ...(input.discountCode ? { p_discount_code: input.discountCode } : {}),
       });
       if (error) fail("Booking failed", error);
       return data as unknown as BookingRow;
@@ -292,6 +300,72 @@ export function useRequestBooking() {
       qc.invalidateQueries({ queryKey: ["calendar"] });
       qc.invalidateQueries({ queryKey: qk.bookings });
     },
+  });
+}
+
+/**
+ * Whether a discount code can be used, and what it gives. The server counts
+ * wrong guesses per address, so this is asked only when the guest presses
+ * Apply, never as they type.
+ */
+export function useCheckDiscountCode() {
+  return useMutation({
+    mutationFn: async (code: string) => {
+      const { data, error } = await supabase.rpc("check_discount_code", { p_code: code });
+      if (error) fail("Could not check the code", error);
+      const row = (data ?? [])[0];
+      if (!row) throw new Error("Could not check the code");
+      return row;
+    },
+  });
+}
+
+/** Every code, for the dashboard. Guests cannot read them. */
+export function useDiscountCodes(enabled: boolean) {
+  return useQuery({
+    queryKey: qk.discountCodes,
+    enabled,
+    queryFn: async (): Promise<DiscountCodeRow[]> => {
+      const { data, error } = await supabase
+        .from("discount_codes")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (error) fail("Could not load discount codes", error);
+      return data ?? [];
+    },
+  });
+}
+
+export function useSaveDiscountCode() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (item: Partial<DiscountCodeRow> & { id?: string }) => {
+      const payload = {
+        code: (item.code ?? "").trim().toUpperCase(),
+        kind: item.kind ?? "percent",
+        value: Number(item.value ?? 0),
+        max_uses: item.max_uses ?? null,
+        expires_on: item.expires_on || null,
+        note: (item.note ?? "").trim(),
+        active: item.active ?? true,
+      };
+      const { error } = item.id
+        ? await supabase.from("discount_codes").update(payload).eq("id", item.id)
+        : await supabase.from("discount_codes").insert(payload);
+      if (error) fail("Could not save the code", error);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.discountCodes }),
+  });
+}
+
+export function useDeleteDiscountCode() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("discount_codes").delete().eq("id", id);
+      if (error) fail("Could not delete the code", error);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.discountCodes }),
   });
 }
 

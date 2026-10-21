@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useI18n } from "@/lib/i18n";
 import { dateLocale } from "@/lib/locale";
-import { addDays, fmtDate, formatMoney, parseDate } from "@/lib/booking";
+import { addDays, discountAmount, fmtDate, formatMoney, parseDate } from "@/lib/booking";
 import { useAdminUpdateBooking, useChalets, useQuote, useUpdateBookingDetails } from "@/lib/api";
 import type { BookingRow } from "@/integrations/supabase/types";
 import { useAdminT } from "./strings";
@@ -72,6 +72,14 @@ export function EditBookingModal({
           ? t("errTooLong")
           : "";
   const quote = useQuote(stay.chaletId, stay.checkIn, lastNight, stayChanged && !stayError);
+  // Repricing keeps a discount code's share: the same percentage of the new
+  // price, or the same amount -- what admin_update_booking() does.
+  const repriced = quote.data
+    ? quote.data.total -
+      (booking.discount_percent !== null && booking.discount_percent !== undefined
+        ? discountAmount(quote.data.total, "percent", Number(booking.discount_percent))
+        : Math.min(Number(booking.discount ?? 0), quote.data.total))
+    : null;
   const busy = update.isPending || move.isPending;
   const error = move.error ?? update.error;
 
@@ -231,8 +239,8 @@ export function EditBookingModal({
                 <span className="block text-sm font-medium">{t("repriceNew")}</span>
                 <span className="block text-xs text-muted-foreground" data-testid="reprice-hint">
                   {stay.reprice
-                    ? quote.data
-                      ? t("repriceTo", { amount: formatMoney(quote.data.total, lang) })
+                    ? repriced !== null
+                      ? t("repriceTo", { amount: formatMoney(repriced, lang) })
                       : t("calculating")
                     : t("repriceKeep", { amount: formatMoney(Number(booking.total), lang) })}
                 </span>
@@ -318,6 +326,14 @@ export function EditBookingModal({
           <legend className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             {t("priceAndNotes")}
           </legend>
+          {booking.discount_code && (
+            <p className="rounded-md bg-secondary px-3 py-2 text-sm" data-testid="edit-code">
+              {t("bookedWithCodeLong", {
+                code: booking.discount_code,
+                amount: formatMoney(Number(booking.discount ?? 0), lang),
+              })}
+            </p>
+          )}
           <div className="grid gap-4 sm:grid-cols-2">
             <Field
               label={`${tr("total")} (${booking.currency})`}

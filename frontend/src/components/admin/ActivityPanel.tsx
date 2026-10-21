@@ -6,6 +6,7 @@ import {
   Home,
   Pencil,
   Settings as SettingsIcon,
+  TicketPercent,
   Trash2,
   type LucideIcon,
 } from "lucide-react";
@@ -22,15 +23,24 @@ function describe(entry: AuditRow, lang: "en" | "ar"): string {
     Array.isArray(d[key]) ? (d[key] as [unknown, unknown]) : null;
 
   switch (entry.action) {
-    case "booking.created":
+    case "booking.created": {
       // A guest's request has no actor; one entered from the dashboard does.
-      return entry.actor
-        ? lang === "en"
-          ? `Booking ${entry.entity_id} added — chalet ${d.chalet}, ${d.start} → ${d.end}`
-          : `إضافة الحجز ${entry.entity_id} — شاليه ${d.chalet}، ${d.start} → ${d.end}`
-        : lang === "en"
-          ? `New request ${entry.entity_id} — chalet ${d.chalet}, ${d.start} → ${d.end}`
-          : `طلب جديد ${entry.entity_id} — شاليه ${d.chalet}، ${d.start} → ${d.end}`;
+      const code =
+        typeof d.code === "string"
+          ? lang === "en"
+            ? ` · code ${d.code}`
+            : ` · الرمز ${d.code}`
+          : "";
+      return (
+        (entry.actor
+          ? lang === "en"
+            ? `Booking ${entry.entity_id} added — chalet ${d.chalet}, ${d.start} → ${d.end}`
+            : `إضافة الحجز ${entry.entity_id} — شاليه ${d.chalet}، ${d.start} → ${d.end}`
+          : lang === "en"
+            ? `New request ${entry.entity_id} — chalet ${d.chalet}, ${d.start} → ${d.end}`
+            : `طلب جديد ${entry.entity_id} — شاليه ${d.chalet}، ${d.start} → ${d.end}`) + code
+      );
+    }
     case "booking.status":
       return lang === "en"
         ? `${entry.entity_id}: status ${d.from} → ${d.to}`
@@ -62,6 +72,22 @@ function describe(entry: AuditRow, lang: "en" | "ar"): string {
         ? `Chalet ${entry.entity_id} updated`
         : `تحديث الشاليه ${entry.entity_id}`;
     }
+    case "discount.created":
+      return lang === "en"
+        ? `Discount code ${entry.entity_id} made — ${
+            d.kind === "percent" ? `${d.value}% off` : `KD ${d.value} off`
+          }, ${d.max_uses === null ? "unlimited" : d.max_uses === 1 ? "one time" : `${d.max_uses} uses`}`
+        : `إنشاء رمز الخصم ${entry.entity_id} — ${
+            d.kind === "percent" ? `خصم ${d.value}%` : `خصم ${d.value} د.ك`
+          }`;
+    case "discount.updated":
+      return lang === "en"
+        ? `Discount code ${entry.entity_id}: edited ${Object.keys(d).join(", ")}`
+        : `رمز الخصم ${entry.entity_id}: تعديل ${Object.keys(d).join("، ")}`;
+    case "discount.deleted":
+      return lang === "en"
+        ? `Discount code ${entry.entity_id} deleted`
+        : `حذف رمز الخصم ${entry.entity_id}`;
     case "offer.created":
     case "offer.updated":
     case "offer.deleted": {
@@ -95,6 +121,9 @@ const ICON: Record<string, LucideIcon> = {
   "offer.created": BadgePercent,
   "offer.updated": BadgePercent,
   "offer.deleted": Trash2,
+  "discount.created": TicketPercent,
+  "discount.updated": TicketPercent,
+  "discount.deleted": Trash2,
 };
 
 export function ActivityPanel() {

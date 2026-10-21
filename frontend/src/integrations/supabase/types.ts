@@ -68,6 +68,21 @@ export type SpecialOccasionRow = {
   updated_by: string | null;
 };
 
+/** A code the admin hands out; max_uses null is unlimited. */
+export type DiscountCodeRow = {
+  id: string;
+  code: string;
+  kind: "percent" | "amount";
+  value: number;
+  max_uses: number | null;
+  expires_on: string | null;
+  note: string;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+  updated_by: string | null;
+};
+
 /** Dates the admin sells at one price; chalet_id null means either chalet. */
 export type OfferRow = {
   id: string;
@@ -114,6 +129,13 @@ export type BookingRow = {
   notify_guest: boolean;
   /** Refundable insurance deposit on top of total; the guest pays both. */
   deposit: number;
+  /** Taken off by a discount code; total is already net of it. */
+  discount: number;
+  /** The code as it was when the booking was made. */
+  discount_code: string | null;
+  discount_code_id: string | null;
+  /** Set when the code was a percentage, so repricing can apply it again. */
+  discount_percent: number | null;
 };
 
 export type NewsRow = {
@@ -196,6 +218,12 @@ export type Database = {
         Update: Partial<BlockedDateRow>;
         Relationships: [];
       };
+      discount_codes: {
+        Row: DiscountCodeRow;
+        Insert: Partial<DiscountCodeRow> & { code: string; kind: string; value: number };
+        Update: Partial<DiscountCodeRow>;
+        Relationships: [];
+      };
       offers: {
         Row: OfferRow;
         Insert: Partial<OfferRow> & {
@@ -270,8 +298,19 @@ export type Database = {
           p_civil_id_path: string;
           p_terms_accepted: boolean;
           p_lang?: string;
+          p_discount_code?: string | null;
         };
         Returns: BookingRow;
+      };
+      check_discount_code: {
+        Args: { p_code: string };
+        Returns: {
+          valid: boolean;
+          reason: "invalid" | "expired" | "used" | "throttled" | null;
+          code: string | null;
+          kind: "percent" | "amount" | null;
+          value: number | null;
+        }[];
       };
       lookup_booking: {
         Args: { p_ref: string; p_email: string };

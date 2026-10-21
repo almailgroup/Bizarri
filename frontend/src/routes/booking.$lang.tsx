@@ -9,6 +9,7 @@ import {
   ChevronRight,
   Paperclip,
   ShieldCheck,
+  TicketPercent,
 } from "lucide-react";
 import { PageShell } from "@/components/PageShell";
 import { CodeDialog } from "@/components/EmailVerify";
@@ -26,6 +27,7 @@ import {
   checkOutDay,
   formatHour,
   daysBetween,
+  discountAmount,
   eachDay,
   fmtDate,
   formatMoney,
@@ -35,10 +37,12 @@ import {
   weekendIsWhole,
   startOfMonth,
   startOfToday,
+  type AppliedDiscount,
 } from "@/lib/booking";
 import {
   uploadCivilId,
   useAvailability,
+  useCheckDiscountCode,
   useChalets,
   useInsuranceDeposit,
   useRates,
@@ -421,8 +425,18 @@ function Steps({ current, onBack }: { current: 1 | 2 | 3; onBack?: () => void })
  * print a step later: a total that is 100 KD more than the calendar said, with
  * no reason beside it, reads as a mistake or a trick.
  */
-function PriceBreakdown({ subtotal, deposit }: { subtotal: number; deposit: number }) {
+function PriceBreakdown({
+  subtotal,
+  deposit,
+  discount = null,
+}: {
+  subtotal: number;
+  deposit: number;
+  /** A discount code's share: taken off, and the deposit not charged. */
+  discount?: { code: string; amount: number } | null;
+}) {
   const { tr, lang } = useI18n();
+  const off = discount?.amount ?? 0;
   return (
     <div className="border border-border" data-testid="price-breakdown">
       <dl className="text-sm">
@@ -432,7 +446,27 @@ function PriceBreakdown({ subtotal, deposit }: { subtotal: number; deposit: numb
             {formatMoney(subtotal, lang)}
           </dd>
         </div>
-        {deposit > 0 && (
+        {discount && (
+          <>
+            <div className="flex items-baseline justify-between gap-4 border-t border-border px-4 py-3">
+              <dt>
+                {tr("discountLine").split("{code}")[0]}
+                <span className="font-mono" dir="ltr">
+                  {discount.code}
+                </span>
+                {tr("discountLine").split("{code}")[1]}
+              </dt>
+              <dd className="tabular-nums" data-testid="discount">
+                − {formatMoney(off, lang)}
+              </dd>
+            </div>
+            <div className="flex items-baseline justify-between gap-4 border-t border-border px-4 py-3">
+              <dt>{tr("insuranceDeposit")}</dt>
+              <dd data-testid="deposit-waived">{tr("depositWaived")}</dd>
+            </div>
+          </>
+        )}
+        {!discount && deposit > 0 && (
           <div className="flex items-baseline justify-between gap-4 border-t border-border px-4 py-3">
             <dt>{tr("insuranceDeposit")}</dt>
             <dd className="tabular-nums" data-testid="deposit">
@@ -443,17 +477,167 @@ function PriceBreakdown({ subtotal, deposit }: { subtotal: number; deposit: numb
         <div className="flex items-baseline justify-between gap-4 bg-foreground px-4 py-3 text-background">
           <dt className="text-xs font-semibold uppercase tracking-widest">{tr("total")}</dt>
           <dd className="text-lg font-semibold tabular-nums" data-testid="total">
-            {formatMoney(subtotal + deposit, lang)}
+            {formatMoney(subtotal - off + (discount ? 0 : deposit), lang)}
           </dd>
         </div>
       </dl>
-      {deposit > 0 && (
+      {discount && (
+        <p
+          className="flex items-start gap-2 border-t border-border px-4 py-3 text-sm text-muted-foreground"
+          data-testid="deposit-waived-note"
+        >
+          <TicketPercent className="mt-0.5 h-4 w-4 shrink-0 text-foreground" aria-hidden="true" />
+          <span>{tr("depositWaivedNote")}</span>
+        </p>
+      )}
+      {!discount && deposit > 0 && (
         <p
           className="flex items-start gap-2 border-t border-border px-4 py-3 text-sm text-muted-foreground"
           data-testid="deposit-note"
         >
           <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-foreground" aria-hidden="true" />
           <span>{tr("depositNote").replace("{n}", amountText(deposit))}</span>
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Where a guest enters a discount code. Folded away behind a link, since most
+ * guests have none. Apply asks the server, which says whether the code can be
+ * used and what it gives; request_booking() checks it again when the request
+ * is sent, so this only lets the guest see the price before they commit.
+ */
+function DiscountCodeBox({
+  applied,
+  onApply,
+  onRemove,
+}: {
+  applied: AppliedDiscount | null;
+  onApply: (d: AppliedDiscount) => void;
+  onRemove: () => void;
+}) {
+  const { tr, lang } = useI18n();
+  const check = useCheckDiscountCode();
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState("");
+  const [problem, setProblem] = useState("");
+
+  const apply = async () => {
+    const code = text.trim();
+    if (!code || check.isPending) return;
+    setProblem("");
+    try {
+      const r = await check.mutateAsync(code);
+      if (r.valid && r.code && r.kind && r.value !== null) {
+        onApply({ code: r.code, kind: r.kind, value: Number(r.value) });
+        setText("");
+        setOpen(false);
+      } else {
+        setProblem(
+          tr(
+            r.reason === "expired"
+              ? "codeExpired"
+              : r.reason === "used"
+                ? "codeUsed"
+                : r.reason === "throttled"
+                  ? "codeThrottled"
+                  : "codeInvalid",
+          ),
+        );
+      }
+    } catch (err) {
+      setProblem((err as Error).message);
+    }
+  };
+
+  if (applied) {
+    return (
+      <div
+        className="flex items-center justify-between gap-3 border border-foreground px-4 py-3 text-sm"
+        data-testid="discount-applied"
+      >
+        <span className="flex min-w-0 items-center gap-2">
+          <TicketPercent className="h-4 w-4 shrink-0" aria-hidden="true" />
+          <span className="font-mono font-semibold" dir="ltr">
+            {applied.code}
+          </span>
+          <span className="text-muted-foreground">
+            ·{" "}
+            {applied.kind === "percent"
+              ? tr("percentOff").replace("{n}", String(applied.value))
+              : tr("amountOff").replace("{amount}", formatMoney(applied.value, lang))}
+          </span>
+        </span>
+        <button
+          type="button"
+          onClick={onRemove}
+          className="min-h-11 shrink-0 px-2 text-xs uppercase tracking-widest underline underline-offset-4"
+        >
+          {tr("removeCode")}
+        </button>
+      </div>
+    );
+  }
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="inline-flex min-h-11 items-center gap-2 text-sm underline underline-offset-4"
+      >
+        <TicketPercent className="h-4 w-4" aria-hidden="true" />
+        {tr("haveDiscountCode")}
+      </button>
+    );
+  }
+
+  return (
+    <div>
+      <label
+        htmlFor="discount-code"
+        className="text-xs uppercase tracking-widest text-muted-foreground"
+      >
+        {tr("discountCodeLabel")}
+      </label>
+      <div className="mt-1 flex gap-2">
+        <input
+          id="discount-code"
+          value={text}
+          onChange={(e) => {
+            setText(e.target.value);
+            setProblem("");
+          }}
+          // Enter applies the code; it must not send the whole booking.
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              apply();
+            }
+          }}
+          dir="ltr"
+          autoCapitalize="characters"
+          autoComplete="off"
+          spellCheck={false}
+          maxLength={32}
+          aria-invalid={!!problem}
+          aria-describedby={problem ? "discount-code-problem" : undefined}
+          className="min-h-12 w-full min-w-0 border border-border bg-background px-3 font-mono uppercase outline-none focus:border-foreground"
+        />
+        <button
+          type="button"
+          onClick={apply}
+          disabled={!text.trim() || check.isPending}
+          className="min-h-12 shrink-0 border border-foreground px-5 text-sm uppercase tracking-widest transition-colors hover:bg-foreground hover:text-background disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {check.isPending ? tr("checkingCode") : tr("applyCode")}
+        </button>
+      </div>
+      {problem && (
+        <p id="discount-code-problem" role="alert" className="mt-2 text-sm text-destructive">
+          {problem}
         </p>
       )}
     </div>
@@ -625,6 +809,9 @@ function Calendar({
   const [details, setDetails] = useState<GuestDetails>(() => restore?.details ?? BLANK_DETAILS);
   const [recognised, setRecognised] = useState(false);
   const deposit = useInsuranceDeposit();
+  // A discount code the guest applied. Here, not in the form, so going back
+  // to change the dates keeps it.
+  const [discount, setDiscount] = useState<AppliedDiscount | null>(null);
 
   // localStorage is not readable during SSR, so fill in after mount. What the
   // guest typed in this tab wins over what a past booking left behind.
@@ -1177,6 +1364,8 @@ function Calendar({
         end={end}
         total={current.total}
         deposit={deposit}
+        discount={discount}
+        setDiscount={setDiscount}
         details={details}
         setDetails={setDetails}
         recognised={recognised}
@@ -1640,7 +1829,7 @@ function Calendar({
 
             {/* Said before the guest commits to the next step, so the total
                 there is no surprise. */}
-            {current && !tooShort && deposit > 0 && (
+            {current && !tooShort && deposit > 0 && !discount && (
               <p
                 className="mt-3 flex items-start gap-2 text-sm text-muted-foreground"
                 data-testid="deposit-next-step"
@@ -1788,6 +1977,8 @@ function BookingForm({
   end,
   total,
   deposit,
+  discount,
+  setDiscount,
   details,
   setDetails,
   recognised,
@@ -1807,6 +1998,9 @@ function BookingForm({
   total: number;
   /** The refundable insurance deposit added on top. */
   deposit: number;
+  /** A discount code applied: it comes off the stay, and the deposit goes. */
+  discount: AppliedDiscount | null;
+  setDiscount: (d: AppliedDiscount | null) => void;
   details: GuestDetails;
   setDetails: (d: GuestDetails) => void;
   /** Their details came back from a previous booking on this device. */
@@ -1822,6 +2016,9 @@ function BookingForm({
 }) {
   const { tr, lang } = useI18n();
   const request = useRequestBooking();
+  const off = discount ? discountAmount(total, discount.kind, discount.value) : 0;
+  // With a code, the price is the chalet alone: no insurance deposit.
+  const payable = total - off + (discount ? 0 : deposit);
   const navigate = Route.useNavigate();
   const router = useRouter();
   const { verify } = Route.useSearch();
@@ -1924,6 +2121,7 @@ function BookingForm({
         civilIdPath,
         termsAccepted: terms,
         lang,
+        discountCode: discount?.code ?? null,
       });
     } catch (err) {
       // The server's confirmation lapsed (it lasts an hour): forget ours too,
@@ -2059,7 +2257,17 @@ function BookingForm({
           <StayTimes start={start} end={end} />
         </div>
 
-        <PriceBreakdown subtotal={total} deposit={deposit} />
+        <DiscountCodeBox
+          applied={discount}
+          onApply={setDiscount}
+          onRemove={() => setDiscount(null)}
+        />
+
+        <PriceBreakdown
+          subtotal={total}
+          deposit={deposit}
+          discount={discount ? { code: discount.code, amount: off } : null}
+        />
 
         {recognised && <p className="text-sm text-muted-foreground">{tr("welcomeBack")}</p>}
 
@@ -2269,11 +2477,7 @@ function BookingForm({
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 px-4 py-3 backdrop-blur lg:hidden">
         <div className="mx-auto flex max-w-xl items-center gap-3">
           <BackButton onClick={onBack} disabled={busy} />
-          <SubmitButton
-            busy={busy}
-            label={submitLabel}
-            total={formatMoney(total + deposit, lang)}
-          />
+          <SubmitButton busy={busy} label={submitLabel} total={formatMoney(payable, lang)} />
         </div>
       </div>
     </form>
@@ -2355,7 +2559,15 @@ function Confirmation({
       {/* The same breakdown the guest agreed to on the details: what the
           server recorded, deposit and all. */}
       <div className="mx-auto mt-8 max-w-md text-start">
-        <PriceBreakdown subtotal={Number(booking.total)} deposit={deposit} />
+        <PriceBreakdown
+          subtotal={Number(booking.total) + Number(booking.discount ?? 0)}
+          deposit={deposit}
+          discount={
+            booking.discount_code
+              ? { code: booking.discount_code, amount: Number(booking.discount ?? 0) }
+              : null
+          }
+        />
       </div>
 
       <div className="mx-auto mt-10 max-w-md border border-border p-6 text-start">

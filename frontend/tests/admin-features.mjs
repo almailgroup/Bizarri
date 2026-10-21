@@ -188,6 +188,7 @@ function makeState() {
     ],
     minStay: 3,
     offers: [],
+    codes: [],
     blocked: [],
     dayPrices: {},
     calls: [],
@@ -342,6 +343,28 @@ function mock(ctx, state) {
     if (path === "special_occasions")
       return req.method() === "PATCH" ? byId(state.occasions) : send(state.occasions);
     if (path === "news") return req.method() === "PATCH" ? byId(state.news) : send(state.news);
+    if (path === "discount_codes") {
+      if (req.method() === "POST") {
+        if (state.codes.some((c) => c.code === body.code))
+          return send(
+            {
+              code: "23505",
+              message: 'duplicate key value violates unique constraint "discount_codes_code_key"',
+            },
+            409,
+          );
+        const row = { id: `code-${state.codes.length + 1}`, ...body };
+        state.codes.push(row);
+        return send([row]);
+      }
+      if (req.method() === "PATCH") return byId(state.codes);
+      if (req.method() === "DELETE") {
+        const id = decodeURIComponent(url.searchParams.get("id") ?? "").replace("eq.", "");
+        state.codes = state.codes.filter((c) => c.id !== id);
+        return send([]);
+      }
+      return send(state.codes);
+    }
     if (path === "offers") {
       if (req.method() === "POST") {
         const row = { id: `offer-${state.offers.length + 1}`, ...body };
@@ -1450,6 +1473,159 @@ async function adminPage(state, { phone = false } = {}) {
     await p
       .getByText(`Offer “Long weekend” made — ${ymd(at(3))} → ${ymd(at(6))}, KD 400`)
       .isVisible(),
+  );
+  await ctx.close();
+}
+
+// =============================================== discount codes, made here
+{
+  const state = makeState();
+  // One already given out once, to Omar's pending request.
+  state.codes = [
+    {
+      id: "code-0",
+      code: "WELCOME",
+      kind: "amount",
+      value: 35,
+      max_uses: 1,
+      expires_on: null,
+      note: "",
+      active: true,
+    },
+  ];
+  Object.assign(state.bookings[1], {
+    discount_code_id: "code-0",
+    discount_code: "WELCOME",
+    discount: 35,
+    total: 315,
+    deposit: 0,
+  });
+  const { p, ctx } = await adminPage(state);
+  await p.getByRole("button", { name: "Discount codes", exact: true }).click();
+  await p.waitForTimeout(600);
+  const welcome = p.locator("li", { hasText: "WELCOME" });
+  ck(
+    "A code shows what it gives and how often it has been used",
+    /KD 35 off · 1 of 1 used/.test(await welcome.getByTestId("code-summary").innerText()),
+    await welcome.getByTestId("code-summary").innerText(),
+  );
+  ck("…and says when it is used up", await welcome.getByText("Used up").isVisible());
+
+  await p.getByRole("button", { name: "New code" }).click();
+  const dlg = p.getByRole("dialog");
+  const codeBox = dlg.getByLabel("Code", { exact: true });
+  ck(
+    "A new code comes with one already made up",
+    /^[A-HJ-NP-Z2-9]{8}$/.test(await codeBox.inputValue()),
+    await codeBox.inputValue(),
+  );
+  await codeBox.fill("ab");
+  ck(
+    "A code too short is refused in the form",
+    (await dlg.getByText("Use 3 to 32 letters, numbers, - or _").isVisible()) &&
+      (await dlg.getByRole("button", { name: "Create code" }).isDisabled()),
+  );
+  await codeBox.fill("summer10");
+  ck("…and what is typed is in capitals", (await codeBox.inputValue()) === "SUMMER10");
+  await dlg.getByLabel("Percentage off").fill("10");
+  ck(
+    "One time is the default",
+    (await dlg.getByRole("button", { name: "One time" }).getAttribute("aria-pressed")) === "true",
+  );
+  await dlg.getByRole("button", { name: "Create code" }).click();
+  await p.waitForTimeout(700);
+  const first = state.calls.find((c) => c.path === "discount_codes" && c.method === "POST");
+  ck(
+    "Creating it saves the code, the percentage and one use",
+    first?.body?.code === "SUMMER10" &&
+      first?.body?.kind === "percent" &&
+      first?.body?.value === 10 &&
+      first?.body?.max_uses === 1 &&
+      first?.body?.expires_on === null &&
+      first?.body?.active === true,
+    JSON.stringify(first?.body),
+  );
+  ck(
+    "…and lists it",
+    /10% off · 0 of 1 used/.test(
+      await p.locator("li", { hasText: "SUMMER10" }).getByTestId("code-summary").innerText(),
+    ),
+  );
+
+  // An amount, several uses, a last day and a note.
+  await p.getByRole("button", { name: "New code" }).click();
+  await codeBox.fill("INSTA50");
+  await dlg.getByRole("button", { name: "Fixed amount" }).click();
+  await dlg.getByLabel("Amount off (KWD)").fill("50");
+  await dlg.getByRole("button", { name: "Limited", exact: true }).click();
+  await dlg.getByLabel("Number of uses").fill("5");
+  await dlg.getByLabel("Last day it can be used").fill("2027-01-31");
+  await dlg.getByLabel("Note (only you see it)").fill("Instagram giveaway");
+  await dlg.getByRole("button", { name: "Create code" }).click();
+  await p.waitForTimeout(700);
+  const second = state.calls.filter((c) => c.path === "discount_codes" && c.method === "POST")[1];
+  ck(
+    "A code can be an amount, for several uses, until a day",
+    second?.body?.kind === "amount" &&
+      second?.body?.value === 50 &&
+      second?.body?.max_uses === 5 &&
+      second?.body?.expires_on === "2027-01-31" &&
+      second?.body?.note === "Instagram giveaway",
+    JSON.stringify(second?.body),
+  );
+
+  // The same code twice is refused, in words.
+  await p.getByRole("button", { name: "New code" }).click();
+  await codeBox.fill("SUMMER10");
+  await dlg.getByLabel("Percentage off").fill("5");
+  await dlg.getByRole("button", { name: "Create code" }).click();
+  await p.waitForTimeout(600);
+  ck(
+    "A code that already exists says so",
+    await dlg.getByText("That code already exists").isVisible(),
+  );
+  await dlg.getByRole("button", { name: /cancel/i }).click();
+
+  // Everything can be changed afterwards.
+  await p.getByRole("button", { name: "Edit SUMMER10" }).click();
+  await dlg.getByRole("button", { name: "Unlimited", exact: true }).click();
+  await dlg.getByLabel("Percentage off").fill("15");
+  await dlg.getByRole("button", { name: /Save changes/i }).click();
+  await p.waitForTimeout(700);
+  const patch = state.calls.find((c) => c.path === "discount_codes" && c.method === "PATCH");
+  ck(
+    "A code can be edited: unlimited now, and 15%",
+    patch?.search.includes(`id=eq.${state.codes.find((c) => c.code === "SUMMER10")?.id}`) &&
+      patch?.body?.max_uses === null &&
+      patch?.body?.value === 15,
+    JSON.stringify(patch?.body),
+  );
+  await p.locator("li", { hasText: "INSTA50" }).getByRole("switch").click();
+  await p.waitForTimeout(600);
+  ck("…switched off", state.codes.find((c) => c.code === "INSTA50")?.active === false);
+  await p.getByRole("button", { name: "Delete INSTA50" }).click();
+  ck(
+    "Deleting one says the bookings made with it keep their discount",
+    await p.getByText(/Bookings already made with it keep their discount/).isVisible(),
+  );
+  await p.getByRole("button", { name: "Yes, delete" }).click();
+  await p.waitForTimeout(700);
+  ck("…and deletes it", !state.codes.some((c) => c.code === "INSTA50"));
+
+  // The booking that used one says so.
+  await p.getByRole("button", { name: "Booking Requests" }).click();
+  await p.waitForTimeout(500);
+  ck(
+    "A booking made with a code shows it",
+    (await p.locator("li", { hasText: "Omar Khalid" }).getByTestId("booking-code").innerText()) ===
+      "Code WELCOME · −KD 35",
+  );
+  await p.locator("li", { hasText: "Omar Khalid" }).getByLabel("Edit details").click();
+  ck(
+    "…and so does its edit form",
+    /Booked with code WELCOME: KD 35 off, and no insurance deposit/.test(
+      await dlg.getByTestId("edit-code").innerText(),
+    ),
   );
   await ctx.close();
 }

@@ -16,6 +16,7 @@ import {
   PartyPopper,
   Settings as SettingsIcon,
   Tags,
+  TicketPercent,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -35,6 +36,7 @@ import { NewsPanel } from "@/components/admin/NewsPanel";
 import { SettingsPanel } from "@/components/admin/SettingsPanel";
 import { OccasionsPanel } from "@/components/admin/OccasionsPanel";
 import { OfferModal, OffersPanel, type OfferPrefill } from "@/components/admin/OffersPanel";
+import { DiscountCodesPanel } from "@/components/admin/DiscountCodesPanel";
 import { ActivityPanel } from "@/components/admin/ActivityPanel";
 
 const TABS = [
@@ -43,6 +45,7 @@ const TABS = [
   "availability",
   "rates",
   "offers",
+  "discounts",
   "occasions",
   "chalets",
   "news",
@@ -264,6 +267,7 @@ function Dashboard() {
     { key: "availability", label: tr("availability"), icon: CalendarDays },
     { key: "rates", label: tr("packageRates"), icon: Tags },
     { key: "offers", label: t("offers"), icon: BadgePercent },
+    { key: "discounts", label: t("discountCodes"), icon: TicketPercent },
     { key: "occasions", label: tr("specialOccasions"), icon: PartyPopper },
     { key: "chalets", label: tr("chaletsMgmt"), icon: Home },
     { key: "news", label: lang === "en" ? "News" : "الأخبار", icon: Newspaper },
@@ -389,6 +393,7 @@ function Dashboard() {
               )}
               {tab === "rates" && <RatesPanel />}
               {tab === "offers" && <OffersPanel />}
+              {tab === "discounts" && <DiscountCodesPanel />}
               {tab === "occasions" && <OccasionsPanel />}
               {tab === "chalets" && <ChaletsPanel />}
               {tab === "news" && <NewsPanel />}

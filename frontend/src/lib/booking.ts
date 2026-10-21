@@ -331,6 +331,25 @@ export function quote(
   };
 }
 
+/* ------------------------------------------------------------ discounts */
+
+/** A discount code the server has said can be used. */
+export interface AppliedDiscount {
+  code: string;
+  kind: "percent" | "amount";
+  value: number;
+}
+
+/**
+ * What a code takes off a stay. Mirrors discount_amount() in SQL: a
+ * percentage rounded to the fils, an amount as it is, and never more than
+ * the stay itself.
+ */
+export function discountAmount(total: number, kind: "percent" | "amount", value: number): number {
+  const off = kind === "percent" ? Math.round(total * value * 10) / 1000 : value;
+  return Math.min(total, off);
+}
+
 /* -------------------------------------------------------- availability */
 
 export interface Availability {

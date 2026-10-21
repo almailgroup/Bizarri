@@ -40,8 +40,15 @@ const NOTE =
   "A refundable insurance deposit of 100 KD is included in the total and will be fully refunded upon completion of your stay at the Chalet.";
 
 function makeState(over = {}) {
-  return { code: null, booked: [], deposit: 100, blocked: [], ...over };
+  return { code: null, booked: [], deposit: 100, blocked: [], checks: [], ...over };
 }
+
+// The codes the mock database holds, as check_discount_code() answers.
+const CODES = {
+  SUMMER10: { valid: true, reason: null, code: "SUMMER10", kind: "percent", value: 10 },
+  EXPIRED: { valid: false, reason: "expired", code: "EXPIRED", kind: null, value: null },
+  USEDUP: { valid: false, reason: "used", code: "USEDUP", kind: null, value: null },
+};
 
 async function page(state, { lang = "en", phone = false } = {}) {
   const ctx = await b.newContext(
@@ -69,18 +76,32 @@ async function page(state, { lang = "en", phone = false } = {}) {
     if (raw.startsWith("/storage/v1/object/civil-ids/"))
       return send({ Key: raw.replace("/storage/v1/object/", ""), Id: "obj-1" });
     if (path === "rpc/verify_email_code") return send(String(body?.p_code ?? "") === state.code);
+    if (path === "rpc/check_discount_code") {
+      state.checks.push(body.p_code);
+      const key = String(body.p_code ?? "")
+        .trim()
+        .toUpperCase();
+      return send([
+        CODES[key] ?? { valid: false, reason: "invalid", code: null, kind: null, value: null },
+      ]);
+    }
     if (path === "rpc/request_booking") {
       state.booked.push(body);
-      // What the database does: the stay priced, the deposit from settings.
+      // What the database does: the stay priced, the deposit from settings,
+      // and with a code the discount taken off and no deposit at all.
+      const code = CODES[String(body.p_discount_code ?? "").toUpperCase()];
+      const discount = code?.valid ? (350 * code.value) / 100 : 0;
       return send({
+        discount,
+        discount_code: code?.valid ? code.code : null,
         id: "b1",
         ref: "BZR-FLOW01",
         chalet_id: 1,
         start_date: body.p_start,
         end_date: body.p_end,
         days: 3,
-        total: 350,
-        deposit: state.deposit,
+        total: 350 - discount,
+        deposit: code?.valid ? 0 : state.deposit,
         currency: "KWD",
         package_key: "weekend",
         guest_name: body.p_guest_name,
@@ -360,6 +381,10 @@ const text = (p, testid) => p.locator(`[data-testid="${testid}"]`).innerText();
   await p.waitForTimeout(1200);
   ck("The request goes", state.booked.length === 1);
   ck(
+    "…without naming a discount code it does not have",
+    state.booked[0] && !("p_discount_code" in state.booked[0]),
+  );
+  ck(
     "…and sends no price of its own: the server prices it, deposit and all",
     state.booked[0] && !("p_total" in state.booked[0]) && !("p_deposit" in state.booked[0]),
     JSON.stringify(Object.keys(state.booked[0] ?? {})),
@@ -382,6 +407,120 @@ const text = (p, testid) => p.locator(`[data-testid="${testid}"]`).innerText();
   ck(
     "…and a sent booking is not brought back by a reload",
     (await onDates(p)) && (await selected(p)).length === 0,
+  );
+  await ctx.close();
+}
+
+// ============================================ a discount code, step 2
+// A code comes off the stay, and with one the insurance deposit is not
+// charged: the guest pays for the chalet alone.
+{
+  const state = makeState();
+  const { p, ctx } = await page(state);
+  await chooseWeekend(p);
+  await next(p).click();
+  await p.waitForTimeout(700);
+  const link = p.getByRole("button", { name: "Have a discount code?" });
+  ck("Guest Information offers a discount code, folded away", await link.isVisible());
+  await link.click();
+  const box = p.getByLabel("Discount code");
+  const apply = p.getByRole("button", { name: "Apply", exact: true });
+
+  await box.fill("nope");
+  await apply.click();
+  await p.waitForTimeout(500);
+  ck("A code that does not exist says so", await p.getByText("That code isn't valid.").isVisible());
+  ck(
+    "…and changes nothing",
+    (await text(p, "total")) === "KD 450" && (await text(p, "deposit")) === "+ KD 100",
+  );
+  await box.fill("usedup");
+  await apply.click();
+  await p.waitForTimeout(500);
+  ck("One already used says so", await p.getByText("That code has already been used.").isVisible());
+  await box.fill("expired");
+  await apply.click();
+  await p.waitForTimeout(500);
+  ck("One past its date says so", await p.getByText("That code has expired.").isVisible());
+
+  // Enter applies the code; it must not send the booking.
+  await box.fill("summer10");
+  await box.press("Enter");
+  await p.waitForTimeout(600);
+  ck("Enter applies a code without sending anything", state.booked.length === 0);
+  ck(
+    "A valid code is shown as applied",
+    /SUMMER10/.test(await text(p, "discount-applied")) &&
+      /10% off/.test(await text(p, "discount-applied")),
+    await text(p, "discount-applied"),
+  );
+  ck(
+    "…taken off the stay",
+    (await text(p, "subtotal")) === "KD 350" && (await text(p, "discount")) === "− KD 35",
+    `${await text(p, "subtotal")} / ${await text(p, "discount")}`,
+  );
+  ck(
+    "…with no insurance deposit",
+    (await text(p, "deposit-waived")) === "Not charged" &&
+      (await p.locator('[data-testid="deposit"], [data-testid="deposit-note"]').count()) === 0,
+  );
+  ck(
+    "…so the total is the chalet alone, less the discount",
+    (await text(p, "total")) === "KD 315",
+    await text(p, "total"),
+  );
+  ck(
+    "…and the guest is told why",
+    /no insurance deposit is charged/.test(await text(p, "deposit-waived-note")),
+  );
+
+  await p.getByRole("button", { name: "Remove", exact: true }).click();
+  await p.waitForTimeout(300);
+  ck(
+    "Removing it puts the deposit back",
+    (await text(p, "total")) === "KD 450" && (await text(p, "deposit")) === "+ KD 100",
+  );
+
+  // Applied again, it survives going back to change the dates.
+  await p.getByRole("button", { name: "Have a discount code?" }).click();
+  await p.getByLabel("Discount code").fill("SUMMER10");
+  await p.getByRole("button", { name: "Apply", exact: true }).click();
+  await p.waitForTimeout(500);
+  await back(p).click();
+  await p.waitForTimeout(700);
+  ck(
+    "Back on the dates, the deposit is no longer promised",
+    (await onDates(p)) && (await p.locator('[data-testid="deposit-next-step"]').count()) === 0,
+  );
+  await next(p).click();
+  await p.waitForTimeout(700);
+  ck("…and the code is still applied", (await text(p, "total")) === "KD 315");
+
+  await p.getByLabel("Full Name").fill("Code Guest");
+  await p.getByLabel("Phone Number", { exact: true }).fill("+96599999999");
+  await p.locator("input[type=email]").fill("code@example.com");
+  await p.locator("input[type=file]").setInputFiles({
+    name: "id.png",
+    mimeType: "image/png",
+    buffer: Buffer.from("89504e470d0a1a0a", "hex"),
+  });
+  await p.locator('input[type=checkbox]:not([role="switch"])').first().check();
+  await p.getByRole("button", { name: /submit booking request/i }).click();
+  await p.waitForTimeout(800);
+  await p.getByLabel(/6-digit code/i).fill(state.code ?? "");
+  await p.getByRole("button", { name: /^Confirm$/i }).click();
+  await p.waitForTimeout(1200);
+  ck(
+    "The request carries the code, for the server to check again",
+    state.booked[0]?.p_discount_code === "SUMMER10",
+    JSON.stringify(state.booked[0]?.p_discount_code),
+  );
+  ck(
+    "The confirmation shows the discount and no deposit",
+    (await text(p, "discount")) === "− KD 35" &&
+      (await text(p, "deposit-waived")) === "Not charged" &&
+      (await text(p, "total")) === "KD 315",
+    `${await text(p, "discount")} / ${await text(p, "total")}`,
   );
   await ctx.close();
 }

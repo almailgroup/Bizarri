@@ -8,7 +8,13 @@
  * with the totals that suite actually returned from Postgres. If the two ever
  * disagree, one of them is wrong and this says so.
  */
-import { quote, weekendIsWhole, parseDate, DEFAULT_RATES } from "../src/lib/booking.ts";
+import {
+  quote,
+  weekendIsWhole,
+  parseDate,
+  discountAmount,
+  DEFAULT_RATES,
+} from "../src/lib/booking.ts";
 
 let fails = 0;
 const ck = (n, c, d = "") => {
@@ -132,6 +138,19 @@ for (const [from, to, want, why] of [
       `got ${got.total} ${got.packageKey}`,
     );
   }
+}
+
+// ---- discount codes (14_discount_codes.sql, the amounts Postgres returned)
+for (const [total, kind, value, want, why] of [
+  [300, "percent", 10, 30, "10% of a 300 weekday"],
+  [350, "percent", 10, 35, "10% of a 350 weekend"],
+  [300, "amount", 50, 50, "KD 50 off"],
+  [300, "amount", 1000, 300, "more than the stay makes it free, not negative"],
+  [300, "percent", 0, 0, "0% takes nothing off"],
+  [350, "percent", 15, 52.5, "15% rounds to the fils"],
+]) {
+  const got = discountAmount(total, kind, value);
+  ck(`Discount: ${why} — KD ${want}`, got === want, `got ${got}`);
 }
 
 console.log(`\n${fails} failing`);

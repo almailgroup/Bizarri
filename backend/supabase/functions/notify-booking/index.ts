@@ -56,6 +56,10 @@ interface BookingRecord {
   notify_guest?: boolean | null;
   /** Refundable insurance deposit on top of total; 0 or absent for none. */
   deposit?: number | null;
+  /** Taken off by a discount code; total is already net of it. */
+  discount?: number | null;
+  /** The code the guest used. With one, no deposit is charged. */
+  discount_code?: string | null;
 }
 
 interface WebhookPayload {
@@ -261,6 +265,7 @@ function money(b: BookingRecord, lang: "en" | "ar", amount = Number(b.total)): s
 }
 
 const depositOf = (b: BookingRecord) => Math.max(0, Number(b.deposit ?? 0) || 0);
+const discountOf = (b: BookingRecord) => Math.max(0, Number(b.discount ?? 0) || 0);
 
 /**
  * The price as the booking page showed it: the stay, the refundable deposit
@@ -274,6 +279,27 @@ function priceRows(
   const ar = lang === "ar";
   const deposit = depositOf(b);
   const total = { label: ar ? "الإجمالي" : "Total", value: money(b, lang, Number(b.total) + deposit) };
+  // With a discount code: the stay before it, the discount, and no deposit --
+  // the same lines the booking page showed.
+  if (b.discount_code) {
+    return {
+      rows: [
+        {
+          label: ar ? "المجموع الفرعي للحجز" : "Booking subtotal",
+          valueHtml: escapeHtml(money(b, lang, Number(b.total) + discountOf(b))),
+        },
+        {
+          label: ar ? `خصم (${b.discount_code})` : `Discount (${b.discount_code})`,
+          valueHtml: escapeHtml(`− ${money(b, lang, discountOf(b))}`),
+        },
+        {
+          label: ar ? "تأمين مسترد" : "Refundable insurance deposit",
+          valueHtml: escapeHtml(ar ? "لا يُحتسب" : "Not charged"),
+        },
+      ],
+      total,
+    };
+  }
   if (!deposit) return { rows: [], total };
   return {
     rows: [
@@ -289,6 +315,13 @@ function priceRows(
 
 /** The same sentence the booking page puts under its total. */
 function depositNote(b: BookingRecord, lang: "en" | "ar"): string {
+  if (b.discount_code) {
+    return escapeHtml(
+      lang === "ar"
+        ? "مع رمز الخصم لا يُحتسب مبلغ التأمين: تدفع قيمة الشاليه فقط."
+        : "With a discount code, no insurance deposit is charged: you pay for the chalet only.",
+    );
+  }
   const deposit = depositOf(b);
   if (!deposit) return "";
   const n = deposit.toLocaleString("en-US", { maximumFractionDigits: 3 });
@@ -489,7 +522,14 @@ export function renderWhatsApp(b: BookingRecord): string {
     `Dates: ${b.start_date} → ${b.end_date} (${b.days} days)`,
     `Check-in: ${b.start_date} ${formatHour(CHECK_IN_HOUR, "en")}`,
     `Check-out: ${checkOutDate(b.end_date)} ${formatHour(CHECK_OUT_HOUR, "en")}`,
-    ...(depositOf(b)
+    ...(b.discount_code
+      ? [
+          `Stay: ${b.currency} ${Number(b.total) + discountOf(b)}`,
+          `Discount (${b.discount_code}): -${b.currency} ${discountOf(b)}`,
+          `Deposit: not charged (discount code)`,
+          `Total: ${b.currency} ${b.total}`,
+        ]
+      : depositOf(b)
       ? [
           `Stay: ${b.currency} ${b.total}`,
           `Deposit (refundable): ${b.currency} ${depositOf(b)}`,

@@ -417,6 +417,45 @@ ck(
     "A refusal names no price, deposit or otherwise",
     !flat(renderDecision({ ...withDeposit, status: "rejected" }, "en")).includes("deposit"),
   );
+
+  // A discount code: the stay before it, the discount, no deposit -- the
+  // lines the booking page showed.
+  const coded = booking({
+    status: "accepted",
+    total: 315,
+    discount: 35,
+    discount_code: "SUMMER10",
+    deposit: 0,
+  });
+  for (const [name, html] of [
+    ["The guest's request email", renderGuest(coded, "en")],
+    ["The confirmation", renderDecision(coded, "en")],
+    ["The team's email", render(coded)],
+  ]) {
+    const t = flat(html);
+    ck(
+      `${name} shows a discount code`,
+      t.includes("Booking subtotal KD 350") &&
+        t.includes("Discount (SUMMER10) − KD 35") &&
+        t.includes("Refundable insurance deposit Not charged") &&
+        t.includes("Total KD 315"),
+      t.slice(t.indexOf("Booking subtotal"), t.indexOf("Booking subtotal") + 160),
+    );
+  }
+  ck(
+    "…says why there is no deposit",
+    flat(renderGuest(coded, "en")).includes("no insurance deposit is charged"),
+  );
+  ck(
+    "…in Arabic too",
+    flat(renderGuest(coded, "ar")).includes("خصم (SUMMER10)") &&
+      flat(renderGuest(coded, "ar")).includes("لا يُحتسب"),
+  );
+  ck(
+    "…and on the team's WhatsApp",
+    renderWhatsApp(coded).includes("Discount (SUMMER10): -KWD 35") &&
+      renderWhatsApp(coded).includes("Total: KWD 315"),
+  );
 }
 
 // ===================================== one failed send does not sink the rest

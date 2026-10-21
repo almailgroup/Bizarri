@@ -1,5 +1,5 @@
 -- ============================================================================
--- Part 19 of 19: offers
+-- Part 19 of 20: offers
 --
 -- Paste this whole file into the Supabase SQL editor and Run, then move on
 -- to the next part. Run them in order; each one is safe to run twice.

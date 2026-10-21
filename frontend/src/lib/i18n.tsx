@@ -355,6 +355,28 @@ export const t: Dict = {
   // The refundable insurance deposit
   bookingSubtotal: { en: "Booking subtotal", ar: "المجموع الفرعي للحجز" },
   insuranceDeposit: { en: "Refundable insurance deposit", ar: "تأمين مسترد" },
+  // Discount codes. With one, the guest pays for the chalet alone: the
+  // insurance deposit is not charged.
+  haveDiscountCode: { en: "Have a discount code?", ar: "لديك رمز خصم؟" },
+  discountCodeLabel: { en: "Discount code", ar: "رمز الخصم" },
+  applyCode: { en: "Apply", ar: "تطبيق" },
+  checkingCode: { en: "Checking…", ar: "جارٍ التحقق…" },
+  removeCode: { en: "Remove", ar: "إزالة" },
+  codeInvalid: { en: "That code isn't valid.", ar: "هذا الرمز غير صالح." },
+  codeExpired: { en: "That code has expired.", ar: "انتهت صلاحية هذا الرمز." },
+  codeUsed: { en: "That code has already been used.", ar: "تم استخدام هذا الرمز من قبل." },
+  codeThrottled: {
+    en: "Too many tries. Please try again in an hour.",
+    ar: "محاولات كثيرة. يرجى المحاولة مرة أخرى بعد ساعة.",
+  },
+  discountLine: { en: "Discount ({code})", ar: "خصم ({code})" },
+  percentOff: { en: "{n}% off", ar: "خصم {n}%" },
+  amountOff: { en: "{amount} off", ar: "خصم {amount}" },
+  depositWaived: { en: "Not charged", ar: "لا يُحتسب" },
+  depositWaivedNote: {
+    en: "With a discount code, no insurance deposit is charged: you pay for the chalet only.",
+    ar: "مع رمز الخصم لا يُحتسب مبلغ التأمين: تدفع قيمة الشاليه فقط.",
+  },
   depositNote: {
     en: "A refundable insurance deposit of {n} KD is included in the total and will be fully refunded upon completion of your stay at the Chalet.",
     ar: "يشمل الإجمالي تأميناً مسترداً بقيمة {n} د.ك، ويُعاد إليك بالكامل عند انتهاء إقامتك في الشاليه.",

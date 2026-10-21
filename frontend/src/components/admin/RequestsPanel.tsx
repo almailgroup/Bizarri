@@ -114,6 +114,8 @@ export function RequestsPanel({
         Days: b.days,
         [`Total (${b.currency})`]: Number(b.total),
         [`Deposit (${b.currency})`]: Number(b.deposit ?? 0),
+        "Discount code": b.discount_code ?? "",
+        [`Discount (${b.currency})`]: Number(b.discount ?? 0),
         Package: packageName(b.package_key),
         Name: b.guest_name,
         Phone: b.guest_phone,
@@ -133,6 +135,8 @@ export function RequestsPanel({
       { wch: 16 },
       { wch: 6 },
       { wch: 12 },
+      { wch: 12 },
+      { wch: 14 },
       { wch: 12 },
       { wch: 20 },
       { wch: 22 },
@@ -285,6 +289,14 @@ export function RequestsPanel({
                       {Number(b.deposit ?? 0) > 0 && (
                         <p className="text-xs text-muted-foreground">
                           {t("plusDeposit", { amount: formatMoney(Number(b.deposit), lang) })}
+                        </p>
+                      )}
+                      {b.discount_code && (
+                        <p className="text-xs text-muted-foreground" data-testid="booking-code">
+                          {t("bookedWithCode", {
+                            code: b.discount_code,
+                            amount: formatMoney(Number(b.discount ?? 0), lang),
+                          })}
                         </p>
                       )}
                       {b.package_key && (

@@ -40,7 +40,9 @@ select 'migrations' as area, * from (values
                                      and tgrelid = 'public.bookings'::regclass))),
   ('18 admin edits stays', (to_regprocedure('public.admin_update_booking(uuid,smallint,date,date,boolean)') is not null)),
   ('19 offers', (to_regclass('public.offers') is not null
-                 and pg_get_functiondef('public.quote_stay(smallint,date,date)'::regprocedure) like '%public.offers%'))
+                 and pg_get_functiondef('public.quote_stay(smallint,date,date)'::regprocedure) like '%public.offers%')),
+  ('20 discount codes', (to_regclass('public.discount_codes') is not null
+                         and to_regprocedure('public.request_booking(smallint,date,date,text,text,text,smallint,text,text,boolean,text,text)') is not null))
 ) t(item, ok)
 union all
 -- Expected from the rates as they stand, not from the defaults: the owner
@@ -103,7 +105,9 @@ union all
 select 'guest access', * from (values
   ('Guests cannot insert bookings', (not has_table_privilege('anon','public.bookings','insert'))),
   ('Guests can read availability', (has_function_privilege('anon','public.availability_calendar(smallint,date,date)','execute'))),
-  ('…and book through the RPC',     (has_function_privilege('anon','public.request_booking(smallint,date,date,text,text,text,smallint,text,text,boolean,text)','execute'))),
+  ('…and book through the RPC',     (has_function_privilege('anon','public.request_booking(smallint,date,date,text,text,text,smallint,text,text,boolean,text,text)','execute'))),
+  ('Guests can check a discount code', (has_function_privilege('anon','public.check_discount_code(text)','execute'))),
+  ('…but cannot read the codes',    (not has_table_privilege('anon','public.discount_codes','select'))),
   ('Code minting is server-only',   (not has_function_privilege('anon','public.start_email_verification(text)','execute'))),
   ('Verified-check is server-only', (not has_function_privilege('anon','public.is_email_verified(text)','execute'))),
   ('The throttle is server-only',   (not has_function_privilege('anon','public.note_lookup(text,text,integer)','execute'))),
