@@ -208,7 +208,7 @@ await b.close();
 
 // ===================== the published files, which is where the status code is
 {
-  const pages = ["", "booking", "photos", "contact", "reservation", "rules"];
+  const pages = ["", "booking", "photos", "contact", "reservation", "rules", "cancellation"];
   const missing = [];
   for (const lang of ["en", "ar"]) {
     for (const slug of pages) {

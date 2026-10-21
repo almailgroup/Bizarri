@@ -320,6 +320,7 @@ for (const lang of ["en", "ar"]) {
       "news",
       "contact",
       "rules",
+      "cancellation",
       "about",
       "privacy",
     ]) {

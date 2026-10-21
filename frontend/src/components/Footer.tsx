@@ -141,6 +141,15 @@ export function Footer() {
                 {tr("rules")}
               </Link>
             </li>
+            <li>
+              <Link
+                to="/cancellation/$lang"
+                params={{ lang }}
+                className="-my-1 inline-block py-2 text-white/70 hover:text-white"
+              >
+                {tr("cancellationPolicy")}
+              </Link>
+            </li>
           </ul>
         </div>
       </div>

@@ -55,7 +55,10 @@ export const t: Dict = {
   photos: { en: "Photos", ar: "الصور" },
   booking: { en: "Booking", ar: "الحجز" },
   news: { en: "News", ar: "الأخبار" },
-  rules: { en: "Rules & Regulations", ar: "القوانين والأحكام" },
+  rules: { en: "Terms & Conditions", ar: "الشروط والأحكام" },
+  cancellationPolicy: { en: "Cancellation & Refund Policy", ar: "سياسة الإلغاء والاسترداد" },
+  readFullTerms: { en: "Read the full Terms & Conditions", ar: "اقرأ الشروط والأحكام كاملة" },
+  lastUpdated: { en: "Last updated {date}", ar: "آخر تحديث: {date}" },
   privacy: { en: "Privacy Policy", ar: "سياسة الخصوصية" },
   contact: { en: "Contact Us", ar: "تواصل معنا" },
   admin: { en: "Admin", ar: "المسؤول" },
@@ -307,15 +310,15 @@ export const t: Dict = {
   civilIdUploading: { en: "Uploading…", ar: "جارٍ الرفع…" },
   viewCivilId: { en: "View Civil ID", ar: "عرض البطاقة المدنية" },
   noCivilId: { en: "No Civil ID on file", ar: "لا توجد بطاقة مدنية" },
+  // {terms} and {cancellation} are links to the two pages.
   acceptTerms: {
-    en: "I have read and accept the terms and regulations.",
-    ar: "لقد قرأت وأوافق على الشروط والأحكام.",
+    en: "I have read and accept the {terms} and the {cancellation}.",
+    ar: "لقد قرأت وأوافق على {terms} و{cancellation}.",
   },
   acceptTermsRequired: {
-    en: "You must accept the terms and regulations.",
-    ar: "يجب الموافقة على الشروط والأحكام.",
+    en: "You must accept the terms and conditions and the cancellation policy.",
+    ar: "يجب الموافقة على الشروط والأحكام وسياسة الإلغاء.",
   },
-  readTerms: { en: "Read them here", ar: "اقرأها هنا" },
 
   // Booking flow guidance
   checkAvailability: { en: "Check availability", ar: "عرض التواريخ المتاحة" },

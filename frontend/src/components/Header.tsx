@@ -30,6 +30,7 @@ const menuNav: { to: NavPath; key: TrKey }[] = [
   { to: "/reservation/$lang", key: "yourReservation" },
   { to: "/news/$lang", key: "news" },
   { to: "/rules/$lang", key: "rules" },
+  { to: "/cancellation/$lang", key: "cancellationPolicy" },
   { to: "/contact/$lang", key: "contact" },
 ];
 

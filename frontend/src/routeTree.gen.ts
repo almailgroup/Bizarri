@@ -21,6 +21,7 @@ import { Route as OffersLangRouteImport } from './routes/offers.$lang'
 import { Route as NewsLangRouteImport } from './routes/news.$lang'
 import { Route as FacilitiesLangRouteImport } from './routes/facilities.$lang'
 import { Route as ContactLangRouteImport } from './routes/contact.$lang'
+import { Route as CancellationLangRouteImport } from './routes/cancellation.$lang'
 import { Route as BookingLangRouteImport } from './routes/booking.$lang'
 import { Route as AdminLangRouteImport } from './routes/admin.$lang'
 import { Route as AboutLangRouteImport } from './routes/about.$lang'
@@ -85,6 +86,11 @@ const ContactLangRoute = ContactLangRouteImport.update({
   path: '/contact/$lang',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CancellationLangRoute = CancellationLangRouteImport.update({
+  id: '/cancellation/$lang',
+  path: '/cancellation/$lang',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const BookingLangRoute = BookingLangRouteImport.update({
   id: '/booking/$lang',
   path: '/booking/$lang',
@@ -108,6 +114,7 @@ export interface FileRoutesByFullPath {
   '/about/$lang': typeof AboutLangRoute
   '/admin/$lang': typeof AdminLangRoute
   '/booking/$lang': typeof BookingLangRoute
+  '/cancellation/$lang': typeof CancellationLangRoute
   '/contact/$lang': typeof ContactLangRoute
   '/facilities/$lang': typeof FacilitiesLangRoute
   '/news/$lang': typeof NewsLangRoute
@@ -125,6 +132,7 @@ export interface FileRoutesByTo {
   '/about/$lang': typeof AboutLangRoute
   '/admin/$lang': typeof AdminLangRoute
   '/booking/$lang': typeof BookingLangRoute
+  '/cancellation/$lang': typeof CancellationLangRoute
   '/contact/$lang': typeof ContactLangRoute
   '/facilities/$lang': typeof FacilitiesLangRoute
   '/news/$lang': typeof NewsLangRoute
@@ -143,6 +151,7 @@ export interface FileRoutesById {
   '/about/$lang': typeof AboutLangRoute
   '/admin/$lang': typeof AdminLangRoute
   '/booking/$lang': typeof BookingLangRoute
+  '/cancellation/$lang': typeof CancellationLangRoute
   '/contact/$lang': typeof ContactLangRoute
   '/facilities/$lang': typeof FacilitiesLangRoute
   '/news/$lang': typeof NewsLangRoute
@@ -162,6 +171,7 @@ export interface FileRouteTypes {
     | '/about/$lang'
     | '/admin/$lang'
     | '/booking/$lang'
+    | '/cancellation/$lang'
     | '/contact/$lang'
     | '/facilities/$lang'
     | '/news/$lang'
@@ -179,6 +189,7 @@ export interface FileRouteTypes {
     | '/about/$lang'
     | '/admin/$lang'
     | '/booking/$lang'
+    | '/cancellation/$lang'
     | '/contact/$lang'
     | '/facilities/$lang'
     | '/news/$lang'
@@ -196,6 +207,7 @@ export interface FileRouteTypes {
     | '/about/$lang'
     | '/admin/$lang'
     | '/booking/$lang'
+    | '/cancellation/$lang'
     | '/contact/$lang'
     | '/facilities/$lang'
     | '/news/$lang'
@@ -214,6 +226,7 @@ export interface RootRouteChildren {
   AboutLangRoute: typeof AboutLangRoute
   AdminLangRoute: typeof AdminLangRoute
   BookingLangRoute: typeof BookingLangRoute
+  CancellationLangRoute: typeof CancellationLangRoute
   ContactLangRoute: typeof ContactLangRoute
   FacilitiesLangRoute: typeof FacilitiesLangRoute
   NewsLangRoute: typeof NewsLangRoute
@@ -311,6 +324,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ContactLangRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/cancellation/$lang': {
+      id: '/cancellation/$lang'
+      path: '/cancellation/$lang'
+      fullPath: '/cancellation/$lang'
+      preLoaderRoute: typeof CancellationLangRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/booking/$lang': {
       id: '/booking/$lang'
       path: '/booking/$lang'
@@ -342,6 +362,7 @@ const rootRouteChildren: RootRouteChildren = {
   AboutLangRoute: AboutLangRoute,
   AdminLangRoute: AdminLangRoute,
   BookingLangRoute: BookingLangRoute,
+  CancellationLangRoute: CancellationLangRoute,
   ContactLangRoute: ContactLangRoute,
   FacilitiesLangRoute: FacilitiesLangRoute,
   NewsLangRoute: NewsLangRoute,

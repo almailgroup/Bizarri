@@ -146,6 +146,7 @@ const ROUTES = [
   "news",
   "contact",
   "rules",
+  "cancellation",
   "about",
   "privacy",
 ];

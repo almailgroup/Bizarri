@@ -568,7 +568,7 @@ const bg = (loc) => loc.evaluate((el) => getComputedStyle(el).backgroundColor);
   ck(
     "Terms checkbox is on the checkout form",
     await p
-      .getByText(/accept the terms and regulations/i)
+      .getByText(/accept the Terms & Conditions and the Cancellation & Refund Policy/i)
       .first()
       .isVisible(),
   );
@@ -596,7 +596,9 @@ const bg = (loc) => loc.evaluate((el) => getComputedStyle(el).backgroundColor);
   );
   ck(
     "Submitting without accepting the terms is refused",
-    await p.getByText("You must accept the terms and regulations.").isVisible(),
+    await p
+      .getByText("You must accept the terms and conditions and the cancellation policy.")
+      .isVisible(),
   );
   ck(
     "No booking was sent while requirements were unmet",

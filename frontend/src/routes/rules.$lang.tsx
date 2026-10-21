@@ -1,37 +1,41 @@
 import { requireLang } from "@/lib/lang-route";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { PageShell } from "@/components/PageShell";
+import { LegalDoc } from "@/components/LegalDoc";
 import { useI18n } from "@/lib/i18n";
 import { usePageMeta } from "@/hooks/use-page-meta";
+import { TERMS } from "@/lib/legal";
 
 export const Route = createFileRoute("/rules/$lang")({ component: Rules, beforeLoad: requireLang });
 
-const RULES_EN = `Bizarri Chalet Rentals is committed to protecting the privacy and personal information of all guests. We collect only the data necessary to confirm bookings, process payments, and deliver a safe and reliable rental experience. All personal information—such as identification details, contact information, and payment data—is stored securely and used strictly for operational and legal purposes in accordance with Kuwaiti regulations.
-
-We do not share, sell, or disclose guest information to third parties unless required by law or essential to completing your reservation. By booking with Bizarri, guests agree to the responsible use of their information as described in this policy, ensuring a transparent and secure experience throughout their stay.`;
-
+/**
+ * The Terms & Conditions every guest accepts at booking. At /rules, where the
+ * footer, the menu and the booking form have always pointed, so no link
+ * already shared stops working.
+ */
 function Rules() {
   const { tr, lang } = useI18n();
   usePageMeta(
-    lang === "en" ? "Rules & Regulations" : "القوانين والأحكام",
+    tr("rules"),
     lang === "en"
-      ? "House rules for guests staying at Bizarri Chalet."
-      : "قوانين الإقامة لضيوف شاليه بيزاري.",
+      ? "The terms and conditions for booking and staying at Bizarri Chalet."
+      : "الشروط والأحكام لحجز شاليه بيزاري والإقامة فيه.",
   );
   return (
     <PageShell>
-      <section className="max-w-3xl mx-auto px-6 py-16 md:py-32">
-        <p className="text-xs tracking-[0.4em] uppercase text-muted-foreground mb-6">
-          {tr("rules")}
-        </p>
-        <h1 className="font-display text-5xl md:text-6xl mb-12 animate-fade-up">{tr("rules")}</h1>
-        <div
-          className="space-y-6 text-foreground/80 leading-relaxed whitespace-pre-line animate-fade-up"
-          style={{ animationDelay: "150ms" }}
-        >
-          {RULES_EN}
-        </div>
-      </section>
+      <LegalDoc
+        label={tr("rules")}
+        doc={TERMS[lang]}
+        footer={
+          <Link
+            to="/cancellation/$lang"
+            params={{ lang }}
+            className="inline-flex min-h-11 items-center text-sm underline underline-offset-4 hover:opacity-70"
+          >
+            {tr("cancellationPolicy")}
+          </Link>
+        }
+      />
     </PageShell>
   );
 }

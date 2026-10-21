@@ -2407,15 +2407,25 @@ function BookingForm({
               className="mt-1 h-4 w-4 shrink-0 accent-black"
             />
             <span className="text-sm">
-              {tr("acceptTerms")}{" "}
-              <Link
-                to="/rules/$lang"
-                params={{ lang }}
-                target="_blank"
-                className="underline underline-offset-4 hover:opacity-70"
-              >
-                {tr("readTerms")}
-              </Link>
+              {/* Both documents, each opening in a new tab so the form
+                  stays as it was filled in. */}
+              {tr("acceptTerms")
+                .split(/(\{terms\}|\{cancellation\})/)
+                .map((part) =>
+                  part === "{terms}" || part === "{cancellation}" ? (
+                    <Link
+                      key={part}
+                      to={part === "{terms}" ? "/rules/$lang" : "/cancellation/$lang"}
+                      params={{ lang }}
+                      target="_blank"
+                      className="underline underline-offset-4 hover:opacity-70"
+                    >
+                      {part === "{terms}" ? tr("rules") : tr("cancellationPolicy")}
+                    </Link>
+                  ) : (
+                    part
+                  ),
+                )}
             </span>
           </label>
           {errors.terms && (
