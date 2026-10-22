@@ -279,8 +279,9 @@ function priceRows(
   const ar = lang === "ar";
   const deposit = depositOf(b);
   const total = { label: ar ? "الإجمالي" : "Total", value: money(b, lang, Number(b.total) + deposit) };
-  // With a discount code: the stay before it, the discount, and no deposit --
-  // the same lines the booking page showed.
+  // With a discount code: the stay before it, the discount, then the deposit
+  // -- charged, or not, as the code was set -- the lines the booking page
+  // showed.
   if (b.discount_code) {
     return {
       rows: [
@@ -294,7 +295,9 @@ function priceRows(
         },
         {
           label: ar ? "تأمين مسترد" : "Refundable insurance deposit",
-          valueHtml: escapeHtml(ar ? "لا يُحتسب" : "Not charged"),
+          valueHtml: escapeHtml(
+            deposit ? money(b, lang, deposit) : ar ? "لا يُحتسب" : "Not charged",
+          ),
         },
       ],
       total,
@@ -315,7 +318,7 @@ function priceRows(
 
 /** The same sentence the booking page puts under its total. */
 function depositNote(b: BookingRecord, lang: "en" | "ar"): string {
-  if (b.discount_code) {
+  if (b.discount_code && !depositOf(b)) {
     return escapeHtml(
       lang === "ar"
         ? "مع رمز الخصم لا يُحتسب مبلغ التأمين: تدفع قيمة الشاليه فقط."
@@ -526,8 +529,10 @@ export function renderWhatsApp(b: BookingRecord): string {
       ? [
           `Stay: ${b.currency} ${Number(b.total) + discountOf(b)}`,
           `Discount (${b.discount_code}): -${b.currency} ${discountOf(b)}`,
-          `Deposit: not charged (discount code)`,
-          `Total: ${b.currency} ${b.total}`,
+          depositOf(b)
+            ? `Deposit (refundable): ${b.currency} ${depositOf(b)}`
+            : `Deposit: not charged (discount code)`,
+          `Total: ${b.currency} ${Number(b.total) + depositOf(b)}`,
         ]
       : depositOf(b)
       ? [

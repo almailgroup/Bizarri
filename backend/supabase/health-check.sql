@@ -42,7 +42,10 @@ select 'migrations' as area, * from (values
   ('19 offers', (to_regclass('public.offers') is not null
                  and pg_get_functiondef('public.quote_stay(smallint,date,date)'::regprocedure) like '%public.offers%')),
   ('20 discount codes', (to_regclass('public.discount_codes') is not null
-                         and to_regprocedure('public.request_booking(smallint,date,date,text,text,text,smallint,text,text,boolean,text,text)') is not null))
+                         and to_regprocedure('public.request_booking(smallint,date,date,text,text,text,smallint,text,text,boolean,text,text)') is not null)),
+  ('21 discount deposit choice', (exists (select 1 from information_schema.columns
+                                  where table_schema = 'public' and table_name = 'discount_codes'
+                                    and column_name = 'waives_deposit')))
 ) t(item, ok)
 union all
 -- Expected from the rates as they stand, not from the defaults: the owner

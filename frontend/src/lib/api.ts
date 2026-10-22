@@ -339,7 +339,10 @@ export function useDiscountCodes(enabled: boolean) {
 export function useSaveDiscountCode() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (item: Partial<DiscountCodeRow> & { id?: string }) => {
+    mutationFn: async ({
+      hasDepositChoice = false,
+      ...item
+    }: Partial<DiscountCodeRow> & { id?: string; hasDepositChoice?: boolean }) => {
       const payload = {
         code: (item.code ?? "").trim().toUpperCase(),
         kind: item.kind ?? "percent",
@@ -348,6 +351,12 @@ export function useSaveDiscountCode() {
         expires_on: item.expires_on || null,
         note: (item.note ?? "").trim(),
         active: item.active ?? true,
+        // Named only when it matters -- set to keep the deposit, or on a code
+        // that already has the column -- so codes can still be made on a
+        // database that has not had the deposit-choice migration yet.
+        ...(item.waives_deposit === false || hasDepositChoice
+          ? { waives_deposit: item.waives_deposit ?? true }
+          : {}),
       };
       const { error } = item.id
         ? await supabase.from("discount_codes").update(payload).eq("id", item.id)

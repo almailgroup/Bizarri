@@ -45,7 +45,25 @@ function makeState(over = {}) {
 
 // The codes the mock database holds, as check_discount_code() answers.
 const CODES = {
-  SUMMER10: { valid: true, reason: null, code: "SUMMER10", kind: "percent", value: 10 },
+  SUMMER10: {
+    valid: true,
+    reason: null,
+    code: "SUMMER10",
+    kind: "percent",
+    value: 10,
+    waives_deposit: true,
+  },
+  // Set by the admin to take money off but keep the deposit.
+  KEEP10: {
+    valid: true,
+    reason: null,
+    code: "KEEP10",
+    kind: "percent",
+    value: 10,
+    waives_deposit: false,
+  },
+  // As a database answers before it knew the setting: no such field.
+  OLDDB10: { valid: true, reason: null, code: "OLDDB10", kind: "percent", value: 10 },
   EXPIRED: { valid: false, reason: "expired", code: "EXPIRED", kind: null, value: null },
   USEDUP: { valid: false, reason: "used", code: "USEDUP", kind: null, value: null },
 };
@@ -101,7 +119,7 @@ async function page(state, { lang = "en", phone = false } = {}) {
         end_date: body.p_end,
         days: 3,
         total: 350 - discount,
-        deposit: code?.valid ? 0 : state.deposit,
+        deposit: code?.valid && code.waives_deposit !== false ? 0 : state.deposit,
         currency: "KWD",
         package_key: "weekend",
         guest_name: body.p_guest_name,
@@ -521,6 +539,61 @@ const text = (p, testid) => p.locator(`[data-testid="${testid}"]`).innerText();
       (await text(p, "deposit-waived")) === "Not charged" &&
       (await text(p, "total")) === "KD 315",
     `${await text(p, "discount")} / ${await text(p, "total")}`,
+  );
+  await ctx.close();
+}
+
+// =========================== a code the admin set to keep the deposit
+{
+  const state = makeState();
+  const { p, ctx } = await page(state);
+  await chooseWeekend(p);
+  await next(p).click();
+  await p.waitForTimeout(700);
+  await p.getByRole("button", { name: "Have a discount code?" }).click();
+  await p.getByLabel("Discount code").fill("KEEP10");
+  await p.getByRole("button", { name: "Apply", exact: true }).click();
+  await p.waitForTimeout(600);
+  ck(
+    "A code that keeps the deposit takes its discount",
+    (await text(p, "discount")) === "− KD 35",
+    await text(p, "discount"),
+  );
+  ck(
+    "…and the deposit stays, with its sentence",
+    (await text(p, "deposit")) === "+ KD 100" &&
+      (await text(p, "deposit-note")) === NOTE &&
+      (await p
+        .locator('[data-testid="deposit-waived"], [data-testid="deposit-waived-note"]')
+        .count()) === 0,
+  );
+  ck(
+    "…so the total is the discounted stay plus the deposit",
+    (await text(p, "total")) === "KD 415",
+    await text(p, "total"),
+  );
+  await back(p).click();
+  await p.waitForTimeout(700);
+  ck(
+    "Back on the dates, the deposit is still promised",
+    (await text(p, "deposit-next-step")).includes("100 KD"),
+  );
+  await ctx.close();
+}
+{
+  // Before the database knew the setting, every code waived the deposit.
+  const state = makeState();
+  const { p, ctx } = await page(state);
+  await chooseWeekend(p);
+  await next(p).click();
+  await p.waitForTimeout(700);
+  await p.getByRole("button", { name: "Have a discount code?" }).click();
+  await p.getByLabel("Discount code").fill("OLDDB10");
+  await p.getByRole("button", { name: "Apply", exact: true }).click();
+  await p.waitForTimeout(600);
+  ck(
+    "A code from a database without the setting waives the deposit, as that database does",
+    (await text(p, "total")) === "KD 315" && (await text(p, "deposit-waived")) === "Not charged",
   );
   await ctx.close();
 }

@@ -138,7 +138,8 @@ export function DiscountCodesPanel() {
                     {c.max_uses === null
                       ? t("usesNoLimit", { n })
                       : t("usesOf", { n, max: c.max_uses })}
-                    {c.expires_on && <> · {t("codeUntil", { date: longDate(c.expires_on) })}</>}
+                    {c.expires_on && <> · {t("codeUntil", { date: longDate(c.expires_on) })}</>} ·{" "}
+                    {c.waives_deposit === false ? t("codeKeepsDeposit") : t("codeWaivesDeposit")}
                   </p>
                   {c.note && <p className="mt-1 text-sm text-muted-foreground">{c.note}</p>}
                 </div>
@@ -151,7 +152,7 @@ export function DiscountCodesPanel() {
                       disabled={save.isPending}
                       onChange={() =>
                         save.mutate(
-                          { ...c, active: !c.active },
+                          { ...c, active: !c.active, hasDepositChoice: "waives_deposit" in c },
                           {
                             onSuccess: () => toast.success(t("saved")),
                             onError: (err) => toast.error(errorText(err)),
@@ -226,6 +227,9 @@ function DiscountCodeModal({ code, onClose }: { code?: DiscountCodeRow; onClose:
     expiresOn: code?.expires_on ?? "",
     note: code?.note ?? "",
     active: code?.active ?? true,
+    // Every code waived the deposit before this was a choice; that stays the
+    // default, so a new code behaves as the ones already handed out.
+    waivesDeposit: code?.waives_deposit ?? true,
   }));
 
   const normalised = form.code.trim().toUpperCase();
@@ -246,6 +250,7 @@ function DiscountCodeModal({ code, onClose }: { code?: DiscountCodeRow; onClose:
     const text = errorText(err);
     if (/discount_codes_code_key|duplicate key/.test(text)) return t("errCodeTaken");
     if (/discount_codes_code_format/.test(text)) return t("errCodeFormat");
+    if (/waives_deposit/.test(text)) return t("errDepositChoiceMissing");
     return text;
   };
 
@@ -262,6 +267,8 @@ function DiscountCodeModal({ code, onClose }: { code?: DiscountCodeRow; onClose:
         expires_on: form.expiresOn || null,
         note: form.note,
         active: form.active,
+        waives_deposit: form.waivesDeposit,
+        hasDepositChoice: !!code && "waives_deposit" in code,
       },
       {
         onSuccess: () => {
@@ -362,6 +369,22 @@ function DiscountCodeModal({ code, onClose }: { code?: DiscountCodeRow; onClose:
             />
           )}
         </Field>
+
+        <div>
+          <p className="mb-1.5 text-sm font-medium">{t("depositChoice")}</p>
+          <Segmented
+            label={t("depositChoice")}
+            value={form.waivesDeposit ? "waive" : "keep"}
+            onChange={(v) => setForm({ ...form, waivesDeposit: v === "waive" })}
+            options={[
+              { value: "waive", label: t("depositWaivedOpt") },
+              { value: "keep", label: t("depositKeptOpt") },
+            ]}
+          />
+          <p className="mt-1.5 text-xs text-muted-foreground" data-testid="deposit-choice-hint">
+            {form.waivesDeposit ? t("depositWaivedHint") : t("depositKeptHint")}
+          </p>
+        </div>
 
         <div>
           <p className="mb-1.5 text-sm font-medium">{t("usesLabel")}</p>

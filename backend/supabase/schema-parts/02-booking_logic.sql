@@ -1,5 +1,5 @@
 -- ============================================================================
--- Part 2 of 20: booking_logic
+-- Part 2 of 21: booking_logic
 --
 -- Paste this whole file into the Supabase SQL editor and Run, then move on
 -- to the next part. Run them in order; each one is safe to run twice.

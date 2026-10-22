@@ -338,6 +338,8 @@ export interface AppliedDiscount {
   code: string;
   kind: "percent" | "amount";
   value: number;
+  /** Whether the code also waives the insurance deposit; the admin decides. */
+  waivesDeposit: boolean;
 }
 
 /**

@@ -328,7 +328,7 @@ export function EditBookingModal({
           </legend>
           {booking.discount_code && (
             <p className="rounded-md bg-secondary px-3 py-2 text-sm" data-testid="edit-code">
-              {t("bookedWithCodeLong", {
+              {t(Number(booking.deposit ?? 0) > 0 ? "bookedWithCodeKeep" : "bookedWithCodeLong", {
                 code: booking.discount_code,
                 amount: formatMoney(Number(booking.discount ?? 0), lang),
               })}

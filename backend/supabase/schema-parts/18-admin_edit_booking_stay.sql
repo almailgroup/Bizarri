@@ -1,5 +1,5 @@
 -- ============================================================================
--- Part 18 of 20: admin_edit_booking_stay
+-- Part 18 of 21: admin_edit_booking_stay
 --
 -- Paste this whole file into the Supabase SQL editor and Run, then move on
 -- to the next part. Run them in order; each one is safe to run twice.

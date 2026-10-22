@@ -137,8 +137,8 @@ const s = {
   offerSaved: { en: "Offer saved", ar: "تم حفظ العرض" },
   discountCodes: { en: "Discount codes", ar: "رموز الخصم" },
   discountsHint: {
-    en: "Codes a guest enters at booking for money off the stay. With any code the insurance deposit is not charged, so the guest pays for the chalet only. A use is given back if its booking is rejected or cancelled.",
-    ar: "رموز يُدخلها الضيف عند الحجز للحصول على خصم من قيمة الإقامة. مع أي رمز لا يُحتسب مبلغ التأمين، فيدفع الضيف قيمة الشاليه فقط. يُستعاد الاستخدام إذا رُفض الحجز أو أُلغي.",
+    en: "Codes a guest enters at booking for money off the stay. Each code either waives the insurance deposit, so the guest pays for the chalet only, or keeps it, as you choose. A use is given back if its booking is rejected or cancelled.",
+    ar: "رموز يُدخلها الضيف عند الحجز للحصول على خصم من قيمة الإقامة. كل رمز إما يُلغي مبلغ التأمين فيدفع الضيف قيمة الشاليه فقط، أو يُبقيه، حسب اختيارك. يُستعاد الاستخدام إذا رُفض الحجز أو أُلغي.",
   },
   newCode: { en: "New code", ar: "رمز جديد" },
   editCode: { en: "Edit code", ar: "تعديل الرمز" },
@@ -155,8 +155,25 @@ const s = {
   percentValue: { en: "Percentage off", ar: "نسبة الخصم" },
   amountValue: { en: "Amount off (KWD)", ar: "مبلغ الخصم (د.ك)" },
   percentZeroHint: {
-    en: "0% takes nothing off, and still waives the deposit.",
-    ar: "0% لا يخصم شيئاً، لكنه يُلغي مبلغ التأمين.",
+    en: "0% takes nothing off: useful for a code that only waives the deposit.",
+    ar: "0% لا يخصم شيئاً: مفيد لرمز يُلغي مبلغ التأمين فقط.",
+  },
+  depositChoice: { en: "Insurance deposit", ar: "مبلغ التأمين" },
+  depositWaivedOpt: { en: "Waived", ar: "يُلغى" },
+  depositKeptOpt: { en: "Still charged", ar: "يُحتسب كالمعتاد" },
+  depositWaivedHint: {
+    en: "A guest with this code pays for the chalet only, with no insurance deposit.",
+    ar: "يدفع الضيف بهذا الرمز قيمة الشاليه فقط، دون مبلغ تأمين.",
+  },
+  depositKeptHint: {
+    en: "The code only takes money off the stay; the insurance deposit is charged as usual.",
+    ar: "يخصم الرمز من قيمة الإقامة فقط، ويُحتسب مبلغ التأمين كالمعتاد.",
+  },
+  codeWaivesDeposit: { en: "deposit waived", ar: "دون تأمين" },
+  codeKeepsDeposit: { en: "deposit charged", ar: "مع التأمين" },
+  errDepositChoiceMissing: {
+    en: "Run part 21 of the database update in Supabase first, then try again.",
+    ar: "شغّل الجزء 21 من تحديث قاعدة البيانات في Supabase أولاً، ثم حاول مرة أخرى.",
   },
   usesLabel: { en: "How many times it can be used", ar: "عدد مرات الاستخدام" },
   usesOnce: { en: "One time", ar: "مرة واحدة" },
@@ -194,6 +211,10 @@ const s = {
   bookedWithCodeLong: {
     en: "Booked with code {code}: {amount} off, and no insurance deposit.",
     ar: "حُجز بالرمز {code}: خصم {amount}، ودون مبلغ تأمين.",
+  },
+  bookedWithCodeKeep: {
+    en: "Booked with code {code}: {amount} off. The insurance deposit is charged as usual.",
+    ar: "حُجز بالرمز {code}: خصم {amount}، ويُحتسب مبلغ التأمين كالمعتاد.",
   },
   repriceNew: { en: "Price the new dates from the rates", ar: "تسعير التواريخ الجديدة من الأسعار" },
   repriceTo: { en: "The total becomes {amount}.", ar: "يصبح الإجمالي {amount}." },

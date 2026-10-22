@@ -78,6 +78,8 @@ export type DiscountCodeRow = {
   expires_on: string | null;
   note: string;
   active: boolean;
+  /** True: a booking with this code pays no insurance deposit. */
+  waives_deposit: boolean;
   created_at: string;
   updated_at: string;
   updated_by: string | null;
@@ -310,6 +312,8 @@ export type Database = {
           code: string | null;
           kind: "percent" | "amount" | null;
           value: number | null;
+          /** Absent before the database learned it: such codes all waive. */
+          waives_deposit?: boolean | null;
         }[];
       };
       lookup_booking: {

@@ -456,6 +456,32 @@ ck(
     renderWhatsApp(coded).includes("Discount (SUMMER10): -KWD 35") &&
       renderWhatsApp(coded).includes("Total: KWD 315"),
   );
+
+  // A code set to keep the deposit: the discount, and the deposit on top.
+  const kept = booking({
+    status: "accepted",
+    total: 315,
+    discount: 35,
+    discount_code: "KEEP10",
+    deposit: 100,
+  });
+  const k = flat(renderGuest(kept, "en"));
+  ck(
+    "A code that keeps the deposit shows the discount and the deposit",
+    k.includes("Discount (KEEP10) − KD 35") &&
+      k.includes("Refundable insurance deposit KD 100") &&
+      k.includes("Total KD 415"),
+    k.slice(k.indexOf("Booking subtotal"), k.indexOf("Booking subtotal") + 160),
+  );
+  ck(
+    "…with the deposit sentence, not the waived one",
+    k.includes(NOTE) && !k.includes("no insurance deposit is charged"),
+  );
+  ck(
+    "…and the team's WhatsApp adds them up the same way",
+    renderWhatsApp(kept).includes("Deposit (refundable): KWD 100") &&
+      renderWhatsApp(kept).includes("Total: KWD 415"),
+  );
 }
 
 // ===================================== one failed send does not sink the rest

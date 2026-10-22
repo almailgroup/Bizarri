@@ -1546,6 +1546,10 @@ async function adminPage(state, { phone = false } = {}) {
     JSON.stringify(first?.body),
   );
   ck(
+    "…waiving the deposit by default, without naming it to a database that may not know it",
+    !("waives_deposit" in (first?.body ?? {})),
+  );
+  ck(
     "…and lists it",
     /10% off · 0 of 1 used/.test(
       await p.locator("li", { hasText: "SUMMER10" }).getByTestId("code-summary").innerText(),
@@ -1561,6 +1565,19 @@ async function adminPage(state, { phone = false } = {}) {
   await dlg.getByLabel("Number of uses").fill("5");
   await dlg.getByLabel("Last day it can be used").fill("2027-01-31");
   await dlg.getByLabel("Note (only you see it)").fill("Instagram giveaway");
+  ck(
+    "The deposit is waived unless the admin says otherwise",
+    (await dlg
+      .getByRole("button", { name: "Waived", exact: true })
+      .getAttribute("aria-pressed")) === "true",
+  );
+  await dlg.getByRole("button", { name: "Still charged", exact: true }).click();
+  ck(
+    "…and the form says what keeping it means",
+    /the insurance deposit is charged as usual/.test(
+      await dlg.getByTestId("deposit-choice-hint").innerText(),
+    ),
+  );
   await dlg.getByRole("button", { name: "Create code" }).click();
   await p.waitForTimeout(700);
   const second = state.calls.filter((c) => c.path === "discount_codes" && c.method === "POST")[1];
@@ -1572,6 +1589,17 @@ async function adminPage(state, { phone = false } = {}) {
       second?.body?.expires_on === "2027-01-31" &&
       second?.body?.note === "Instagram giveaway",
     JSON.stringify(second?.body),
+  );
+  ck(
+    "…and one can keep the deposit",
+    second?.body?.waives_deposit === false &&
+      /deposit charged/.test(
+        await p.locator("li", { hasText: "INSTA50" }).getByTestId("code-summary").innerText(),
+      ),
+  );
+  ck(
+    "The list says which codes waive it",
+    /deposit waived/.test(await welcome.getByTestId("code-summary").innerText()),
   );
 
   // The same code twice is refused, in words.

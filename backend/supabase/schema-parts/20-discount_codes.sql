@@ -1,5 +1,5 @@
 -- ============================================================================
--- Part 20 of 20: discount_codes
+-- Part 20 of 21: discount_codes
 --
 -- Paste this whole file into the Supabase SQL editor and Run, then move on
 -- to the next part. Run them in order; each one is safe to run twice.

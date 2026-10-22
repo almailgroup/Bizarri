@@ -432,11 +432,12 @@ function PriceBreakdown({
 }: {
   subtotal: number;
   deposit: number;
-  /** A discount code's share: taken off, and the deposit not charged. */
-  discount?: { code: string; amount: number } | null;
+  /** A discount code's share, and whether it also waives the deposit. */
+  discount?: { code: string; amount: number; waivesDeposit: boolean } | null;
 }) {
   const { tr, lang } = useI18n();
   const off = discount?.amount ?? 0;
+  const waived = !!discount?.waivesDeposit;
   return (
     <div className="border border-border" data-testid="price-breakdown">
       <dl className="text-sm">
@@ -460,13 +461,15 @@ function PriceBreakdown({
                 − {formatMoney(off, lang)}
               </dd>
             </div>
-            <div className="flex items-baseline justify-between gap-4 border-t border-border px-4 py-3">
-              <dt>{tr("insuranceDeposit")}</dt>
-              <dd data-testid="deposit-waived">{tr("depositWaived")}</dd>
-            </div>
           </>
         )}
-        {!discount && deposit > 0 && (
+        {waived && (
+          <div className="flex items-baseline justify-between gap-4 border-t border-border px-4 py-3">
+            <dt>{tr("insuranceDeposit")}</dt>
+            <dd data-testid="deposit-waived">{tr("depositWaived")}</dd>
+          </div>
+        )}
+        {!waived && deposit > 0 && (
           <div className="flex items-baseline justify-between gap-4 border-t border-border px-4 py-3">
             <dt>{tr("insuranceDeposit")}</dt>
             <dd className="tabular-nums" data-testid="deposit">
@@ -477,11 +480,11 @@ function PriceBreakdown({
         <div className="flex items-baseline justify-between gap-4 bg-foreground px-4 py-3 text-background">
           <dt className="text-xs font-semibold uppercase tracking-widest">{tr("total")}</dt>
           <dd className="text-lg font-semibold tabular-nums" data-testid="total">
-            {formatMoney(subtotal - off + (discount ? 0 : deposit), lang)}
+            {formatMoney(subtotal - off + (waived ? 0 : deposit), lang)}
           </dd>
         </div>
       </dl>
-      {discount && (
+      {waived && (
         <p
           className="flex items-start gap-2 border-t border-border px-4 py-3 text-sm text-muted-foreground"
           data-testid="deposit-waived-note"
@@ -490,7 +493,7 @@ function PriceBreakdown({
           <span>{tr("depositWaivedNote")}</span>
         </p>
       )}
-      {!discount && deposit > 0 && (
+      {!waived && deposit > 0 && (
         <p
           className="flex items-start gap-2 border-t border-border px-4 py-3 text-sm text-muted-foreground"
           data-testid="deposit-note"
@@ -531,7 +534,13 @@ function DiscountCodeBox({
     try {
       const r = await check.mutateAsync(code);
       if (r.valid && r.code && r.kind && r.value !== null) {
-        onApply({ code: r.code, kind: r.kind, value: Number(r.value) });
+        onApply({
+          code: r.code,
+          kind: r.kind,
+          value: Number(r.value),
+          // A database without the deposit choice waives it for every code.
+          waivesDeposit: r.waives_deposit ?? true,
+        });
         setText("");
         setOpen(false);
       } else {
@@ -1829,7 +1838,7 @@ function Calendar({
 
             {/* Said before the guest commits to the next step, so the total
                 there is no surprise. */}
-            {current && !tooShort && deposit > 0 && !discount && (
+            {current && !tooShort && deposit > 0 && !discount?.waivesDeposit && (
               <p
                 className="mt-3 flex items-start gap-2 text-sm text-muted-foreground"
                 data-testid="deposit-next-step"
@@ -1998,7 +2007,7 @@ function BookingForm({
   total: number;
   /** The refundable insurance deposit added on top. */
   deposit: number;
-  /** A discount code applied: it comes off the stay, and the deposit goes. */
+  /** A discount code applied: it comes off the stay, and may waive the deposit. */
   discount: AppliedDiscount | null;
   setDiscount: (d: AppliedDiscount | null) => void;
   details: GuestDetails;
@@ -2017,8 +2026,8 @@ function BookingForm({
   const { tr, lang } = useI18n();
   const request = useRequestBooking();
   const off = discount ? discountAmount(total, discount.kind, discount.value) : 0;
-  // With a code, the price is the chalet alone: no insurance deposit.
-  const payable = total - off + (discount ? 0 : deposit);
+  // A code that waives the deposit leaves the price of the chalet alone.
+  const payable = total - off + (discount?.waivesDeposit ? 0 : deposit);
   const navigate = Route.useNavigate();
   const router = useRouter();
   const { verify } = Route.useSearch();
@@ -2266,7 +2275,11 @@ function BookingForm({
         <PriceBreakdown
           subtotal={total}
           deposit={deposit}
-          discount={discount ? { code: discount.code, amount: off } : null}
+          discount={
+            discount
+              ? { code: discount.code, amount: off, waivesDeposit: discount.waivesDeposit }
+              : null
+          }
         />
 
         {recognised && <p className="text-sm text-muted-foreground">{tr("welcomeBack")}</p>}
@@ -2574,7 +2587,12 @@ function Confirmation({
           deposit={deposit}
           discount={
             booking.discount_code
-              ? { code: booking.discount_code, amount: Number(booking.discount ?? 0) }
+              ? {
+                  code: booking.discount_code,
+                  amount: Number(booking.discount ?? 0),
+                  // What the server recorded: no deposit means the code waived it.
+                  waivesDeposit: deposit === 0,
+                }
               : null
           }
         />
