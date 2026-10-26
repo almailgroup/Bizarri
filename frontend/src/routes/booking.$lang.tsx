@@ -15,6 +15,8 @@ import { PageShell } from "@/components/PageShell";
 import { CodeDialog } from "@/components/EmailVerify";
 import { rememberBookingRef } from "@/components/BookingLookup";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
+import { LegalDialog } from "@/components/LegalDoc";
+import { CANCELLATION_POLICY, TERMS } from "@/lib/legal";
 import { useI18n, type TrKey } from "@/lib/i18n";
 import { dateLocale } from "@/lib/locale";
 import { usePageMeta } from "@/hooks/use-page-meta";
@@ -86,7 +88,14 @@ interface BookingSearch {
    * close the whole form instead, dropping the guest on the dates.
    */
   verify?: true;
+  /**
+   * The terms or the cancellation policy is open over the form, for the same
+   * reason: Back closes the popup rather than leaving the form.
+   */
+  doc?: LegalDocKey;
 }
+
+type LegalDocKey = "terms" | "cancellation";
 
 export const Route = createFileRoute("/booking/$lang")({
   component: Booking,
@@ -104,7 +113,9 @@ export const Route = createFileRoute("/booking/$lang")({
         : s.step === "details"
           ? s.verify === true || s.verify === "true"
             ? { step: "details", verify: true }
-            : { step: "details" }
+            : s.doc === "terms" || s.doc === "cancellation"
+              ? { step: "details", doc: s.doc }
+              : { step: "details" }
           : s.step === "done"
             ? { step: "done" }
             : {},
@@ -1231,7 +1242,7 @@ function Calendar({
   // ahead, since somebody else may have booked it in the meantime. Until then
   // the details step waits rather than sending the guest back to the dates.
   const [restoring, setRestoring] = useState(() => !!restore?.start && !!restore?.end);
-  const { verify } = Route.useSearch();
+  const { verify, doc } = Route.useSearch();
   useEffect(() => {
     if (!restoring || !calendar) return;
     setRestoring(false);
@@ -1247,7 +1258,9 @@ function Calendar({
     setEnd(e);
     // A reload with the code dialog open would mail a new code by itself;
     // come back to the form instead, and let Submit ask when it is wanted.
-    if (showForm && verify) navigate({ search: { step: "details" }, replace: true });
+    // A popup reloaded has no entry of the form behind it to step back to,
+    // so the terms close too.
+    if (showForm && (verify || doc)) navigate({ search: { step: "details" }, replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [calendar, restoring]);
 
@@ -2030,7 +2043,7 @@ function BookingForm({
   const payable = total - off + (discount?.waivesDeposit ? 0 : deposit);
   const navigate = Route.useNavigate();
   const router = useRouter();
-  const { verify } = Route.useSearch();
+  const { verify, doc } = Route.useSearch();
   // The address that was actually proved, not a boolean: editing the field
   // after confirming has to drop the confirmation, and comparing the two is
   // the only way to notice.
@@ -2147,6 +2160,11 @@ function BookingForm({
   // they filled in. Opening pushes the entry without moving the page behind.
   const openCode = () =>
     navigate({ search: { step: "details", verify: true }, resetScroll: false });
+
+  // The terms and the cancellation policy open the same way, over the form:
+  // an entry of their own, closed by a step back.
+  const openDoc = (which: LegalDocKey) =>
+    navigate({ search: { step: "details", doc: which }, resetScroll: false });
 
   // Closing is always a step back: the entry behind the dialog is the form
   // it was opened from. (A dialog entry with no form behind it cannot be
@@ -2420,8 +2438,10 @@ function BookingForm({
               className="mt-1 h-4 w-4 shrink-0 accent-black"
             />
             <span className="text-sm">
-              {/* Both documents, each opening in a new tab so the form
-                  stays as it was filled in. */}
+              {/* Both documents open in a popup over the form, so the guest
+                  reads what they accept without leaving what they filled
+                  in. Still links to the pages: Ctrl- or Cmd-click opens one
+                  in a tab of its own for anyone who wants that. */}
               {tr("acceptTerms")
                 .split(/(\{terms\}|\{cancellation\})/)
                 .map((part) =>
@@ -2430,7 +2450,12 @@ function BookingForm({
                       key={part}
                       to={part === "{terms}" ? "/rules/$lang" : "/cancellation/$lang"}
                       params={{ lang }}
-                      target="_blank"
+                      onClick={(e) => {
+                        if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0)
+                          return;
+                        e.preventDefault();
+                        openDoc(part === "{terms}" ? "terms" : "cancellation");
+                      }}
                       className="underline underline-offset-4 hover:opacity-70"
                     >
                       {part === "{terms}" ? tr("rules") : tr("cancellationPolicy")}
@@ -2467,6 +2492,14 @@ function BookingForm({
           <p className="border border-destructive p-4 text-sm text-destructive">
             {(request.error as Error).message}
           </p>
+        )}
+
+        {doc && (
+          <LegalDialog
+            doc={doc === "terms" ? TERMS[lang] : CANCELLATION_POLICY[lang]}
+            numbered={doc === "terms"}
+            onClose={() => router.history.back()}
+          />
         )}
 
         {/* Opened by Submit, never before. Everything else on the form has

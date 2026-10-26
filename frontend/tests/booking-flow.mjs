@@ -598,6 +598,74 @@ const text = (p, testid) => p.locator(`[data-testid="${testid}"]`).innerText();
   await ctx.close();
 }
 
+// ================== the terms and the cancellation policy open in a popup
+{
+  const state = makeState();
+  const { p, ctx } = await page(state);
+  await chooseWeekend(p);
+  await next(p).click();
+  await p.waitForTimeout(700);
+  await p.getByLabel("Full Name").fill("Popup Guest");
+  const box = p.locator('input[type=checkbox]:not([role="switch"])').first();
+  const where = () => new URL(p.url()).pathname + new URL(p.url()).search;
+
+  await p.locator("form").getByRole("link", { name: "Terms & Conditions" }).click();
+  await p.waitForTimeout(500);
+  const dialog = p.getByRole("dialog", { name: "Terms and Conditions for Chalet Booking and Use" });
+  ck("The terms open in a popup", await dialog.isVisible());
+  ck("…not in another tab", ctx.pages().length === 1, `${ctx.pages().length} tabs`);
+  ck(
+    "…over the form, which stays where it was",
+    where() === "/booking/en?step=details&doc=terms",
+    where(),
+  );
+  ck(
+    "…with the whole text, numbered",
+    (await dialog.getByRole("heading", { level: 3 }).count()) === 8 &&
+      /Check-in is at 2:00 PM/.test(await dialog.innerText()),
+  );
+  ck("Following the link does not tick the box", !(await box.isChecked()));
+  ck(
+    "The close button has the focus",
+    (await p.evaluate(() => document.activeElement?.getAttribute("aria-label"))) === "Close",
+  );
+  await p.keyboard.press("Escape");
+  await p.waitForTimeout(500);
+  ck(
+    "Escape closes it, back to the form as it was",
+    (await dialog.count()) === 0 &&
+      where() === "/booking/en?step=details" &&
+      (await p.getByLabel("Full Name").inputValue()) === "Popup Guest",
+    where(),
+  );
+
+  await p.locator("form").getByRole("link", { name: "Cancellation & Refund Policy" }).click();
+  await p.waitForTimeout(500);
+  const policy = p.getByRole("dialog", { name: "Cancellation and Refund Policy" });
+  ck(
+    "The cancellation policy opens in a popup too",
+    (await policy.isVisible()) && ctx.pages().length === 1,
+  );
+  await policy.getByRole("button", { name: "Close", exact: true }).last().click();
+  await p.waitForTimeout(500);
+  ck(
+    "Its Close button closes it",
+    (await policy.count()) === 0 && where() === "/booking/en?step=details",
+    where(),
+  );
+
+  await p.locator("form").getByRole("link", { name: "Terms & Conditions" }).click();
+  await p.waitForTimeout(500);
+  await p.goBack();
+  await p.waitForTimeout(600);
+  ck(
+    "On a phone's Back the popup closes, not the form",
+    (await dialog.count()) === 0 && (await onDetails(p)),
+    where(),
+  );
+  await ctx.close();
+}
+
 // ======================================= a reload keeps the booking going
 {
   const state = makeState();
