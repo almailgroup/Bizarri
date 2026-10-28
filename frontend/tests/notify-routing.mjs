@@ -42,10 +42,17 @@ let handler = null;
 const env = {};
 globalThis.Deno = { serve: (h) => (handler = h), env: { get: (k) => env[k] } };
 
-const { classify, renderDecision, renderGuest, render, renderWhatsApp, checkOutDate } =
-  await import(
-    "data:text/javascript;base64," + Buffer.from(built.outputFiles[0].text).toString("base64")
-  );
+const {
+  classify,
+  renderDecision,
+  renderGuest,
+  render,
+  renderWhatsApp,
+  renderWhatsAppCancelled,
+  checkOutDate,
+} = await import(
+  "data:text/javascript;base64," + Buffer.from(built.outputFiles[0].text).toString("base64")
+);
 
 ck("The real classify() was imported, not a copy", typeof classify === "function");
 
@@ -529,6 +536,60 @@ ck(
     "…with the team's reported as not delivered",
     out.email?.attempted === true && out.email?.delivered === false,
   );
+}
+
+// ======================== a cancellation reaches the team on WhatsApp too
+{
+  const cancelled = booking({ status: "cancelled" });
+  const text = renderWhatsAppCancelled(cancelled, "accepted");
+  ck(
+    "The team's cancellation message says what was cancelled",
+    text.startsWith("*Booking cancelled*") &&
+      text.includes(`Ref: ${cancelled.ref}`) &&
+      text.includes("Was: Accepted") &&
+      text.includes(`Guest: ${cancelled.guest_name}`) &&
+      text.includes(`Phone: ${cancelled.guest_phone}`) &&
+      text.includes("The dates are free again"),
+    text.replace(/\n/g, " | "),
+  );
+
+  env.CALLMEBOT_PHONE = "96594040955";
+  env.CALLMEBOT_APIKEY = "123456";
+  const deliver = async (before, after) => {
+    const calls = [];
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = async (url) => {
+      calls.push(String(url));
+      return new Response("ok", { status: 200 });
+    };
+    const res = await handler(
+      new Request("http://local/", {
+        method: "POST",
+        body: JSON.stringify({
+          type: "UPDATE",
+          table: "bookings",
+          record: booking({ status: after }),
+          old_record: booking({ status: before }),
+        }),
+      }),
+    );
+    globalThis.fetch = realFetch;
+    return { out: await res.json(), wa: calls.filter((u) => u.includes("api.callmebot.com")) };
+  };
+  const c = await deliver("accepted", "cancelled");
+  ck(
+    "Cancelling a booking sends the team a WhatsApp",
+    c.wa.length === 1 &&
+      decodeURIComponent(c.wa[0]).includes("*Booking cancelled*") &&
+      c.out.whatsapp?.attempted === true,
+    JSON.stringify(c.out),
+  );
+  const a = await deliver("pending", "accepted");
+  ck("…but accepting one does not", a.wa.length === 0, JSON.stringify(a.out));
+  const r = await deliver("pending", "rejected");
+  ck("…nor rejecting one", r.wa.length === 0, JSON.stringify(r.out));
+  delete env.CALLMEBOT_PHONE;
+  delete env.CALLMEBOT_APIKEY;
 }
 
 // ================================ an admin booking, delivered end to end

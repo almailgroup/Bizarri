@@ -273,6 +273,9 @@ Dashboard → Database → Webhooks → *Create*:
 Add a **second** hook on the same table for **Update**, pointing at the same
 function — or simply tick **Update** on the existing hook, which is the same
 thing with less to maintain. That is what tells the guest the outcome.
+It is also what tells the team when a booking is cancelled: a change to
+`cancelled` sends the WhatsApp numbers in Site Settings a short note, as a
+new request does.
 
 An Update hook fires on every column, so `classify()` decides what is worth an
 email: only a change of `status`, and only to accepted, rejected, cancelled or

@@ -516,6 +516,27 @@ export function renderDecision(
   });
 }
 
+/**
+ * The team's WhatsApp when a booking is cancelled from the dashboard. Whoever
+ * cancelled it knows; the others on the list may not, and the dates it held
+ * are free again for someone else.
+ */
+export function renderWhatsAppCancelled(b: BookingRecord, before?: string | null): string {
+  const was: Record<string, string> = { pending: "Awaiting approval", accepted: "Accepted" };
+  return [
+    `*Booking cancelled*`,
+    `Ref: ${b.ref}`,
+    ...(before && was[before] ? [`Was: ${was[before]}`] : []),
+    `Chalet: Bizarri Chalet ${b.chalet_id}`,
+    `Dates: ${b.start_date} → ${b.end_date} (${b.days} days)`,
+    `Total: ${b.currency} ${b.total}`,
+    `Guest: ${b.guest_name}`,
+    `Phone: ${b.guest_phone}`,
+    `Email: ${b.guest_email}`,
+    `The dates are free again on the calendar.`,
+  ].join("\n");
+}
+
 /** Plain-text with WhatsApp's own emphasis markup (*bold*), not HTML. */
 export function renderWhatsApp(b: BookingRecord): string {
   const lines = [
@@ -746,6 +767,7 @@ async function sendDecisionEmail(
 
 async function sendAllWhatsApp(
   booking: BookingRecord,
+  text = renderWhatsApp(booking),
 ): Promise<DeliveryResult> {
   const configured = await notifyWhatsAppFromSettings();
   const envPhone = Deno.env.get("CALLMEBOT_PHONE");
@@ -762,7 +784,6 @@ async function sendAllWhatsApp(
     return { attempted: false, delivered: false, reason: "no recipients" };
   }
 
-  const text = renderWhatsApp(booking);
   const results = await Promise.all(
     recipients.map((r) => sendWhatsApp(r, text)),
   );
@@ -796,9 +817,25 @@ Deno.serve(async (req: Request) => {
 
     const booking = payload!.record!;
 
+    // A decision is the guest's news, by email. A cancellation is the team's
+    // too: it goes to the WhatsApp numbers in Site Settings as well, the same
+    // ones told about new requests.
     if (action === "decision") {
-      const guestEmail = await sendDecisionEmail(booking);
-      return json({ ok: true, action, guestEmail }, 200, origin);
+      const cancelled = booking.status === "cancelled";
+      const [guestEmail, whatsapp] = await Promise.all([
+        sendDecisionEmail(booking),
+        cancelled
+          ? sendAllWhatsApp(
+              booking,
+              renderWhatsAppCancelled(booking, payload!.old_record?.status),
+            )
+          : Promise.resolve(undefined),
+      ]);
+      return json(
+        { ok: true, action, guestEmail, ...(cancelled ? { whatsapp } : {}) },
+        200,
+        origin,
+      );
     }
 
     // Entered by the admin: an accepted booking gets the confirmation, a
