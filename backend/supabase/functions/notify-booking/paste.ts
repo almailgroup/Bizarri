@@ -406,24 +406,45 @@ const NOTIFIED_STATUSES = ["accepted", "rejected", "cancelled", "pending"];
  * Pure and exported so it can be tested without a Deno runtime — the routing
  * is the part with the edge cases, and an UPDATE hook fires on every column,
  * not just the one that matters.
+ *
+ *   new       a guest's request: the team (email and WhatsApp) and the guest.
+ *   admin     a booking typed in from the dashboard: the team's WhatsApp, and
+ *             the guest only if the admin left "email the guest" on.
+ *   decision  a change of status: the guest by email, the team by WhatsApp.
+ *   moved     other dates or the other chalet: the team's WhatsApp.
+ *   deleted   the row is gone: the team's WhatsApp.
+ *
+ * Any other edit -- a phone number, an internal note, a price -- sends
+ * nothing: the WhatsApp numbers are for things that happen to a booking, not
+ * for every keystroke in the dashboard.
  */
 export function classify(payload: WebhookPayload | null): {
-  action: "new" | "admin" | "decision" | "ignore";
+  action: "new" | "admin" | "decision" | "moved" | "deleted" | "ignore";
   reason?: string;
+  /** For an admin's own booking: whether the guest is emailed about it. */
+  emailGuest?: boolean;
 } {
+  // A delete carries only the row as it was.
+  if (payload?.type === "DELETE") {
+    return payload.old_record?.ref
+      ? { action: "deleted" }
+      : { action: "ignore", reason: "no booking in payload" };
+  }
+
   const record = payload?.record;
   if (!record?.ref)
     return { action: "ignore", reason: "no booking in payload" };
 
-  // A booking the admin typed in is not a request for the team to act on --
-  // they made it -- so it only ever concerns the guest, and only if the admin
-  // left "email the guest" on. Checked before the generic insert below.
+  // A booking the admin typed in concerns the guest only if the admin left
+  // "email the guest" on, and only while it stands; the team hears either
+  // way. Checked before the generic insert below.
   if (payload?.type === "INSERT" && record.source === "admin") {
-    if (record.notify_guest === false)
-      return { action: "ignore", reason: "admin booking, guest not to be emailed" };
-    if (record.status !== "accepted" && record.status !== "pending")
-      return { action: "ignore", reason: `admin booking with status ${record.status}` };
-    return { action: "admin" };
+    return {
+      action: "admin",
+      emailGuest:
+        record.notify_guest !== false &&
+        (record.status === "accepted" || record.status === "pending"),
+    };
   }
 
   // A direct call (no webhook envelope) is treated as a new request, which is
@@ -435,17 +456,26 @@ export function classify(payload: WebhookPayload | null): {
     // "probably a decision" is not good enough to mail a guest about.
     if (!payload.old_record)
       return { action: "ignore", reason: "no previous row" };
-    const before = payload.old_record.status ?? null;
+    const old = payload.old_record;
+    const before = old.status ?? null;
     const after = record.status ?? null;
-    if (before === after)
-      return { action: "ignore", reason: "status unchanged" };
-    if (!after || !NOTIFIED_STATUSES.includes(after)) {
-      return {
-        action: "ignore",
-        reason: `status ${after} is not worth an email`,
-      };
+    if (before !== after) {
+      if (!after || !NOTIFIED_STATUSES.includes(after)) {
+        return {
+          action: "ignore",
+          reason: `status ${after} is not worth an email`,
+        };
+      }
+      return { action: "decision" };
     }
-    return { action: "decision" };
+    if (
+      old.chalet_id !== record.chalet_id ||
+      old.start_date !== record.start_date ||
+      old.end_date !== record.end_date
+    ) {
+      return { action: "moved" };
+    }
+    return { action: "ignore", reason: "status unchanged" };
   }
 
   return { action: "ignore", reason: `unhandled event ${payload.type}` };
@@ -838,25 +868,26 @@ export function renderDecision(
   });
 }
 
-/**
- * The team's WhatsApp when a booking is cancelled from the dashboard. Whoever
- * cancelled it knows; the others on the list may not, and the dates it held
- * are free again for someone else.
- */
-export function renderWhatsAppCancelled(b: BookingRecord, before?: string | null): string {
-  const was: Record<string, string> = { pending: "Awaiting approval", accepted: "Accepted" };
-  return [
-    `*Booking cancelled*`,
-    `Ref: ${b.ref}`,
-    ...(before && was[before] ? [`Was: ${was[before]}`] : []),
-    `Chalet: Bizarri Chalet ${b.chalet_id}`,
-    `Dates: ${b.start_date} → ${b.end_date} (${b.days} days)`,
-    `Total: ${b.currency} ${b.total}`,
-    `Guest: ${b.guest_name}`,
-    `Phone: ${b.guest_phone}`,
-    `Email: ${b.guest_email}`,
-    `The dates are free again on the calendar.`,
-  ].join("\n");
+/** The price lines every WhatsApp shares: discount and deposit as charged. */
+function priceLines(b: BookingRecord): string[] {
+  if (b.discount_code) {
+    return [
+      `Stay: ${b.currency} ${Number(b.total) + discountOf(b)}`,
+      `Discount (${b.discount_code}): -${b.currency} ${discountOf(b)}`,
+      depositOf(b)
+        ? `Deposit (refundable): ${b.currency} ${depositOf(b)}`
+        : `Deposit: not charged (discount code)`,
+      `Total: ${b.currency} ${Number(b.total) + depositOf(b)}`,
+    ];
+  }
+  if (depositOf(b)) {
+    return [
+      `Stay: ${b.currency} ${b.total}`,
+      `Deposit (refundable): ${b.currency} ${depositOf(b)}`,
+      `Total: ${b.currency} ${Number(b.total) + depositOf(b)}`,
+    ];
+  }
+  return [`Total: ${b.currency} ${b.total}`];
 }
 
 /** Plain-text with WhatsApp's own emphasis markup (*bold*), not HTML. */
@@ -868,28 +899,84 @@ export function renderWhatsApp(b: BookingRecord): string {
     `Dates: ${b.start_date} → ${b.end_date} (${b.days} days)`,
     `Check-in: ${b.start_date} ${formatHour(CHECK_IN_HOUR, "en")}`,
     `Check-out: ${checkOutDate(b.end_date)} ${formatHour(CHECK_OUT_HOUR, "en")}`,
-    ...(b.discount_code
-      ? [
-          `Stay: ${b.currency} ${Number(b.total) + discountOf(b)}`,
-          `Discount (${b.discount_code}): -${b.currency} ${discountOf(b)}`,
-          depositOf(b)
-            ? `Deposit (refundable): ${b.currency} ${depositOf(b)}`
-            : `Deposit: not charged (discount code)`,
-          `Total: ${b.currency} ${Number(b.total) + depositOf(b)}`,
-        ]
-      : depositOf(b)
-      ? [
-          `Stay: ${b.currency} ${b.total}`,
-          `Deposit (refundable): ${b.currency} ${depositOf(b)}`,
-          `Total: ${b.currency} ${Number(b.total) + depositOf(b)}`,
-        ]
-      : [`Total: ${b.currency} ${b.total}`]),
+    ...priceLines(b),
     `Guest: ${b.guest_name}`,
     `Phone: ${b.guest_phone}`,
     `Email: ${b.guest_email}`,
     `Guests: ${b.guests}`,
   ];
   if (b.notes) lines.push(`Notes: ${b.notes}`);
+  return lines.join("\n");
+}
+
+const STATUS_WORD: Record<string, string> = {
+  pending: "Awaiting approval",
+  accepted: "Accepted",
+  rejected: "Rejected",
+  cancelled: "Cancelled",
+};
+
+export type BookingEvent =
+  | "accepted"
+  | "rejected"
+  | "cancelled"
+  | "pending"
+  | "deleted"
+  | "admin"
+  | "moved";
+
+const EVENT_TITLE: Record<BookingEvent, string> = {
+  accepted: "Booking accepted",
+  rejected: "Booking rejected",
+  cancelled: "Booking cancelled",
+  pending: "Booking back to awaiting approval",
+  deleted: "Booking deleted",
+  admin: "Booking added from the dashboard",
+  moved: "Booking moved",
+};
+
+/**
+ * The team's WhatsApp for anything that happens to a booking after it was
+ * requested: a decision, a delete, a move, or one typed in from the
+ * dashboard. Whoever did it knows; the others on the list may not, and a
+ * booking that let go of its dates leaves them free for someone else.
+ *
+ * `b` is the booking as it is now (as it was, for a delete); `before` is the
+ * row before the change, where there was one.
+ */
+export function renderWhatsAppEvent(
+  event: BookingEvent,
+  b: BookingRecord,
+  before?: BookingRecord | null,
+): string {
+  const was = before?.status ? STATUS_WORD[before.status] : undefined;
+  const heldDates = (s?: string | null) => s === "pending" || s === "accepted";
+  const lines = [`*${EVENT_TITLE[event]}*`, `Ref: ${b.ref}`];
+  if (event === "admin") lines.push(`Status: ${STATUS_WORD[b.status ?? ""] ?? b.status}`);
+  else if (event === "deleted") {
+    if (b.status && STATUS_WORD[b.status]) lines.push(`Was: ${STATUS_WORD[b.status]}`);
+  } else if (event !== "moved" && was) lines.push(`Was: ${was}`);
+  if (event === "moved" && before) {
+    lines.push(
+      `From: Bizarri Chalet ${before.chalet_id}, ${before.start_date} → ${before.end_date}`,
+      `To: Bizarri Chalet ${b.chalet_id}, ${b.start_date} → ${b.end_date} (${b.days} days)`,
+    );
+  } else {
+    lines.push(
+      `Chalet: Bizarri Chalet ${b.chalet_id}`,
+      `Dates: ${b.start_date} → ${b.end_date} (${b.days} days)`,
+    );
+  }
+  lines.push(
+    ...priceLines(b),
+    `Guest: ${b.guest_name}`,
+    `Phone: ${b.guest_phone}`,
+    `Email: ${b.guest_email}`,
+  );
+  const freed =
+    (event === "deleted" && heldDates(b.status)) ||
+    ((event === "cancelled" || event === "rejected") && heldDates(before?.status));
+  if (freed) lines.push(`The dates are free again on the calendar.`);
   return lines.join("\n");
 }
 
@@ -1123,13 +1210,15 @@ Deno.serve(async (req: Request) => {
     const raw = await req.json().catch(() => null);
     // Database Webhooks post { type, table, record, old_record }; a direct
     // call may post the record itself.
-    const payload: WebhookPayload | null = raw?.record
-      ? (raw as WebhookPayload)
-      : raw?.ref
-        ? { record: raw as BookingRecord }
-        : null;
+    // A delete posts the row only as old_record, with record null.
+    const payload: WebhookPayload | null =
+      raw?.record || raw?.old_record
+        ? (raw as WebhookPayload)
+        : raw?.ref
+          ? { record: raw as BookingRecord }
+          : null;
 
-    const { action, reason } = classify(payload);
+    const { action, reason, emailGuest } = classify(payload);
     if (action === "ignore") {
       // 200, not an error: an update this function has nothing to say about is
       // a normal event, and a failing webhook would be retried forever.
@@ -1137,38 +1226,50 @@ Deno.serve(async (req: Request) => {
       return json({ ok: true, action, reason }, 200, origin);
     }
 
-    const booking = payload!.record!;
+    // Gone from the table: only the team hears, with the row as it was.
+    if (action === "deleted") {
+      const gone = payload!.old_record!;
+      const whatsapp = await sendAllWhatsApp(gone, renderWhatsAppEvent("deleted", gone));
+      return json({ ok: true, action, whatsapp }, 200, origin);
+    }
 
-    // A decision is the guest's news, by email. A cancellation is the team's
-    // too: it goes to the WhatsApp numbers in Site Settings as well, the same
-    // ones told about new requests.
+    const booking = payload!.record!;
+    const before = payload!.old_record ?? null;
+
+    // Moved to other dates or the other chalet: the team's WhatsApp.
+    if (action === "moved") {
+      const whatsapp = await sendAllWhatsApp(
+        booking,
+        renderWhatsAppEvent("moved", booking, before),
+      );
+      return json({ ok: true, action, whatsapp }, 200, origin);
+    }
+
+    // A decision is the guest's news, by email, and the team's by WhatsApp.
     if (action === "decision") {
-      const cancelled = booking.status === "cancelled";
       const [guestEmail, whatsapp] = await Promise.all([
         sendDecisionEmail(booking),
-        cancelled
-          ? sendAllWhatsApp(
-              booking,
-              renderWhatsAppCancelled(booking, payload!.old_record?.status),
-            )
-          : Promise.resolve(undefined),
+        sendAllWhatsApp(
+          booking,
+          renderWhatsAppEvent(booking.status as BookingEvent, booking, before),
+        ),
       ]);
-      return json(
-        { ok: true, action, guestEmail, ...(cancelled ? { whatsapp } : {}) },
-        200,
-        origin,
-      );
+      return json({ ok: true, action, guestEmail, whatsapp }, 200, origin);
     }
 
     // Entered by the admin: an accepted booking gets the confirmation, a
-    // pending one the same "we have your request" a guest would. The team is
-    // not told about a booking one of them just made.
+    // pending one the same "we have your request" a guest would -- unless the
+    // admin said not to email the guest. The team hears on WhatsApp.
     if (action === "admin") {
-      const guestEmail =
-        booking.status === "accepted"
-          ? await sendDecisionEmail(booking)
-          : await sendGuestEmail(booking);
-      return json({ ok: true, action, guestEmail }, 200, origin);
+      const [guestEmail, whatsapp] = await Promise.all([
+        emailGuest
+          ? booking.status === "accepted"
+            ? sendDecisionEmail(booking)
+            : sendGuestEmail(booking)
+          : Promise.resolve(undefined),
+        sendAllWhatsApp(booking, renderWhatsAppEvent("admin", booking)),
+      ]);
+      return json({ ok: true, action, guestEmail, whatsapp }, 200, origin);
     }
 
     // The three sends are independent: one being unconfigured or failing

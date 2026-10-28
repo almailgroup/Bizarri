@@ -48,7 +48,7 @@ const {
   renderGuest,
   render,
   renderWhatsApp,
-  renderWhatsAppCancelled,
+  renderWhatsAppEvent,
   checkOutDate,
 } = await import(
   "data:text/javascript;base64," + Buffer.from(built.outputFiles[0].text).toString("base64")
@@ -147,8 +147,30 @@ for (const status of ["accepted", "rejected", "cancelled"]) {
   ck("A new pending booking is still a new request, not a status change", r.action === "new");
 }
 {
-  const r = classify({ type: "DELETE", old_record: booking(), record: booking() });
-  ck("A delete sends nothing", r.action === "ignore", r.reason);
+  const r = classify({ type: "DELETE", old_record: booking(), record: null });
+  ck("A delete tells the team", r.action === "deleted", r.reason);
+  const none = classify({ type: "DELETE", old_record: null, record: null });
+  ck("…unless there is no row in it", none.action === "ignore", none.reason);
+}
+{
+  const r = classify({
+    type: "UPDATE",
+    old_record: booking({ start_date: "2027-01-07", end_date: "2027-01-09" }),
+    record: booking({ start_date: "2027-01-14", end_date: "2027-01-16" }),
+  });
+  ck("Moving a booking to other dates tells the team", r.action === "moved", r.reason);
+  const c = classify({
+    type: "UPDATE",
+    old_record: booking({ chalet_id: 1 }),
+    record: booking({ chalet_id: 2 }),
+  });
+  ck("…and so does moving it to the other chalet", c.action === "moved", c.reason);
+  const t = classify({
+    type: "UPDATE",
+    old_record: booking({ total: 350 }),
+    record: booking({ total: 300 }),
+  });
+  ck("A change of price alone sends nothing", t.action === "ignore", t.reason);
 }
 {
   // An UPDATE with no old_record cannot be shown to be a change.
@@ -157,20 +179,23 @@ for (const status of ["accepted", "rejected", "cancelled"]) {
 }
 
 // ------------------------------------------- bookings the admin typed in
-// The team made it, so the team is not emailed about it; the guest hears
-// only if the admin left "email the guest" on.
+// The team hears on WhatsApp; the guest only if the admin left "email the
+// guest" on.
 {
   const admin = (over = {}) =>
     classify({ type: "INSERT", record: booking({ source: "admin", ...over }) });
   ck(
     "An admin's accepted booking goes to the guest",
-    admin({ status: "accepted" }).action === "admin",
+    admin({ status: "accepted" }).action === "admin" && admin({ status: "accepted" }).emailGuest,
   );
-  ck("…and so does a pending one", admin({ status: "pending" }).action === "admin");
   ck(
-    "Not when the admin said not to email the guest",
-    admin({ status: "accepted", notify_guest: false }).action === "ignore",
-    admin({ status: "accepted", notify_guest: false }).reason,
+    "…and so does a pending one",
+    admin({ status: "pending" }).action === "admin" && admin({ status: "pending" }).emailGuest,
+  );
+  ck(
+    "Not to the guest when the admin said not to email them -- but the team still hears",
+    admin({ status: "accepted", notify_guest: false }).action === "admin" &&
+      admin({ status: "accepted", notify_guest: false }).emailGuest === false,
   );
   ck(
     "A guest's own request is still a new request",
@@ -538,10 +563,10 @@ ck(
   );
 }
 
-// ======================== a cancellation reaches the team on WhatsApp too
+// ============================ every booking event reaches the team on WhatsApp
 {
   const cancelled = booking({ status: "cancelled" });
-  const text = renderWhatsAppCancelled(cancelled, "accepted");
+  const text = renderWhatsAppEvent("cancelled", cancelled, booking({ status: "accepted" }));
   ck(
     "The team's cancellation message says what was cancelled",
     text.startsWith("*Booking cancelled*") &&
@@ -552,10 +577,29 @@ ck(
       text.includes("The dates are free again"),
     text.replace(/\n/g, " | "),
   );
+  const moved = renderWhatsAppEvent(
+    "moved",
+    booking({ chalet_id: 2, start_date: "2027-01-14", end_date: "2027-01-16" }),
+    booking(),
+  );
+  ck(
+    "A move says from where to where",
+    moved.startsWith("*Booking moved*") &&
+      moved.includes("From: Bizarri Chalet 1, 2027-01-07 → 2027-01-09") &&
+      moved.includes("To: Bizarri Chalet 2, 2027-01-14 → 2027-01-16"),
+    moved.replace(/\n/g, " | "),
+  );
+  const accepted = renderWhatsAppEvent("accepted", booking({ status: "accepted" }), booking());
+  ck(
+    "An acceptance does not claim to free any dates",
+    accepted.startsWith("*Booking accepted*") &&
+      accepted.includes("Was: Awaiting approval") &&
+      !accepted.includes("free again"),
+  );
 
   env.CALLMEBOT_PHONE = "96594040955";
   env.CALLMEBOT_APIKEY = "123456";
-  const deliver = async (before, after) => {
+  const deliver = async (payload) => {
     const calls = [];
     const realFetch = globalThis.fetch;
     globalThis.fetch = async (url) => {
@@ -565,29 +609,77 @@ ck(
     const res = await handler(
       new Request("http://local/", {
         method: "POST",
-        body: JSON.stringify({
-          type: "UPDATE",
-          table: "bookings",
-          record: booking({ status: after }),
-          old_record: booking({ status: before }),
-        }),
+        body: JSON.stringify({ table: "bookings", ...payload }),
       }),
     );
     globalThis.fetch = realFetch;
-    return { out: await res.json(), wa: calls.filter((u) => u.includes("api.callmebot.com")) };
+    const wa = calls
+      .filter((u) => u.includes("api.callmebot.com"))
+      .map((u) => new URL(u).searchParams.get("text"));
+    return { status: res.status, out: await res.json(), wa };
   };
-  const c = await deliver("accepted", "cancelled");
+  const change = (before, after) =>
+    deliver({
+      type: "UPDATE",
+      record: booking({ status: after }),
+      old_record: booking({ status: before }),
+    });
+
+  for (const [before, after, title] of [
+    ["pending", "accepted", "*Booking accepted*"],
+    ["pending", "rejected", "*Booking rejected*"],
+    ["accepted", "cancelled", "*Booking cancelled*"],
+    ["accepted", "pending", "*Booking back to awaiting approval*"],
+  ]) {
+    const r = await change(before, after);
+    ck(
+      `${before} → ${after} sends the team a WhatsApp`,
+      r.wa.length === 1 && r.wa[0].startsWith(title) && r.out.whatsapp?.attempted === true,
+      r.wa[0]?.split("\n")[0],
+    );
+  }
+
+  const del = await deliver({
+    type: "DELETE",
+    record: null,
+    old_record: booking({ status: "accepted" }),
+  });
   ck(
-    "Cancelling a booking sends the team a WhatsApp",
-    c.wa.length === 1 &&
-      decodeURIComponent(c.wa[0]).includes("*Booking cancelled*") &&
-      c.out.whatsapp?.attempted === true,
-    JSON.stringify(c.out),
+    "Deleting a booking sends the team a WhatsApp",
+    del.status === 200 &&
+      del.wa.length === 1 &&
+      del.wa[0].startsWith("*Booking deleted*") &&
+      del.wa[0].includes("Was: Accepted") &&
+      del.wa[0].includes("free again"),
+    JSON.stringify(del.out),
   );
-  const a = await deliver("pending", "accepted");
-  ck("…but accepting one does not", a.wa.length === 0, JSON.stringify(a.out));
-  const r = await deliver("pending", "rejected");
-  ck("…nor rejecting one", r.wa.length === 0, JSON.stringify(r.out));
+
+  const mv = await deliver({
+    type: "UPDATE",
+    record: booking({ start_date: "2027-01-14", end_date: "2027-01-16" }),
+    old_record: booking(),
+  });
+  ck("Moving one does too", mv.wa.length === 1 && mv.wa[0].startsWith("*Booking moved*"));
+
+  const added = await deliver({
+    type: "INSERT",
+    record: booking({ source: "admin", status: "accepted", notify_guest: false }),
+    old_record: null,
+  });
+  ck(
+    "A booking added from the dashboard does too, even with the guest left unemailed",
+    added.wa.length === 1 &&
+      added.wa[0].startsWith("*Booking added from the dashboard*") &&
+      added.wa[0].includes("Status: Accepted"),
+    JSON.stringify(added.out),
+  );
+
+  const note = await deliver({
+    type: "UPDATE",
+    record: booking({ admin_note: "called them" }),
+    old_record: booking(),
+  });
+  ck("An internal note sends nothing", note.wa.length === 0, JSON.stringify(note.out));
   delete env.CALLMEBOT_PHONE;
   delete env.CALLMEBOT_APIKEY;
 }
