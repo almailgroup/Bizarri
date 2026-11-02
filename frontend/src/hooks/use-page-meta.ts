@@ -1,48 +1,53 @@
 import { useEffect } from "react";
+import { useI18n } from "@/lib/i18n";
+import { pagePath, pageSeo } from "@/lib/seo";
 
-/**
- * Both names, always, because both are the name.
- *
- * It is what the tab says, what a search result links, and what someone sees
- * when the page is shared. An Arabic speaker searching شاليه بيزاري should
- * find the same title an English speaker does rather than a translation of
- * it, so the site carries one bilingual name in both languages instead of a
- * different one each way.
- */
-const SITE = "Bizarri Chalet | شاليه بيزاري";
+const SITE = "https://bizarri.com";
 
-function setMeta(selector: string, attr: "content", value: string) {
-  const el = document.head.querySelector<HTMLMetaElement>(selector);
-  if (el) el.setAttribute(attr, value);
+function setMeta(selector: string, value: string) {
+  document.head.querySelector<HTMLMetaElement>(selector)?.setAttribute("content", value);
+}
+
+function setLink(selector: string, href: string) {
+  const el = document.head.querySelector<HTMLLinkElement>(selector);
+  if (el) el.href = href;
 }
 
 /**
- * Per-route document title and description.
+ * The page's title, description and language links, from src/lib/seo.ts.
  *
- * The app is a client-rendered SPA, so this is what a visitor sees in the tab
- * and what a crawler that executes JS reads. Static crawlers still get the
- * defaults baked into index.html.
+ * The build has already written the same words into each page's HTML file;
+ * this keeps the tab and the tags right as the visitor moves between pages
+ * without a reload, and for a crawler that reads the page after it runs.
  */
-export function usePageMeta(title: string, description?: string) {
+export function usePageSeo(slug: string) {
+  const { lang } = useI18n();
   useEffect(() => {
+    const { title, description } = pageSeo(slug, lang);
     const previousTitle = document.title;
-    document.title = title ? `${title} — ${SITE}` : SITE;
+    document.title = title;
 
     if (description) {
-      setMeta('meta[name="description"]', "content", description);
-      setMeta('meta[property="og:description"]', "content", description);
-      setMeta('meta[name="twitter:description"]', "content", description);
+      setMeta('meta[name="description"]', description);
+      setMeta('meta[property="og:description"]', description);
+      setMeta('meta[name="twitter:description"]', description);
     }
-    setMeta('meta[property="og:title"]', "content", document.title);
-    setMeta('meta[name="twitter:title"]', "content", document.title);
+    setMeta('meta[property="og:title"]', title);
+    setMeta('meta[name="twitter:title"]', title);
+    setMeta('meta[property="og:locale"]', lang === "ar" ? "ar_KW" : "en_US");
+    setMeta('meta[property="og:locale:alternate"]', lang === "ar" ? "en_US" : "ar_KW");
 
-    // Canonical follows the SPA's current location.
-    const canonical = document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]');
-    if (canonical) canonical.href = window.location.href;
-    setMeta('meta[property="og:url"]', "content", window.location.href);
+    // Always the public address of the page, without a query string: the
+    // booking page's ?shape= or ?doc= is the same page, not another one.
+    const url = SITE + pagePath(slug, lang);
+    setLink('link[rel="canonical"]', url);
+    setMeta('meta[property="og:url"]', url);
+    setLink('link[rel="alternate"][hreflang="en"]', SITE + pagePath(slug, "en"));
+    setLink('link[rel="alternate"][hreflang="ar"]', SITE + pagePath(slug, "ar"));
+    setLink('link[rel="alternate"][hreflang="x-default"]', SITE + pagePath(slug, "en"));
 
     return () => {
       document.title = previousTitle;
     };
-  }, [title, description]);
+  }, [slug, lang]);
 }

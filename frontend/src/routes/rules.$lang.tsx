@@ -3,7 +3,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { PageShell } from "@/components/PageShell";
 import { LegalDoc } from "@/components/LegalDoc";
 import { useI18n } from "@/lib/i18n";
-import { usePageMeta } from "@/hooks/use-page-meta";
+import { usePageSeo } from "@/hooks/use-page-meta";
 import { TERMS } from "@/lib/legal";
 
 export const Route = createFileRoute("/rules/$lang")({ component: Rules, beforeLoad: requireLang });
@@ -15,12 +15,7 @@ export const Route = createFileRoute("/rules/$lang")({ component: Rules, beforeL
  */
 function Rules() {
   const { tr, lang } = useI18n();
-  usePageMeta(
-    tr("rules"),
-    lang === "en"
-      ? "The terms and conditions for booking and staying at Bizarri Chalet."
-      : "الشروط والأحكام لحجز شاليه بيزاري والإقامة فيه.",
-  );
+  usePageSeo("rules");
   return (
     <PageShell>
       <LegalDoc

@@ -19,7 +19,7 @@ import { LegalDialog } from "@/components/LegalDoc";
 import { CANCELLATION_POLICY, TERMS } from "@/lib/legal";
 import { useI18n, type TrKey } from "@/lib/i18n";
 import { dateLocale } from "@/lib/locale";
-import { usePageMeta } from "@/hooks/use-page-meta";
+import { usePageSeo } from "@/hooks/use-page-meta";
 import { scrollToTop } from "@/lib/scroll";
 import {
   CHECK_IN_HOUR,
@@ -242,12 +242,7 @@ const amountText = (n: number) => String(Number.isInteger(n) ? n : Number(n.toFi
 
 function Booking() {
   const { tr, lang } = useI18n();
-  usePageMeta(
-    lang === "en" ? "Booking" : "الحجز",
-    lang === "en"
-      ? "Check availability and request your stay at Bizarri Chalet."
-      : "تحقق من التوفر واطلب إقامتك في شاليه بيزاري.",
-  );
+  usePageSeo("booking");
 
   const { step, shape, occasion, offer } = Route.useSearch();
   const navigate = Route.useNavigate();

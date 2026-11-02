@@ -6,7 +6,7 @@
     <link rel="icon" href="%BASE_URL%favicon.ico" />
 
     <title>Bizarri Chalet | شاليه بيزاري</title>
-    <meta name="description" content="Bizarri Chalet in Al Khiran, Kuwait, by Almail Group: 7 bedrooms for 14 guests, a heated pool and seating on the lagoon, and a children's play area." />
+    <meta name="description" content="Bizarri Chalet is a private family chalet for rent in Al Khiran, Kuwait: 7 bedrooms for 14 guests, a heated pool, seating on the lagoon and a children's play area." />
     <meta name="theme-color" content="#000000" />
     <meta name="robots" content="index, follow" />
     <link rel="canonical" href="https://bizarri.com/en" />
@@ -16,7 +16,7 @@
 
     <meta property="og:site_name" content="Bizarri Chalet" />
     <meta property="og:title" content="Bizarri Chalet | شاليه بيزاري" />
-    <meta property="og:description" content="Bizarri Chalet in Al Khiran, Kuwait, by Almail Group: 7 bedrooms for 14 guests, a heated pool and seating on the lagoon, and a children's play area." />
+    <meta property="og:description" content="Bizarri Chalet is a private family chalet for rent in Al Khiran, Kuwait: 7 bedrooms for 14 guests, a heated pool, seating on the lagoon and a children's play area." />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://bizarri.com/en" />
     <meta property="og:locale" content="en_US" />
@@ -29,7 +29,7 @@
 
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Bizarri Chalet | شاليه بيزاري" />
-    <meta name="twitter:description" content="Bizarri Chalet in Al Khiran, Kuwait, by Almail Group: 7 bedrooms for 14 guests, a heated pool and seating on the lagoon, and a children's play area." />
+    <meta name="twitter:description" content="Bizarri Chalet is a private family chalet for rent in Al Khiran, Kuwait: 7 bedrooms for 14 guests, a heated pool, seating on the lagoon and a children's play area." />
     <meta name="twitter:image" content="https://bizarri.com/og-image.jpg" />
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -49,10 +49,11 @@
       Static in the shell rather than injected by the app: this is the one
       thing that has to be true for a crawler that does not run JavaScript.
 
-      Kept to what is certain. There is no street address here because the
-      chalet's exact location is given to guests rather than published, and a
-      wrong or invented PostalAddress is worse than none; the map link is the
-      authority on where it is.
+      Kept to what the site already says: the address is the one on the
+      Contact and Facilities pages, the amenities are the Facilities page's,
+      and the stay hours are the Terms'. alternateName lists the names people
+      search for, in both scripts, so "Bizarri", "Bizarri Kuwait" and
+      "بيزاري" all lead here.
     -->
     <script type="application/ld+json">
       {
@@ -60,20 +61,43 @@
         "@type": "LodgingBusiness",
         "@id": "https://bizarri.com/#chalet",
         "name": "Bizarri Chalet",
-        "alternateName": "شاليه بيزاري",
+        "alternateName": [
+          "شاليه بيزاري",
+          "Bizarri",
+          "Bizarri Kuwait",
+          "Bizarri Chalet Kuwait",
+          "بيزاري"
+        ],
         "url": "https://bizarri.com/en",
         "image": "https://bizarri.com/og-image.jpg",
-        "description": "Bizarri Chalet in Al Khiran, Kuwait, by Almail Group: 7 bedrooms for 14 guests, a heated pool and seating on the lagoon, and a children's play area.",
+        "description": "Bizarri Chalet is a private family chalet for rent in Al Khiran, Kuwait: 7 bedrooms for 14 guests, a heated pool, seating on the lagoon and a children's play area. Book the weekdays, the weekend or a full week.",
         "telephone": "+96594040955",
         "email": "sales@bizarri.com",
         "priceRange": "KWD 75–600",
         "currenciesAccepted": "KWD",
         "areaServed": { "@type": "Country", "name": "Kuwait" },
-        "address": { "@type": "PostalAddress", "addressCountry": "KW" },
+        "address": {
+          "@type": "PostalAddress",
+          "streetAddress": "Road 278, Phase 3",
+          "addressLocality": "Al Khiran Al Bahri",
+          "addressRegion": "Al Ahmadi",
+          "addressCountry": "KW"
+        },
         "hasMap": "https://maps.app.goo.gl/5wjw1skfpqdnDhFa6",
         "sameAs": ["https://www.instagram.com/bizarri.chalet"],
         "parentOrganization": { "@type": "Organization", "name": "Almail Group" },
+        "checkinTime": "14:00",
+        "checkoutTime": "12:00",
+        "knowsLanguage": ["ar", "en"],
         "petsAllowed": false,
+        "amenityFeature": [
+          { "@type": "LocationFeatureSpecification", "name": "Outdoor swimming pool with heating", "value": true },
+          { "@type": "LocationFeatureSpecification", "name": "Outdoor seating on the lagoon", "value": true },
+          { "@type": "LocationFeatureSpecification", "name": "7 bedrooms for 14 guests", "value": true },
+          { "@type": "LocationFeatureSpecification", "name": "Fully equipped kitchen", "value": true },
+          { "@type": "LocationFeatureSpecification", "name": "Children's play area with a football pitch", "value": true },
+          { "@type": "LocationFeatureSpecification", "name": "Parking for 9 cars", "value": true }
+        ],
         "potentialAction": {
           "@type": "ReserveAction",
           "target": {
@@ -88,6 +112,19 @@
         }
       }
     </script>
+    <!-- The site's name, for the line Google prints above a result. -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "@id": "https://bizarri.com/#website",
+        "name": "Bizarri Chalet",
+        "alternateName": ["Bizarri", "شاليه بيزاري", "Bizarri Kuwait"],
+        "url": "https://bizarri.com/",
+        "inLanguage": ["en", "ar"],
+        "publisher": { "@id": "https://bizarri.com/#chalet" }
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
@@ -95,12 +132,13 @@
       A crawler that does not run JavaScript sees an empty div and nothing to
       follow — least of all at https://bizarri.com/, which is only a redirect
       into a language and so has no content of its own at all. These are the
-      two doors in. Real links, so they are followed; in <noscript> so they
-      never appear for a visitor whose browser did run the app.
+      two doors in. Real links, so they are followed; inside noscript so they
+      never appear for a visitor whose browser did run the app. The build
+      gives every page its own version of this block (vite.config.ts).
     -->
     <noscript>
       <h1>Bizarri Chalet | شاليه بيزاري</h1>
-      <p>A premium private chalet in Kuwait by Almail Group.</p>
+      <p>A private family chalet for rent in Al Khiran, Kuwait, by Almail Group. شاليه عائلي خاص للإيجار في الخيران، الكويت.</p>
       <ul>
         <li><a href="/en">English</a></li>
         <li><a href="/ar">العربية</a></li>

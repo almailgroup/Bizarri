@@ -249,6 +249,163 @@ await b.close();
     locs.every((l) => /bizarri\.com\/(.*\/)?(en|ar)$/.test(l)),
     locs.filter((l) => !/bizarri\.com\/(.*\/)?(en|ar)$/.test(l)).join(", "),
   );
+  ck(
+    "…and leaves the admin out",
+    !locs.some((l) => l.includes("/admin/")),
+    locs.filter((l) => l.includes("/admin/")).join(", "),
+  );
+
+  // What a search result shows, read from the file before any JavaScript:
+  // every page its own title and description, in its own language, linked
+  // to its twin in the other one.
+  const file = (slug, lang) =>
+    readFileSync(`${dist}${slug ? `${slug}/` : ""}${lang}/index.html`, "utf8");
+  const tag = (html, re) => (html.match(re) ?? [])[1] ?? "";
+  const titles = new Set();
+  const descriptions = new Set();
+  const wrong = [];
+  for (const lang of ["en", "ar"]) {
+    for (const slug of ["", "booking", "packages", "facilities", "photos", "offers", "contact"]) {
+      const html = file(slug, lang);
+      titles.add(tag(html, /<title>([^<]*)<\/title>/));
+      descriptions.add(tag(html, /<meta name="description" content="([^"]*)"/));
+      const path = slug ? `${slug}/` : "";
+      if (!html.includes(`hreflang="en" href="https://bizarri.com/${path}en"`))
+        wrong.push(`${slug}/${lang} en`);
+      if (!html.includes(`hreflang="ar" href="https://bizarri.com/${path}ar"`))
+        wrong.push(`${slug}/${lang} ar`);
+      const ar = /[؀-ۿ]/.test(tag(html, /<title>([^<]*)<\/title>/));
+      if (ar !== (lang === "ar")) wrong.push(`${slug}/${lang} title language`);
+      if (!html.includes(`og:locale" content="${lang === "ar" ? "ar_KW" : "en_US"}"`))
+        wrong.push(`${slug}/${lang} og:locale`);
+    }
+  }
+  ck("Every page has its own title in its file", titles.size === 14, [...titles].join(" | "));
+  ck("…and its own description", descriptions.size === 14, `${descriptions.size} of 14`);
+  ck("…in its own language, linked to its twin", wrong.length === 0, wrong.join(", "));
+
+  // The searches the owner asked to be found for.
+  const homeEn = tag(file("", "en"), /<title>([^<]*)<\/title>/);
+  const homeAr = tag(file("", "ar"), /<title>([^<]*)<\/title>/);
+  ck(
+    "The English home page's title says Bizarri, Chalet and Kuwait",
+    /Bizarri/.test(homeEn) && /Chalet/.test(homeEn) && /Kuwait/.test(homeEn),
+    homeEn,
+  );
+  ck(
+    "…the Arabic one, a chalet for rent in Al Khiran",
+    homeAr.includes("شاليه بيزاري") && homeAr.includes("للإيجار في الخيران"),
+    homeAr,
+  );
+  ck(
+    "…booking, weekdays and the weekend",
+    /حجز شاليه في الخيران/.test(tag(file("booking", "ar"), /<title>([^<]*)<\/title>/)) &&
+      /الويكند/.test(tag(file("booking", "ar"), /<title>([^<]*)<\/title>/)),
+  );
+  ck(
+    "…a chalet with a pool, and the prices",
+    tag(file("facilities", "ar"), /<title>([^<]*)<\/title>/).includes("شاليه بمسبح في الخيران") &&
+      tag(file("packages", "ar"), /<title>([^<]*)<\/title>/).includes(
+        "أسعار إيجار شاليهات الخيران",
+      ),
+  );
+
+  const admin = file("admin", "en");
+  ck("The admin page asks not to be indexed", admin.includes('name="robots" content="noindex'));
+
+  // The noscript block is the page's own, in its language, with links in.
+  const noscript = tag(file("packages", "ar"), /<noscript>([\s\S]*?)<\/noscript>/);
+  ck(
+    "Without JavaScript a page still names itself and links to the rest",
+    noscript.includes("<h1>أسعار إيجار شاليهات الخيران") &&
+      noscript.includes('href="/booking/ar"') &&
+      noscript.includes('href="/packages/en"'),
+  );
+  // The comment in the shell mentions noscript too; it must still be a comment.
+  ck(
+    "…and the app's own script is still there",
+    /<script type="module"[^>]*src="\/assets\//.test(file("packages", "ar")),
+  );
+
+  // The business, as Google reads it: the names people search, and where.
+  const ld = JSON.parse(tag(shell, /<script type="application\/ld\+json">([\s\S]*?)<\/script>/));
+  ck(
+    "The structured data names Bizarri, Bizarri Kuwait and بيزاري",
+    ["Bizarri", "Bizarri Kuwait", "بيزاري"].every((n) => ld.alternateName.includes(n)),
+    JSON.stringify(ld.alternateName),
+  );
+  ck(
+    "…and puts it in Al Khiran",
+    ld.address?.addressLocality === "Al Khiran Al Bahri" && ld.address?.addressCountry === "KW",
+    JSON.stringify(ld.address),
+  );
+  ck("…and gives the site a name", /"@type": "WebSite"/.test(shell));
+}
+
+// ================================ the homepage answers what people search
+{
+  const b2 = await chromium.launch(
+    process.env.PLAYWRIGHT_CHROMIUM_PATH
+      ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_PATH }
+      : {},
+  );
+  const ctx = await b2.newContext();
+  await ctx.route(/^https?:\/\/(?!localhost)/, (r) =>
+    r.request().url().includes("/rest/v1/rates")
+      ? r.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            full_week: 600,
+            weekend: 250,
+            weekday: 200,
+            daily_weekday: 75,
+            daily_weekend: 100,
+            currency: "KWD",
+            min_stay_days: 3,
+          }),
+        })
+      : r.abort(),
+  );
+  await ctx.addInitScript(() => sessionStorage.setItem("bizarri_intro_seen", "1"));
+  const p = await ctx.newPage();
+  for (const lang of ["en", "ar"]) {
+    await p.goto(`http://localhost:4173/${lang}`, { waitUntil: "load" });
+    await p.waitForTimeout(1200);
+    const qa = await p.locator('[data-testid="home-questions"]').innerText();
+    ck(
+      `The homepage answers the questions people search (${lang})`,
+      lang === "en"
+        ? /Renting a chalet in Al Khiran/.test(qa) && /chalet in Kuwait/.test(qa)
+        : qa.includes("حجز شاليه في الخيران") && qa.includes("شاليه للتأجير في الكويت"),
+    );
+    ck(
+      `…with the prices the owner set (${lang})`,
+      /200/.test(qa) && /250/.test(qa) && /600/.test(qa),
+      qa.slice(0, 120),
+    );
+    ck(
+      `…and the tab carries the page's title (${lang})`,
+      (await p.title()) ===
+        (lang === "en"
+          ? "Bizarri Chalet Kuwait | Private Chalet for Rent in Al Khiran"
+          : "شاليه بيزاري | شاليه خاص للإيجار في الخيران، الكويت"),
+      await p.title(),
+    );
+  }
+  // Moving within the app keeps the tags with the page, without a reload.
+  await p.getByRole("link", { name: "الباقات" }).last().click();
+  await p.waitForTimeout(800);
+  ck(
+    "A page reached without a reload has its own title and links",
+    (await p.title()).startsWith("أسعار إيجار شاليهات الخيران") &&
+      (await p.evaluate(() => document.querySelector('link[rel="canonical"]').href)) ===
+        "https://bizarri.com/packages/ar" &&
+      (await p.evaluate(
+        () => document.querySelector('link[rel="alternate"][hreflang="en"]').href,
+      )) === "https://bizarri.com/packages/en",
+  );
+  await b2.close();
 }
 
 console.log(`\n${fails} failing`);

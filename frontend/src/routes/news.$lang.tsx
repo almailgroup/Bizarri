@@ -4,7 +4,7 @@ import { PageShell } from "@/components/PageShell";
 import { useI18n } from "@/lib/i18n";
 import { dateLocale } from "@/lib/locale";
 import { usePublishedNews } from "@/lib/api";
-import { usePageMeta } from "@/hooks/use-page-meta";
+import { usePageSeo } from "@/hooks/use-page-meta";
 
 import { AlertCircle, Newspaper } from "lucide-react";
 
@@ -12,12 +12,7 @@ export const Route = createFileRoute("/news/$lang")({ component: News, beforeLoa
 
 function News() {
   const { tr, lang } = useI18n();
-  usePageMeta(
-    lang === "en" ? "News" : "الأخبار",
-    lang === "en"
-      ? "Latest news and announcements from Bizarri Chalet."
-      : "آخر الأخبار والإعلانات من شاليه بيزاري.",
-  );
+  usePageSeo("news");
   const { data: items, isError, isLoading, refetch } = usePublishedNews();
   const sorted = items ?? [];
 

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { PageShell } from "@/components/PageShell";
 import { useI18n, type Lang } from "@/lib/i18n";
-import { usePageMeta } from "@/hooks/use-page-meta";
+import { usePageSeo } from "@/hooks/use-page-meta";
 import { photosFor, type Photo } from "@/lib/gallery";
 
 export const Route = createFileRoute("/photos/$lang")({
@@ -45,12 +45,7 @@ const CATEGORIES: Category[] = [
 
 function Photos() {
   const { tr, lang } = useI18n();
-  usePageMeta(
-    lang === "en" ? "Gallery" : "المعرض",
-    lang === "en"
-      ? "Photographs of Bizarri Chalet — rooms, interiors and the private pool."
-      : "صور شاليه بيزاري — الغرف والتصميم الداخلي والمسبح الخاص.",
-  );
+  usePageSeo("photos");
 
   const [openAt, setOpenAt] = useState<number | null>(null);
 

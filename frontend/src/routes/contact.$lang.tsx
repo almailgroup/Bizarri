@@ -2,7 +2,7 @@ import { requireLang } from "@/lib/lang-route";
 import { createFileRoute } from "@tanstack/react-router";
 import { PageShell } from "@/components/PageShell";
 import { useI18n } from "@/lib/i18n";
-import { usePageMeta } from "@/hooks/use-page-meta";
+import { usePageSeo } from "@/hooks/use-page-meta";
 import { instagramHandle, useContactInfo } from "@/lib/api";
 import { ArrowUpRight, Instagram, Mail, MapPin, MessageCircle, Phone } from "lucide-react";
 
@@ -13,12 +13,7 @@ export const Route = createFileRoute("/contact/$lang")({
 
 function Contact() {
   const { tr, lang } = useI18n();
-  usePageMeta(
-    lang === "en" ? "Contact" : "تواصل معنا",
-    lang === "en"
-      ? "Reach Bizarri Chalet by phone, WhatsApp, email or Instagram."
-      : "تواصل مع شاليه بيزاري عبر الهاتف أو واتساب أو البريد الإلكتروني أو إنستغرام.",
-  );
+  usePageSeo("contact");
   const contact = useContactInfo();
   // `ltr` marks a value that is Latin or numeric rather than prose. On the
   // Arabic page the surrounding direction is RTL, and a leading "+" or "@" is

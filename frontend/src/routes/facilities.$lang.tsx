@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { PageShell } from "@/components/PageShell";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
 import { useI18n } from "@/lib/i18n";
-import { usePageMeta } from "@/hooks/use-page-meta";
+import { usePageSeo } from "@/hooks/use-page-meta";
 import { instagramHandle, useContactInfo } from "@/lib/api";
 import {
   Armchair,
@@ -110,12 +110,7 @@ const SECTIONS = [
 function Facilities() {
   const { tr, lang } = useI18n();
   const contact = useContactInfo();
-  usePageMeta(
-    lang === "en" ? "Facilities" : "المرافق",
-    lang === "en"
-      ? "Bizarri Chalet, Al Khiran: 7 bedrooms for 14 guests, a heated pool on the lagoon, a children's play area, parking for 9 cars and more."
-      : "شاليه بيزاري، الخيران: 7 غرف نوم تكفي 14 شخص، حمام سباحة مع تدفئة على الخور، منطقة ألعاب للأطفال، مواقف لـ 9 سيارات والمزيد.",
-  );
+  usePageSeo("facilities");
 
   let n = 0;
   return (

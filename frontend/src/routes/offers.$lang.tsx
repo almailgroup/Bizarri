@@ -6,7 +6,7 @@ import { PageShell } from "@/components/PageShell";
 import { Reveal } from "@/components/Reveal";
 import { WhatsAppLink } from "@/components/WhatsAppLink";
 import { useI18n } from "@/lib/i18n";
-import { usePageMeta } from "@/hooks/use-page-meta";
+import { usePageSeo } from "@/hooks/use-page-meta";
 import { daysBetween, eachDay, fmtDate, formatMoney, formatSpan, parseDate } from "@/lib/booking";
 import { useAvailabilityFor, useChalets, useOffers } from "@/lib/api";
 
@@ -28,12 +28,7 @@ export const Route = createFileRoute("/offers/$lang")({
  */
 function Offers() {
   const { tr, lang } = useI18n();
-  usePageMeta(
-    lang === "en" ? "Offers" : "العروض",
-    lang === "en"
-      ? "Special offers at Bizarri Chalet: selected dates at one price for the whole stay."
-      : "عروض خاصة في شاليه بيزاري: تواريخ مختارة بسعر واحد للإقامة كاملة.",
-  );
+  usePageSeo("offers");
   const { data: offers, isLoading } = useOffers();
   const { data: chalets } = useChalets();
   // Only what can still be booked: an offer is sold whole, so one that has

@@ -5,7 +5,7 @@ import { ArrowRight, Check } from "lucide-react";
 import { PageShell } from "@/components/PageShell";
 import { Reveal } from "@/components/Reveal";
 import { useI18n } from "@/lib/i18n";
-import { usePageMeta } from "@/hooks/use-page-meta";
+import { usePageSeo } from "@/hooks/use-page-meta";
 import { DEFAULT_RATES, formatMoney } from "@/lib/booking";
 import { useRates } from "@/lib/api";
 
@@ -21,12 +21,7 @@ export const Route = createFileRoute("/packages/$lang")({
  */
 function Packages() {
   const { tr, lang } = useI18n();
-  usePageMeta(
-    lang === "en" ? "Packages" : "الباقات",
-    lang === "en"
-      ? "Fixed-rate stay packages for Bizarri Chalet, or a single weekday at the daily rate."
-      : "باقات إقامة بسعر ثابت لشاليه بيزاري، أو يوم واحد من أيام الأسبوع بالسعر اليومي.",
-  );
+  usePageSeo("packages");
   // Rates are admin-editable, so read them rather than hard-coding the figures.
   const { data: stored, isError: ratesFailed } = useRates();
   const rates = stored ?? DEFAULT_RATES;

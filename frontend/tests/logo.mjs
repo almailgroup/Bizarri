@@ -212,7 +212,11 @@ async function check(label, page, locator) {
   // The banner is a lit night exterior, so the type sits over bright windows.
   // Each piece of hero copy has to survive that, not just the average.
   await check("Hero eyebrow over the banner", p, p.locator("section p").first());
-  await check("Hero intro copy over the banner", p, p.getByText(/private modern chalet/i).first());
+  await check(
+    "Hero intro copy over the banner",
+    p,
+    p.getByText(/private family chalet for rent/i).first(),
+  );
   await check("Hero primary button", p, p.getByRole("link", { name: /book now/i }).first());
 
   // A phone keeps only about a quarter of a 16:9 frame's width, so the hero

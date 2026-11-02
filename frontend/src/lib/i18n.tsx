@@ -46,8 +46,8 @@ type Dict = Record<string, { en: string; ar: string }>;
 export const t: Dict = {
   brand: { en: "Bizarri Chalet", ar: "شاليه بيزاري" },
   tagline: {
-    en: "A premium private chalet experience by Almail Group.",
-    ar: "تجربة شاليه خاصة فاخرة من مجموعة الميل.",
+    en: "A private family chalet for rent in Al Khiran, Kuwait, by Almail Group.",
+    ar: "شاليه عائلي خاص للإيجار في الخيران، الكويت، من مجموعة الميل.",
   },
   home: { en: "Home", ar: "الرئيسية" },
   about: { en: "About", ar: "عن الشاليه" },
@@ -67,8 +67,8 @@ export const t: Dict = {
   viewFacilities: { en: "View Facilities", ar: "عرض المرافق" },
   location: { en: "Location", ar: "الموقع" },
   heroIntro: {
-    en: "A private modern chalet experience in Kuwait, designed for comfort, privacy, technology, and relaxation.",
-    ar: "تجربة شاليه عصري خاص في الكويت، مصمم ليوفر لك الراحة والخصوصية والتقنيات الحديثة والاسترخاء.",
+    en: "A private family chalet for rent in Al Khiran, Kuwait, with a heated pool and seating on the lagoon.",
+    ar: "شاليه عائلي خاص للإيجار في الخيران بالكويت، مع مسبح مُدفّأ وجلسة على الخور.",
   },
   menu: { en: "Menu", ar: "القائمة" },
   close: { en: "Close", ar: "إغلاق" },

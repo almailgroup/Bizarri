@@ -3,7 +3,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { PageShell } from "@/components/PageShell";
 import { BookingLookup } from "@/components/BookingLookup";
 import { useI18n } from "@/lib/i18n";
-import { usePageMeta } from "@/hooks/use-page-meta";
+import { usePageSeo } from "@/hooks/use-page-meta";
 
 export const Route = createFileRoute("/reservation/$lang")({
   component: Reservation,
@@ -12,12 +12,7 @@ export const Route = createFileRoute("/reservation/$lang")({
 
 function Reservation() {
   const { tr, lang } = useI18n();
-  usePageMeta(
-    lang === "en" ? "Your Reservation" : "حجزك",
-    lang === "en"
-      ? "Check the status of your Bizarri Chalet booking request."
-      : "تحقق من حالة طلب حجزك في شاليه بيزاري.",
-  );
+  usePageSeo("reservation");
 
   return (
     <PageShell>

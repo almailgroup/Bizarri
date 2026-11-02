@@ -21,6 +21,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
+import { usePageSeo } from "@/hooks/use-page-meta";
 import { useAuth } from "@/lib/auth";
 import { useBookings, useIsAdmin } from "@/lib/api";
 import logoWhite from "@/assets/bizarri-logo-white.png";
@@ -73,6 +74,7 @@ export const Route = createFileRoute("/admin/$lang")({
 });
 
 function Admin() {
+  usePageSeo("admin");
   const { session, loading } = useAuth();
   const { data: isAdmin, isLoading: checking } = useIsAdmin(!!session);
 

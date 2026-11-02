@@ -2,11 +2,14 @@ import { createFileRoute, redirect, Link } from "@tanstack/react-router";
 import { PageShell } from "@/components/PageShell";
 import { Reveal } from "@/components/Reveal";
 import { LANGS, preferredLang, useI18n, type Lang } from "@/lib/i18n";
-import { usePageMeta } from "@/hooks/use-page-meta";
+import { usePageSeo } from "@/hooks/use-page-meta";
 import logoWhite from "@/assets/bizarri-logo-white.png";
 import heroImg from "@/assets/banner.webp";
 import heroImgPortrait from "@/assets/banner-portrait.webp";
 import { photo } from "@/lib/gallery";
+import { useRates } from "@/lib/api";
+import { formatMoney } from "@/lib/booking";
+import { pageSeo } from "@/lib/seo";
 
 // The gallery preview: the pool at sunset to lead, then the living room and a
 // bedroom -- outside, in, and where you sleep, which is the order a guest
@@ -68,12 +71,7 @@ const highlights = [
 
 function Home() {
   const { tr, lang } = useI18n();
-  usePageMeta(
-    "",
-    lang === "en"
-      ? "Bizarri Chalet in Al Khiran, Kuwait, by Almail Group: 7 bedrooms for 14 guests, a heated pool and seating on the lagoon, and a children's play area."
-      : "شاليه بيزاري في الخيران، الكويت، من مجموعة الميل: 7 غرف نوم تكفي 14 شخص، حمام سباحة مع تدفئة وجلسة على الخور، ومنطقة ألعاب للأطفال.",
-  );
+  usePageSeo("");
 
   return (
     <PageShell>
@@ -326,6 +324,8 @@ function Home() {
         </Reveal>
       </section>
 
+      <Questions />
+
       {/* -------------------------------------------------------- Find / contact */}
       <section className="border-t border-border">
         <div className="mx-auto grid max-w-7xl gap-px bg-border sm:grid-cols-2">
@@ -341,7 +341,7 @@ function Home() {
                 {tr("location")}
               </span>
               <span className="mt-1 block font-display text-2xl">
-                {lang === "en" ? "Kuwait" : "الكويت"}
+                {lang === "en" ? "Al Khiran, Kuwait" : "الخيران، الكويت"}
               </span>
             </span>
           </a>
@@ -382,5 +382,128 @@ function Home() {
         </Reveal>
       </section>
     </PageShell>
+  );
+}
+
+/**
+ * What guests ask before they book, answered on the page.
+ *
+ * Also what someone types into a search box -- a chalet for rent in Kuwait,
+ * booking Al Khiran on weekdays or for the weekend, a chalet with a pool,
+ * the prices -- so the homepage says those things in those words. The
+ * prices come from the rates the owner sets in the dashboard; until they
+ * load (or if they cannot), the answer points to the Packages page instead
+ * of quoting figures that may be out of date.
+ */
+function Questions() {
+  const { lang } = useI18n();
+  const { data: rates } = useRates();
+  const en = lang === "en";
+  const m = (n: number) => formatMoney(n, lang);
+
+  const prices = rates
+    ? en
+      ? `The Sunday to Wednesday package is ${m(rates.weekday)}, the Thursday to Saturday weekend is ${m(rates.weekend)}, and a full week is ${m(rates.fullWeek)}. A single weekday is ${m(rates.dailyWeekday)}. Holidays such as Eid are priced on their own, and current deals are on the Offers page.`
+      : `باقة الأحد – الأربعاء بسعر ${m(rates.weekday)}، وباقة الويكند من الخميس إلى السبت بسعر ${m(rates.weekend)}، والأسبوع الكامل بسعر ${m(rates.fullWeek)}، ويوم واحد من أيام الأسبوع بسعر ${m(rates.dailyWeekday)}. أسعار المناسبات مثل العيد مختلفة، وأحدث العروض في صفحة العروض.`
+    : en
+      ? "The prices of the Sunday to Wednesday package, the weekend and a full week are on the Packages page, and current deals are on the Offers page."
+      : "أسعار باقة الأحد – الأربعاء وباقة الويكند والأسبوع الكامل في صفحة الباقات، وأحدث العروض في صفحة العروض.";
+
+  const items = en
+    ? [
+        [
+          "Where is Bizarri Chalet?",
+          "In Al Khiran Al Bahri, Kuwait (Road 278, Phase 3), with outdoor seating right on the lagoon.",
+        ],
+        ["How much does it cost to rent the chalet?", prices],
+        [
+          "Can I book weekdays, or only the weekend?",
+          "Either. Book Sunday to Wednesday, the weekend from Thursday to Saturday, a full week, or a single weekday. Check-in is at 2:00 PM and check-out at 12:00 PM (noon).",
+        ],
+        [
+          "Does the chalet have a pool?",
+          "Yes: an outdoor swimming pool with heating, beside outdoor seating on the lagoon. The whole chalet is yours alone for the stay.",
+        ],
+        [
+          "Is it suitable for families?",
+          "It is a private family chalet: 7 bedrooms sleeping 14 guests, a fully equipped kitchen and dining for 12, a children's play area with a football pitch, and parking for 9 cars.",
+        ],
+        [
+          "How do I book?",
+          "Choose your dates on the booking page and send a request. We confirm it with you, and you can reach us by phone or WhatsApp with any question.",
+        ],
+      ]
+    : [
+        [
+          "أين يقع شاليه بيزاري؟",
+          "في الخيران البحري بالكويت (طريق 278، المرحلة الثالثة)، مع جلسة خارجية على الخور مباشرة.",
+        ],
+        ["كم أسعار إيجار الشاليه في الخيران؟", prices],
+        [
+          "هل يمكن حجز شاليه الخيران أيام الأسبوع أو للويكند؟",
+          "نعم، الاثنان. احجز من الأحد إلى الأربعاء، أو الويكند من الخميس إلى السبت، أو أسبوعاً كاملاً، أو يوماً واحداً من أيام الأسبوع. الدخول الساعة 2:00 مساءً والخروج الساعة 12:00 ظهراً.",
+        ],
+        [
+          "هل في الشاليه مسبح؟",
+          "نعم، حمام سباحة خارجي مع خاصية التدفئة بجانب جلسة خارجية على الخور، والشاليه بالكامل لك وحدك طوال الإقامة.",
+        ],
+        [
+          "هل الشاليه مناسب للعائلات؟",
+          "شاليه عائلي خاص: 7 غرف نوم تكفي لعدد 14 شخص، ومطبخ مجهز بالكامل وطاولة طعام تكفي لعدد 12 شخص، ومنطقة ألعاب للأطفال مع ملعب كرة قدم، ومواقف تتسع لعدد 9 سيارات.",
+        ],
+        [
+          "كيف أحجز الشاليه؟",
+          "اختر التواريخ في صفحة الحجز وأرسل طلبك، وسنؤكد الحجز معك. ولأي سؤال تواصل معنا بالهاتف أو واتساب.",
+        ],
+      ];
+
+  // Real links rather than words in the answers: each one a full-size target.
+  const links = [
+    { to: "/booking/$lang", slug: "booking" },
+    { to: "/packages/$lang", slug: "packages" },
+    { to: "/offers/$lang", slug: "offers" },
+    { to: "/contact/$lang", slug: "contact" },
+  ] as const;
+
+  return (
+    <section className="border-t border-border bg-secondary">
+      <div className="mx-auto max-w-6xl px-6 py-28 md:py-36" data-testid="home-questions">
+        <Reveal>
+          <p className="mb-6 text-xs uppercase tracking-[0.4em] text-muted-foreground">
+            {en ? "Good to know" : "معلومات تهمك"}
+          </p>
+          <h2 className="font-display text-4xl md:text-5xl">
+            {en ? "Renting a chalet in Al Khiran" : "حجز شاليه في الخيران"}
+          </h2>
+          <p className="mt-5 max-w-xl text-muted-foreground">
+            {en
+              ? "Looking for a chalet in Kuwait? These are the questions guests ask before they book Bizarri."
+              : "تبحث عن شاليه للتأجير في الكويت؟ إليك أكثر ما يسأل عنه الضيوف قبل حجز شاليه بيزاري."}
+          </p>
+        </Reveal>
+
+        <dl className="mt-14 grid gap-x-12 gap-y-10 md:grid-cols-2">
+          {items.map(([q, a], i) => (
+            <Reveal key={q} delay={(i % 2) * 60}>
+              <dt className="text-lg font-semibold leading-snug">{q}</dt>
+              <dd className="mt-3 leading-relaxed text-muted-foreground">{a}</dd>
+            </Reveal>
+          ))}
+        </dl>
+
+        <div className="mt-14 flex flex-wrap gap-3">
+          {links.map((l) => (
+            <Link
+              key={l.slug}
+              to={l.to}
+              params={{ lang }}
+              className="inline-flex min-h-11 items-center gap-2 border border-foreground/30 px-5 text-sm uppercase tracking-widest transition-colors hover:border-foreground"
+            >
+              {pageSeo(l.slug, lang).nav}
+            </Link>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }

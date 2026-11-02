@@ -2,7 +2,7 @@ import { requireLang } from "@/lib/lang-route";
 import { createFileRoute } from "@tanstack/react-router";
 import { PageShell } from "@/components/PageShell";
 import { useI18n } from "@/lib/i18n";
-import { usePageMeta } from "@/hooks/use-page-meta";
+import { usePageSeo } from "@/hooks/use-page-meta";
 
 export const Route = createFileRoute("/privacy/$lang")({
   component: Privacy,
@@ -13,12 +13,7 @@ const TEXT = `Bizarri Chalet Rentals is committed to protecting the privacy and 
 
 function Privacy() {
   const { tr, lang } = useI18n();
-  usePageMeta(
-    lang === "en" ? "Privacy Policy" : "سياسة الخصوصية",
-    lang === "en"
-      ? "How Bizarri Chalet handles your information."
-      : "كيف يتعامل شاليه بيزاري مع معلوماتك.",
-  );
+  usePageSeo("privacy");
   return (
     <PageShell>
       <section className="max-w-3xl mx-auto px-6 py-16 md:py-32">
